@@ -1,1 +1,4 @@
 /cmake-build-debug
+/build-test/
+/build-test-ninja/
+/build-test-ninja-noscan/
