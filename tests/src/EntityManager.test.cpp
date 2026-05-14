@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include <helios/helios_config.h>
+#include "helios-ecs-config.h"
 
 
 import helios.ecs;
@@ -7,7 +7,13 @@ import helios.ecs;
 using namespace helios::ecs;
 using namespace helios::ecs::types;
 
-class Entity {
+struct TestDomainTag {};
+using TestHandle = EntityHandle<TestDomainTag>;
+using TestRegistry = EntityRegistry<TestDomainTag>;
+using TestEntityManager = EntityManager<TestHandle, TestRegistry, DEFAULT_ENTITY_MANAGER_CAPACITY>;
+using TestReflector = ComponentReflector<TestEntityManager>;
+
+class TestEntity {
 
 public:
     int value = 0;
@@ -18,7 +24,7 @@ public:
         return remove_;
     }
 
-    bool operator==(const Entity& other) const {
+    bool operator==(const TestEntity& other) const {
         return value == other.value;
     }
 };
@@ -38,12 +44,12 @@ class MyComponent {
 
 TEST(EntityManager, create) {
 
-    ComponentReflector::registerType<Entity>();
-    ComponentReflector::registerType<MyComponent>();
+    TestReflector::registerType<TestEntity>();
+    TestReflector::registerType<MyComponent>();
 
-    EntityRegistry registry;
+    TestRegistry registry;
 
-    EntityManager em(registry);
+    TestEntityManager em(registry);
 
     const auto handle = em.create();
     EXPECT_EQ(handle.entityId, 0);
@@ -52,34 +58,34 @@ TEST(EntityManager, create) {
 
 TEST(EntityManager, destroy) {
 
-    ComponentReflector::registerType<Entity>();
-    ComponentReflector::registerType<MyComponent>();
+    TestReflector::registerType<TestEntity>();
+    TestReflector::registerType<MyComponent>();
 
-    EntityRegistry registry;
-    EntityManager em(registry);
+    TestRegistry registry;
+    TestEntityManager em(registry);
 
     const auto handle = em.create();
     EXPECT_EQ(handle.entityId, 0);
     EXPECT_EQ(handle.versionId, 1);
 
     em.emplace<MyComponent>(handle, 10);
-    em.emplace<Entity>(handle, 10);
+    em.emplace<TestEntity>(handle, 10);
     EXPECT_TRUE(em.has<MyComponent>(handle));
-    EXPECT_TRUE(em.has<Entity>(handle));
+    EXPECT_TRUE(em.has<TestEntity>(handle));
 
     EXPECT_TRUE(em.destroy(handle));
 
     EXPECT_FALSE(em.has<MyComponent>(handle));
-    EXPECT_FALSE(em.has<Entity>(handle));
+    EXPECT_FALSE(em.has<TestEntity>(handle));
 }
 
 TEST(EntityManager, emplace) {
 
-    ComponentReflector::registerType<Entity>();
-    ComponentReflector::registerType<MyComponent>();
+    TestReflector::registerType<TestEntity>();
+    TestReflector::registerType<MyComponent>();
 
-    EntityRegistry registry;
-    EntityManager em(registry);
+    TestRegistry registry;
+    TestEntityManager em(registry);
 
     const auto handle = em.create();
     EXPECT_EQ(handle.entityId, 0);
@@ -104,11 +110,11 @@ TEST(EntityManager, emplace) {
 
 TEST(EntityManager, remove) {
 
-    ComponentReflector::registerType<Entity>();
-    ComponentReflector::registerType<MyComponent>();
+    TestReflector::registerType<TestEntity>();
+    TestReflector::registerType<MyComponent>();
 
-    EntityRegistry registry;
-    EntityManager em(registry);
+    TestRegistry registry;
+    TestEntityManager em(registry);
 
     const auto handle = em.create();
     EXPECT_EQ(handle.entityId, 0);

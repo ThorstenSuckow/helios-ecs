@@ -1,34 +1,37 @@
 #include <gtest/gtest.h>
-#include <helios/helios_config.h>
+#include "helios-ecs-config.h"
 
 import helios.ecs;
 
 using namespace helios::ecs;
-using namespace helios::common::types;
 using namespace helios::ecs::types;
+
+struct TestDomainTag {};
+using TestHandle = EntityHandle<TestDomainTag>;
+using TestRegistry = EntityRegistry<TestDomainTag>;
 
 
 TEST(EntityRegistryTest, create) {
 
-    EntityRegistry registry;
+    TestRegistry registry;
     {
-        auto [entityId, versionId] = registry.create();
+        auto handle = registry.create();
 
-        EXPECT_EQ(entityId, 0);
-        EXPECT_EQ(versionId, 1);
+        EXPECT_EQ(handle.entityId, 0);
+        EXPECT_EQ(handle.versionId, 1);
     }
 
     {
-        auto [entityId, versionId] = registry.create();
+        auto handle = registry.create();
 
-        EXPECT_EQ(entityId, 1);
-        EXPECT_EQ(versionId, 1);
+        EXPECT_EQ(handle.entityId, 1);
+        EXPECT_EQ(handle.versionId, 1);
     }
 }
 
 TEST(EntityRegistryTest, isValid) {
 
-    EntityRegistry registry;
+    TestRegistry registry;
 
     auto handle = registry.create();
 
@@ -40,7 +43,7 @@ TEST(EntityRegistryTest, isValid) {
 
 TEST(EntityRegistryTest, destroyAndreuse) {
 
-    EntityRegistry registry;
+    TestRegistry registry;
 
     auto handle = registry.create();
 
