@@ -12,8 +12,8 @@ module;
 
 export module helios.ecs.types.ComponentTypeId;
 
-import helios.core.TypeIndexer;
-import helios.core.types.TypeDefs;
+import helios.ecs.TypeIndexer;
+import helios.ecs.types.TypeDefs;
 
 export namespace helios::ecs::types {
 
@@ -76,7 +76,7 @@ export namespace helios::ecs::types {
          *
          * @param no_init_t Tag to indicate no initialization.
          */
-        explicit ComponentTypeId(helios::core::types::no_init_t) {}
+        explicit ComponentTypeId(helios::ecs::types::no_init_t) {}
 
         /**
          * @brief Returns the underlying ID value.
@@ -99,7 +99,7 @@ export namespace helios::ecs::types {
          */
         template <typename T>
         [[nodiscard]] static ComponentTypeId<THandle> id() {
-            static const size_t tid = helios::core::TypeIndexer<THandle>::template typeIndex<T>();
+            static const size_t tid = helios::ecs::TypeIndexer<THandle>::template typeIndex<T>();
             return ComponentTypeId(tid);
         }
 

@@ -6,3 +6,4 @@ export import helios.ecs.types.ComponentOps;
 export import helios.ecs.types.ComponentTypeId;
 export import helios.ecs.types.EntityHandle;
 export import helios.ecs.types.TypeDefs;
+export import helios.ecs.types.FuncDefs;

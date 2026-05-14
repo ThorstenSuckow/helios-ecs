@@ -4,16 +4,16 @@
  */
 module;
 
-#include "helios/helios_config.h"
+#include "helios-ecs-config.h"
 #include <vector>
 #include <cassert>
 #include <cstddef>
 
 export module helios.ecs.EntityRegistry;
 
-import helios.core.types.StrongId;
-import helios.core.types.TypeDefs;
-import helios.core.concepts.IsStrongIdLike;
+import helios.ecs.types.StrongId;
+import helios.ecs.types.TypeDefs;
+import helios.ecs.concepts.IsStrongIdLike;
 import helios.ecs.types.TypeDefs;
 import helios.ecs.types.EntityHandle;
 import helios.ecs.strategies.LinearLookupStrategy;
@@ -22,7 +22,7 @@ import helios.ecs.strategies.HashedLookupStrategy;
 import helios.ecs.concepts;
 
 using namespace helios::ecs::types;
-using namespace helios::core::types;
+using namespace helios::ecs::types;
 using namespace helios::ecs::strategies;
 export namespace helios::ecs {
 

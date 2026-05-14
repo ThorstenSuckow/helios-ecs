@@ -8,9 +8,9 @@ module;
 
 export module helios.ecs.concepts.IsStrongIdCollisionResolverLike;
 
-import helios.core.types;
+import helios.ecs.types;
 
-using namespace helios::core::types;
+using namespace helios::ecs::types;
 export namespace helios::ecs::concepts {
 
     /**

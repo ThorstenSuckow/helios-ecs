@@ -9,9 +9,9 @@ module;
 
 export module helios.ecs.strategies.HashedLookupStrategy;
 
-import helios.core.types.TypeDefs;
+import helios.ecs.types.TypeDefs;
 
-using namespace helios::core::types;
+using namespace helios::ecs::types;
 export namespace helios::ecs::strategies {
 
     /**

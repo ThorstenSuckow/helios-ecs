@@ -70,7 +70,7 @@ export namespace helios::ecs {
     /**
      * @brief Sentinel value indicating an empty slot in the sparse array.
      *
-     * Aliased from `helios::core::types::EntityTombstone`.
+     * Aliased from `helios::ecs::types::EntityTombstone`.
      */
     constexpr auto Tombstone = EntityTombstone;
 

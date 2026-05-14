@@ -12,9 +12,9 @@ module;
 export module helios.ecs.types.EntityHandle;
 
 import helios.ecs.types.TypeDefs;
-import helios.core.types.StrongId;
+import helios.ecs.types.StrongId;
 
-using namespace helios::core::types;
+using namespace helios::ecs::types;
 export namespace helios::ecs::types {
 
     /**

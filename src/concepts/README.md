@@ -15,7 +15,7 @@ time (handle shape, lookup strategy API, lifecycle hooks).
 | `IsEntityHandle<T>` | Constrains types matching `EntityHandle<TDomainTag>` |
 | `IsStrongIdCollisionResolverLike<T>` | Constrains registry lookup strategies (`add/remove/has`) |
 
-> **Note:** Strong-id validation now lives in `helios::core::concepts::IsStrongIdLike`.
+> **Note:** Strong-id validation now lives in `helios::ecs::concepts::IsStrongIdLike`.
 
 ## Traits Namespace
 
@@ -37,7 +37,7 @@ time (handle shape, lookup strategy API, lifecycle hooks).
 | `helios.ecs.EntityRegistry` | Consumes lookup strategy concepts |
 | `helios.ecs.EntityHandle` | Primary handle shape validated by concepts |
 | `helios.ecs.ComponentReflector` | Uses trait hooks for lifecycle registration |
-| `helios.core.concepts` | Provides shared constraints such as `IsStrongIdLike` |
+| `helios.ecs.concepts` | Provides shared constraints such as `IsStrongIdLike` |
 
 ---
 <details>

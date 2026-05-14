@@ -11,9 +11,9 @@ module;
 
 export module helios.ecs.strategies.LinearLookupStrategy;
 
-import helios.core.types.TypeDefs;
+import helios.ecs.types.TypeDefs;
 
-using namespace helios::core::types;
+using namespace helios::ecs::types;
 export namespace helios::ecs::strategies {
 
     /**
