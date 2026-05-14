@@ -1,12 +1,15 @@
 include(FetchContent)
+
+set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+set(BENCHMARK_ENABLE_WERROR OFF CACHE BOOL "" FORCE)
+set(BENCHMARK_DOWNLOAD_DEPENDENCIES ON CACHE BOOL "" FORCE)
+
 FetchContent_Declare(
     benchmark
     GIT_REPOSITORY https://github.com/google/benchmark.git
     GIT_TAG v1.9.4
-
-    CMAKE_ARGS -DCMAKE_CXX_SCAN_FOR_MODULES=OFF
 )
-FetchContent_MakeAvailable(benchmark)
 
 FetchContent_Declare(
         glm
@@ -18,8 +21,18 @@ set(GLM_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLM_BUILD_INSTALL OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(benchmark glm)
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    if(TARGET benchmark)
+        target_compile_options(benchmark PRIVATE -Wno-c2y-extensions)
+    endif()
+    if(TARGET benchmark_main)
+        target_compile_options(benchmark_main PRIVATE -Wno-c2y-extensions)
+    endif()
+endif()
 
-file(GLOB_RECURSE BENCHMARK_FILES "*.benchmark.cpp")
+
+file(GLOB_RECURSE BENCHMARK_FILES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.benchmark.cpp")
 
 foreach(BENCHMARK_FILE ${BENCHMARK_FILES})
     file(RELATIVE_PATH REL_PATH ${CMAKE_CURRENT_SOURCE_DIR} ${BENCHMARK_FILE})
