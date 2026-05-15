@@ -45,7 +45,7 @@ foreach(BENCHMARK_FILE ${BENCHMARK_FILES})
     add_executable(${UNIQUE_TARGET} ${BENCHMARK_FILE})
 
     target_link_libraries(${UNIQUE_TARGET} PRIVATE
-            helios
+            helios_ecs
             benchmark::benchmark
             glm::glm
     )

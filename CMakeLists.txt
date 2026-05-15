@@ -9,7 +9,9 @@ endif()
 
 include(CTest)
 
-file(MAKE_DIRECTORY "${CMAKE_IFC_OUTPUT_DIRECTORY}")
+if(CMAKE_IFC_OUTPUT_DIRECTORY)
+    file(MAKE_DIRECTORY "${CMAKE_IFC_OUTPUT_DIRECTORY}")
+endif()
 
 file(GLOB_RECURSE CPP_FILES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
@@ -20,14 +22,15 @@ file(GLOB_RECURSE MODULE_INTERFACE_FILES CONFIGURE_DEPENDS
 list(FILTER CPP_FILES EXCLUDE REGEX "/CMakeFiles/|/CMakeTmp/|/cmake_build_|/build/")
 list(FILTER MODULE_INTERFACE_FILES EXCLUDE REGEX "/CMakeFiles/|/CMakeTmp/|/cmake_build_|/build/")
 
-add_library(helios STATIC)
-set_property(TARGET helios PROPERTY CXX_SCAN_FOR_MODULES ON)
-target_compile_features(helios PUBLIC cxx_std_23)
+add_library(helios_ecs STATIC)
+add_library(helios::ecs ALIAS helios_ecs)
+set_property(TARGET helios_ecs PROPERTY CXX_SCAN_FOR_MODULES ON)
+target_compile_features(helios_ecs PUBLIC cxx_std_23)
 
-target_sources(helios PRIVATE ${CPP_FILES})
+target_sources(helios_ecs PRIVATE ${CPP_FILES})
 
 if(MODULE_INTERFACE_FILES)
-    target_sources(helios PUBLIC
+    target_sources(helios_ecs PUBLIC
             FILE_SET modules TYPE CXX_MODULES
             BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/src"
             FILES ${MODULE_INTERFACE_FILES}
@@ -35,9 +38,9 @@ if(MODULE_INTERFACE_FILES)
 endif()
 
 
-target_include_directories(helios PUBLIC
+target_include_directories(helios_ecs PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-        $<BUILD_INTERFACE:${HELIOS_ECS_GENERATED_INCLUDE_DIR}>
+        $<INSTALL_INTERFACE:include>
 )
 
 if(BUILD_TESTING)
@@ -56,7 +59,7 @@ if(BUILD_TESTING)
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/src/*.test.cpp")
 
     add_executable(helios-ecs-tests ${TEST_SOURCES})
-    target_link_libraries(helios-ecs-tests PRIVATE helios GTest::gtest_main)
+    target_link_libraries(helios-ecs-tests PRIVATE helios_ecs GTest::gtest_main)
 
     include(GoogleTest)
     gtest_discover_tests(helios-ecs-tests)
