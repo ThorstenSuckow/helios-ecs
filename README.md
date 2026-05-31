@@ -1,100 +1,68 @@
 # helios::ecs
 
-Generic, reusable ECS primitives shared across the engine.
+Generic ECS primitives for the helios module ecosystem.
 
 ## Overview
 
-`helios::ecs` provides policy-based templates for entity identity, storage,
-lookup, lifecycle hooks, and typed views. The module is domain-agnostic and
-can be specialized for game entities, UI entities, render resources, or
-platform/runtime entities.
+`helios::ecs` provides reusable C++23 building blocks for entity identity,
+component storage, lifecycle reflection, and typed queries. It is used by
+higher-level [helios](https://github.com/thorstensuckow/helios-engine) modules that need strongly typed entity domains and compact
+component storage and can be used as a standalone ECS-implementation with other projects that require high performance for real-time applications.
 
-## Module Structure
+## Features
 
-### Entity Management
+- Versioned, strongly typed entity handles via `EntityHandle<TStrongId>`
+- Configurable entity registries with strong-id collision tracking
+- Sparse-set component storage with dense iteration
+- Typed entity/component views with filtering helpers
+- Trait-based component lifecycle reflection
+- Multi-domain world composition with `TypedHandleWorld`
 
-| Type | Purpose |
-|------|---------|
-| `EntityHandle<TDomainTag>` | Versioned, strongly-typed entity reference |
-| `EntityRegistry<TDomainTag, TLookupStrategy, TAllowRemoval, TCapacity>` | Handle allocation, version tracking, validation |
-| `EntityManager<THandle, TEntityRegistry, TCapacity>` | Entity creation, destruction, component storage |
-| `Entity<TManager>` | Lightweight entity facade (handle + manager pointer) |
-| `EntityResolver<TEntityManager>` | Callable handle-to-entity resolver |
-| `TypedHandleWorld<TEntityManagers...>` | Multi-domain world with compile-time handle dispatch |
+## Module surface
 
-### Component Infrastructure
+| Area | Public API |
+|------|------------|
+| Entity management | `EntityHandle`, `EntityRegistry`, `EntityManager`, `Entity`, `EntityResolver`, `TypedHandleWorld` |
+| Component metadata | `ComponentTypeId`, `ComponentOps`, `ComponentOpsRegistry`, `ComponentReflector` |
+| Storage/query | `SparseSet`, `View` |
+| Lookup strategies | `HashedLookupStrategy`, `LinearLookupStrategy` |
+| Concepts/traits | ECS constraints and lifecycle hook detection traits |
 
-| Type | Purpose |
-|------|---------|
-| `ComponentTypeId<THandle>` | Domain-scoped component type ids |
-| `ComponentOps` | Type-erased lifecycle callback function set |
-| `ComponentOpsRegistry<THandle>` | Runtime map: type id -> component ops |
-| `ComponentReflector<THandle, TEntityManager>` | Trait-based registration of lifecycle hooks |
+## Usage
 
-### Storage & Query
-
-| Type | Purpose |
-|------|---------|
-| `SparseSet<T>` | Generic O(1)-style sparse-set component storage |
-| `View<TEntityManager, Components...>` | Typed component query/iteration |
-
-### Lookup Strategies
-
-| Strategy | Purpose |
-|----------|---------|
-| `HashedLookupStrategy` | Hash-based strong-id collision tracking |
-| `LinearLookupStrategy<TCapacity>` | Flat-vector collision tracking for small sets |
-
-### Concepts & Traits
-
-| Type | Purpose |
-|------|---------|
-| `IsEntityHandle` | Constraint for `EntityHandle<TDomainTag>` shapes |
-| `IsStrongIdCollisionResolverLike` | Constraint for registry lookup strategies |
-| `traits::HasOnAcquire`, `traits::HasOnRelease`, `traits::HasOnRemove` | Optional pool/remove hooks |
-| `traits::HasToggleable`, `traits::HasClone`, `traits::HasActivatable` | Optional component lifecycle hooks |
-
-## TypedHandleWorld
-
-`TypedHandleWorld<TEntityManagers...>` stores multiple manager types and routes
-calls by handle type at compile time:
+### C++ module
 
 ```cpp
-using GameHandle = EntityHandle<GameDomainTag>;
-using UiHandle   = EntityHandle<UiDomainTag>;
-
-using GameEM = EntityManager<GameHandle, GameRegistry, 4096>;
-using UiEM   = EntityManager<UiHandle, UiRegistry, 512>;
-
-TypedHandleWorld<GameEM, UiEM> world;
-
-auto player = world.addEntity<GameHandle>();
-auto button = world.addEntity<UiHandle>();
+import helios.ecs;
 ```
 
-## Subdirectories
+### CMake
 
-| Directory | Purpose |
-|-----------|---------|
-| `components/` | Core ECS marker/relationship components |
-| `concepts/` | Concepts and lifecycle trait constraints |
-| `strategies/` | Strong-id collision lookup strategies |
-| `types/` | Handle ids, component ids, and ECS typedefs |
+When used as a subdirectory, link against the exported target:
 
-## See Also
+```cmake
+add_subdirectory(path/to/helios-ecs)
+target_link_libraries(your_target PRIVATE helios::ecs)
+```
 
-- [Components](components/README.md) — ECS core components
-- [Concepts](concepts/README.md) — ECS-specific constraints and lifecycle traits
-- [Core Concepts](../core/concepts/README.md) — shared constraints such as `IsStrongIdLike`
-- [Strategies](strategies/README.md) — lookup strategy implementations
-- [Types](types/README.md) — ECS type layer
-- [Core Concepts: ECS](../../../docs/core-concepts/ecs/README.md) — architecture-oriented ECS documentation
+## Development
 
----
-<details>
-<summary>Doxygen</summary><p>
-@namespace helios::ecs
-@brief Generic, reusable ECS primitives.
-@details Provides policy-based templates for handle management, sparse-set storage,
-component lifecycle reflection, typed queries, and multi-domain ECS worlds.
-</p></details>
+Build the project:
+
+```bash
+cmake -S . -B build
+cmake --build build
+```
+
+Run tests when test discovery is enabled:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+## Related repositories
+
+- [`helios-engine`](https://github.com/thorstensuckow/helios-engine)
+- [`helios-math`](https://github.com/thorstensuckow/helios-math)
+- [`helios-opengl`](https://github.com/thorstensuckow/helios-opengl)
+- [`helios-glfw`](https://github.com/thorstensuckow/helios-glfw)
