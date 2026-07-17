@@ -6,9 +6,15 @@ import helios.ecs;
 using namespace helios::ecs;
 using namespace helios::ecs::types;
 
+// Internal linkage keeps these helpers distinct from identically named helpers
+// in other test TUs (ODR safety for template instantiations).
+namespace {
+
 struct TestDomainTag {};
 using TestHandle = EntityHandle<TestDomainTag>;
 using TestRegistry = EntityRegistry<TestDomainTag>;
+
+} // namespace
 
 
 TEST(EntityRegistryTest, create) {
