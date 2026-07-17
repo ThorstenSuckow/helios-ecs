@@ -7,6 +7,11 @@ import helios.ecs;
 using namespace helios::ecs;
 using namespace helios::ecs::types;
 
+// Wrapped in an anonymous namespace so these test-local helper types get
+// internal linkage and their template instantiations are not shared/folded
+// with identically named helpers in other test TUs (ODR safety).
+namespace {
+
 struct TestDomainTag {};
 using TestHandle = EntityHandle<TestDomainTag>;
 using TestRegistry = EntityRegistry<TestDomainTag>;
@@ -42,14 +47,14 @@ class MyComponent {
 
 };
 
+} // namespace
+
 TEST(EntityManager, create) {
 
     TestReflector::registerType<TestEntity>();
     TestReflector::registerType<MyComponent>();
 
-    TestRegistry registry;
-
-    TestEntityManager em(registry);
+    TestEntityManager em;
 
     const auto handle = em.create();
     EXPECT_EQ(handle.entityId, 0);
@@ -61,8 +66,7 @@ TEST(EntityManager, destroy) {
     TestReflector::registerType<TestEntity>();
     TestReflector::registerType<MyComponent>();
 
-    TestRegistry registry;
-    TestEntityManager em(registry);
+    TestEntityManager em;
 
     const auto handle = em.create();
     EXPECT_EQ(handle.entityId, 0);
@@ -84,8 +88,7 @@ TEST(EntityManager, emplace) {
     TestReflector::registerType<TestEntity>();
     TestReflector::registerType<MyComponent>();
 
-    TestRegistry registry;
-    TestEntityManager em(registry);
+    TestEntityManager em;
 
     const auto handle = em.create();
     EXPECT_EQ(handle.entityId, 0);
@@ -113,8 +116,7 @@ TEST(EntityManager, remove) {
     TestReflector::registerType<TestEntity>();
     TestReflector::registerType<MyComponent>();
 
-    TestRegistry registry;
-    TestEntityManager em(registry);
+    TestEntityManager em;
 
     const auto handle = em.create();
     EXPECT_EQ(handle.entityId, 0);
