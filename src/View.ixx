@@ -14,9 +14,12 @@ import helios.ecs.SparseSet;
 import helios.ecs.types.TypeDefs;
 import helios.ecs.EntityManager;
 import helios.ecs.Entity;
+import helios.ecs.concepts.Traits;
 import helios.ecs.types.EntityHandle;
 
 using namespace helios::ecs::types;
+
+using namespace helios::ecs::concepts::traits;
 export namespace helios::ecs {
 
     /**
@@ -34,7 +37,7 @@ export namespace helios::ecs {
      *     TransformComponent,
      *     VelocityComponent,
      *     Active
-     * >().whereEnabled()) {
+     * >().whereEnabled().whereAnyChanged().withOptional<MaybeComponent>()) {
      *     // Process entity
      * }
      * ```
@@ -74,7 +77,9 @@ export namespace helios::ecs {
          */
         std::tuple<SparseSet<TRequired>*... > includeSets_;
 
-
+        /**
+         * @brief Optional components, might return nullptr. Are not considered by whereEnabled() or whereAnyChanged().
+         */
         std::tuple<SparseSet<TOptional>*... > optionalSets_;
 
         /**
@@ -89,6 +94,12 @@ export namespace helios::ecs {
          */
         bool filterEnabledOnly_ = false;
 
+        /**
+         * @brief Flag to filter sets with at least one changed components.
+         *
+         * @see HasVersioning
+         */
+        bool filterAnyChangedOnly_ = false;
 
     public:
         /**
@@ -107,8 +118,12 @@ export namespace helios::ecs {
             TEntityManager* em,
             std::tuple<SparseSet<TRequired>*...> includeSets,
             std::vector<std::function<bool(EntityId)>> excludeChecks,
-            const bool filterEnabledOnly
-        ) : em_(em), includeSets_(includeSets), excludeChecks_(std::move(excludeChecks)), filterEnabledOnly_(filterEnabledOnly) {
+            const bool filterEnabledOnly,
+            const bool filterAnyChangedOnly
+        ) : em_(em), includeSets_(includeSets),
+            excludeChecks_(std::move(excludeChecks)),
+            filterEnabledOnly_(filterEnabledOnly),
+            filterAnyChangedOnly_(filterAnyChangedOnly) {
             static_assert(sizeof...(TOptional) == 0, "withOptional() should provide all optional components types in a single call.");
             optionalSets_ = std::make_tuple(em_->template getSparseSet<TOptional>()...);
         }
@@ -138,7 +153,7 @@ export namespace helios::ecs {
         template<typename... TNewOptional>
         PartialView<TEntityManager, std::tuple<TRequired...>, std::tuple<TNewOptional...>> withOptional() {
             return PartialView<TEntityManager, std::tuple<TRequired...>, std::tuple<TNewOptional...>>(
-                em_, includeSets_, excludeChecks_, filterEnabledOnly_
+                em_, includeSets_, excludeChecks_, filterEnabledOnly_, filterAnyChangedOnly_
             );
         }
 
@@ -191,6 +206,19 @@ export namespace helios::ecs {
          */
         PartialView& whereEnabled() {
             filterEnabledOnly_ = true;
+            return *this;
+        }
+
+        /**
+         * @brief Filters to only include entities with changed components.
+         *
+         * @details Components must implement `hasChanges()` returning bool.
+         * Components without this method are assumed to have changes.
+         *
+         * @return Reference to this View for method chaining.
+         */
+        PartialView& whereAnyChanged() {
+            filterAnyChangedOnly_ = true;
             return *this;
         }
 
@@ -279,7 +307,7 @@ export namespace helios::ecs {
 
                     // SFINAE Helper Lambda: Checks if .isEnabled() exists.
                     auto isComponentEnabled = [](const auto& comp) -> bool {
-                        if constexpr (requires { comp.isEnabled(); }) {
+                        if constexpr (concepts::traits::HasToggleable<std::remove_cvref_t<decltype(comp)>>) {
                             return comp.isEnabled();
                         } else {
                             return true; // Assume enabled if method is missing.
@@ -298,6 +326,29 @@ export namespace helios::ecs {
                     }, view_->includeSets_);
 
                     if (!allEnabled) {
+                        return false;
+                    }
+                }
+
+                // 5. CHANGED CHECK (State)
+                if (view_->filterAnyChangedOnly_) {
+
+                    // SFINAE Helper Lambda: Checks if .hasChanges() exists.
+                    auto hasChanges = [](const auto& comp) -> bool {
+                        if constexpr ( HasVersioning<std::remove_cvref_t<decltype(comp)>> ) {
+                            return comp.hasChanges();
+                        } else {
+                            return true; // Assume any changed if method is missing.
+                        }
+                    };
+
+                    // Check included components
+                    const bool anyChanged = std::apply([&](auto*... sets) {
+                        // sets->get(id) returns a pointer, *ptr gives the reference.
+                        return (hasChanges(*sets->get(entityId)) || ...);
+                    }, view_->includeSets_);
+
+                    if (!anyChanged) {
                         return false;
                     }
                 }
@@ -363,22 +414,18 @@ export namespace helios::ecs {
                         return std::make_tuple(sets->get(entityId)...);
                     }, view_->includeSets_),
 
-                    std::apply([entityId, filterEnabledOnly = view_->filterEnabledOnly_](auto*... sets) {
+                    std::apply([
+                        entityId,
+                        filterEnabledOnly = view_->filterEnabledOnly_,
+                        filterAnyChangedOnly = view_->filterAnyChangedOnly_
+                    ](auto*... sets) {
                         return std::make_tuple(
-                        ([filterEnabledOnly, entityId, &sets]() {
+                        ([filterEnabledOnly, filterAnyChangedOnly, entityId, &sets]() {
                             if (!sets || !sets->contains(entityId)) {
                                 return nullptr;
                             }
 
-                            auto* component = sets->get(entityId);
-
-                            if constexpr (requires {component->isEnabled(); }) {
-                                if (filterEnabledOnly && !component->isEnabled()) {
-                                    return nullptr;
-                                }
-                            }
-
-                            return component;
+                            return sets->get(entityId);
                         }())...
 
                         );
