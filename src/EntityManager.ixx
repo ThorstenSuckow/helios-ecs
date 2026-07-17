@@ -90,6 +90,7 @@ export namespace helios::ecs {
         EntityManager(EntityManager&&) noexcept = default;
         EntityManager& operator=(EntityManager&&) noexcept = default;
 
+
         /**
          * @brief Constructs an EntityManager with the given capacity.
          *
@@ -100,24 +101,9 @@ export namespace helios::ecs {
          *                 Defaults to `TCapacity`.
          */
         explicit EntityManager(const size_t capacity = TCapacity)
-        : registry_(EntityRegistry_type{capacity}), capacity_(capacity)
-        {}
-
-        /**
-         * @brief Constructs an EntityManager with an external registry.
-         *
-         * @param registry External EntityRegistry to use for handle allocation.
-         * @param capacity Initial capacity for the sparse sets.
-         *                 Defaults to `TCapacity`.
-         *
-         * @deprecated Prefer the capacity-only constructor which creates its
-         *             own registry internally.
-         */
-        explicit EntityManager(
-            EntityRegistry_type& registry,
-            const size_t capacity = TCapacity)
-        : registry_(registry), capacity_(capacity)
-        {}
+        : registry_(EntityRegistry_type{capacity}), capacity_(capacity) {
+            int i = 1;
+        }
 
         /**
          * @brief Creates a new entity.
