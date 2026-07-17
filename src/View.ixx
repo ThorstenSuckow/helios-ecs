@@ -10,6 +10,7 @@ module;
 
 export module helios.ecs.View;
 
+import helios.ecs.components.Active;
 import helios.ecs.SparseSet;
 import helios.ecs.types.TypeDefs;
 import helios.ecs.EntityManager;
@@ -18,7 +19,7 @@ import helios.ecs.concepts.Traits;
 import helios.ecs.types.EntityHandle;
 
 using namespace helios::ecs::types;
-
+using namespace helios::ecs::components;
 using namespace helios::ecs::concepts::traits;
 export namespace helios::ecs {
 
@@ -37,7 +38,7 @@ export namespace helios::ecs {
      *     TransformComponent,
      *     VelocityComponent,
      *     Active
-     * >().whereEnabled().whereAnyChanged().withOptional<MaybeComponent>()) {
+     * >().whereAllEnabled().whereAnyChanged().withOptional<MaybeComponent>()) {
      *     // Process entity
      * }
      * ```
@@ -78,7 +79,7 @@ export namespace helios::ecs {
         std::tuple<SparseSet<TRequired>*... > includeSets_;
 
         /**
-         * @brief Optional components, might return nullptr. Are not considered by whereEnabled() or whereAnyChanged().
+         * @brief Optional components, might return nullptr. Are not considered by whereAllEnabled() or whereAnyChanged().
          */
         std::tuple<SparseSet<TOptional>*... > optionalSets_;
 
@@ -101,6 +102,16 @@ export namespace helios::ecs {
          */
         bool filterAnyChangedOnly_ = false;
 
+        /**
+         * @brief SparseSet for Active component, required with filterActiveOnly_.
+         */
+        SparseSet<Active<typename TEntityManager::Handle_type>>* activeSet_ = nullptr;
+
+        /**
+         * @brief Flag to filter only entities with Active component.
+         */
+        bool filterActiveOnly_ = false;
+
     public:
         /**
          * @brief Constructs the view and retrieves the necessary component sets.
@@ -119,11 +130,16 @@ export namespace helios::ecs {
             std::tuple<SparseSet<TRequired>*...> includeSets,
             std::vector<std::function<bool(EntityId)>> excludeChecks,
             const bool filterEnabledOnly,
-            const bool filterAnyChangedOnly
-        ) : em_(em), includeSets_(includeSets),
+            const bool filterAnyChangedOnly,
+            const bool filterActiveOnly,
+            SparseSet<Active<typename TEntityManager::Handle_type>>* activeSet
+        ) : em_(em),
+            includeSets_(includeSets),
             excludeChecks_(std::move(excludeChecks)),
             filterEnabledOnly_(filterEnabledOnly),
-            filterAnyChangedOnly_(filterAnyChangedOnly) {
+            filterAnyChangedOnly_(filterAnyChangedOnly),
+            filterActiveOnly_(filterActiveOnly),
+            activeSet_(activeSet) {
             static_assert(sizeof...(TOptional) == 0, "withOptional() should provide all optional components types in a single call.");
             optionalSets_ = std::make_tuple(em_->template getSparseSet<TOptional>()...);
         }
@@ -153,7 +169,7 @@ export namespace helios::ecs {
         template<typename... TNewOptional>
         PartialView<TEntityManager, std::tuple<TRequired...>, std::tuple<TNewOptional...>> withOptional() {
             return PartialView<TEntityManager, std::tuple<TRequired...>, std::tuple<TNewOptional...>>(
-                em_, includeSets_, excludeChecks_, filterEnabledOnly_, filterAnyChangedOnly_
+                em_, includeSets_, excludeChecks_, filterEnabledOnly_, filterAnyChangedOnly_, filterActiveOnly_, activeSet_
             );
         }
 
@@ -188,12 +204,28 @@ export namespace helios::ecs {
             return *this;
         }
 
+        /**
+         * @brief Returns true if the view has no entities to iterate over.
+         *
+         * @return boolean
+         */
         [[nodiscard]] bool empty() {
             auto* leadSet = std::get<0>(includeSets_);
             if (!leadSet) {
                 return true;
             }
             return begin() == end();
+        }
+
+        /**
+         * @brief Filters to only include entities with an active component.
+         *
+         * @return Reference to this View for method chaining.
+         */
+        PartialView& withActive() {
+            activeSet_ = em_->template getSparseSet<Active<typename TEntityManager::Handle_type>>();
+            filterActiveOnly_ = true;
+            return *this;
         }
 
         /**
@@ -204,7 +236,7 @@ export namespace helios::ecs {
          *
          * @return Reference to this View for method chaining.
          */
-        PartialView& whereEnabled() {
+        PartialView& whereAllEnabled() {
             filterEnabledOnly_ = true;
             return *this;
         }
@@ -290,6 +322,10 @@ export namespace helios::ecs {
                 const bool hasAllIncludes = std::apply([entityId](auto*... sets) {
                     return ((sets && sets->contains(entityId)) && ...);
                 }, view_->includeSets_);
+
+                if (view_->filterActiveOnly_ && (!view_->activeSet_ || !view_->activeSet_->contains(entityId))) {
+                    return false;
+                }
 
                 if (!hasAllIncludes) {
                     return false;
@@ -399,7 +435,7 @@ export namespace helios::ecs {
              *
              * Optional component pointers may be `nullptr` when the current
              * entity does not own the respective component (or it is filtered by
-             * `whereEnabled()` when `isEnabled()` is available).
+             * `whereAllEnabled()` when `isEnabled()` is available).
              *
              * @note Returns by value to support C++17 structured binding.
              */
