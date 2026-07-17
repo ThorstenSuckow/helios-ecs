@@ -20,7 +20,6 @@ import helios.ecs.EntityManager;
 using namespace helios::ecs::concepts::traits;
 using namespace helios::ecs::types;
 export namespace helios::ecs {
-
     /**
      * @brief Generates and registers ComponentOps for a component type.
      *
@@ -57,9 +56,10 @@ export namespace helios::ecs {
      * - `HasOnAcquire` - `onAcquire()` method
      * - `HasOnRelease` - `onRelease()` method
      * - `HasOnRemove` - `onRemove()` method returning bool
-     * - `HasToggleable` - `enable()` and `disable()` methods
+     * - `HasToggleable` - `isEnabled()`, enable()` and `disable()` methods
      * - `HasClone` - `onClone(const T&)` method
      * - `HasActivatable` - `onActivate()` and `onDeactivate()` methods
+     * - `HasVersioning` - `commit()` and `hasChanges()` methods
      *
      * @tparam THandle The concrete `EntityHandle<TDomainTag>` specialization.
      *                 Used to scope `ComponentTypeId` and `ComponentOpsRegistry`.
@@ -73,10 +73,7 @@ export namespace helios::ecs {
      */
     template<typename TEntityManager>
     class ComponentReflector {
-
-
     public:
-
         using Handle_type = TEntityManager::Handle_type;
 
         /**
@@ -91,47 +88,52 @@ export namespace helios::ecs {
          */
         template<typename T>
         static void registerType() {
+            ComponentOps ops{
 
-           ComponentOps ops{
-
-                .onAcquire = [](void* ptr) {
+                .onAcquire = [](void *ptr) {
                     if constexpr (HasOnAcquire<T>) {
-                        static_cast<T*>(ptr)->onAcquire();
+                        static_cast<T *>(ptr)->onAcquire();
                     }
                 },
 
-                .onRelease = [](void* ptr) {
+                .onRelease = [](void *ptr) {
                     if constexpr (HasOnRelease<T>) {
-                        static_cast<T*>(ptr)->onRelease();
+                        static_cast<T *>(ptr)->onRelease();
                     }
                 },
 
-                .onRemove = [](void* ptr) -> bool {
+                .onRemove = [](void *ptr) -> bool {
                     if constexpr (HasOnRemove<T>) {
-                        return static_cast<T*>(ptr)->onRemove();
+                        return static_cast<T *>(ptr)->onRemove();
                     }
                     return true;
                 },
 
-                .enable = [](void* ptr) {
+                .enable = [](void *ptr) {
                     if constexpr (HasToggleable<T>) {
-                        static_cast<T*>(ptr)->enable();
+                        static_cast<T *>(ptr)->enable();
                     }
                 },
 
-                .disable = [](void* ptr) {
+                .disable = [](void *ptr) {
                     if constexpr (HasToggleable<T>) {
-                        static_cast<T*>(ptr)->disable();
+                        static_cast<T *>(ptr)->disable();
                     }
                 },
 
-                .clone = [](void* managerRaw, const void* sourceRaw, const void* targetRaw) -> void* {
+                .isEnabled = [](void* ptr) -> bool {
+                    if constexpr (HasToggleable<T>) {
+                        return static_cast<T*>(ptr)->isEnabled();
+                    }
+                    return true;
+                },
 
-                    auto* manager = static_cast<TEntityManager*>(managerRaw);
-                    const auto* source = static_cast<const T*>(sourceRaw);
-                    const auto* target = static_cast<const Handle_type*>(targetRaw);
+                .clone = [](void *managerRaw, const void *sourceRaw, const void *targetRaw) -> void * {
+                    auto *manager = static_cast<TEntityManager *>(managerRaw);
+                    const auto *source = static_cast<const T *>(sourceRaw);
+                    const auto *target = static_cast<const Handle_type *>(targetRaw);
 
-                    T* cmp = nullptr;
+                    T *cmp = nullptr;
                     if constexpr (std::is_copy_constructible_v<T>) {
                         cmp = manager->template emplace<T>(*target, *source);
                     } else {
@@ -149,27 +151,37 @@ export namespace helios::ecs {
                     return cmp;
                 },
 
-               .onActivate = [](void* ptr) {
-                   if constexpr (HasActivatable<T>) {
-                       static_cast<T*>(ptr)->onActivate();
-                   }
+                .onActivate = [](void *ptr) {
+                    if constexpr (HasActivatable<T>) {
+                        static_cast<T *>(ptr)->onActivate();
+                    }
                 },
 
-               .onDeactivate = [](void* ptr) {
-                   if constexpr (HasActivatable<T>) {
-                       static_cast<T*>(ptr)->onDeactivate();
-                   }
+                .onDeactivate = [](void *ptr) {
+                    if constexpr (HasActivatable<T>) {
+                        static_cast<T *>(ptr)->onDeactivate();
+                    }
+                },
+
+                .hasChanges = [](void *ptr) -> bool {
+                    if constexpr (HasVersioning<T>) {
+                        return static_cast<T *>(ptr)->hasChanges();
+                    }
+
+                    return true;
+                },
+
+                .commit = [](void *ptr) {
+                    if constexpr (HasVersioning<T>) {
+                        static_cast<T *>(ptr)->commit();
+                    }
                 },
 
             };
 
             const auto typeId = ComponentTypeId<Handle_type>::template id<T>();
 
-           ComponentOpsRegistry<Handle_type>::setOps(typeId, ops);
-
+            ComponentOpsRegistry<Handle_type>::setOps(typeId, ops);
         }
-
     };
-
-
 }
