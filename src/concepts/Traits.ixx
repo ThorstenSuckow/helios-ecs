@@ -74,15 +74,15 @@ export namespace helios::ecs::concepts::traits {
      * @brief Trait for components that can be enabled/disabled.
      *
      * @details When a type `T` satisfies `HasToggleable`, the component can be
-     * toggled on/off via `enable()` and `disable()` methods. Both methods must
-     * be present for the trait to be satisfied.
+     * toggled on/off via `enable()` and `disable()` methods, the state can be queried
+     * via `isEnabled()`. All methods must be present for the trait to be satisfied.
      *
      * ## Usage
      *
      * ```cpp
      * struct MyComponent {
      *     bool isEnabled_ = true;
-     *
+     *     bool isEnabled() const noexcept {return isEnabled_;}
      *     void enable() noexcept { isEnabled_ = true; }
      *     void disable() noexcept { isEnabled_ = false; }
      * };
@@ -96,6 +96,7 @@ export namespace helios::ecs::concepts::traits {
     concept HasToggleable = requires(T t) {
         {t.disable()} -> std::same_as<void>;
         {t.enable()} -> std::same_as<void>;
+        {t.isEnabled()} -> std::same_as<bool>;
     };
 
     /**
@@ -152,6 +153,12 @@ export namespace helios::ecs::concepts::traits {
     concept HasActivatable = requires(T t) {
         {t.onActivate()} -> std::same_as<void>;
         {t.onDeactivate()} -> std::same_as<void>;
+    };
+
+    template<typename T>
+    concept HasVersioning = requires(T t) {
+        {t.hasChanges()} -> std::same_as<bool>;
+        {t.commit()} -> std::same_as<void>;
     };
 
 
