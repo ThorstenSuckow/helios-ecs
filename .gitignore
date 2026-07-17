@@ -2,3 +2,4 @@
 /build-test/
 /build-test-ninja/
 /build-test-ninja-noscan/
+/cmake-build-release/
