@@ -8,6 +8,9 @@ using namespace helios::ecs;
 using namespace helios::ecs::types;
 
 
+// Internal linkage keeps this helper distinct from identically named helpers
+// in other test TUs (ODR safety for template instantiations).
+namespace {
 
 class TestEntity {
 
@@ -24,6 +27,8 @@ public:
         return value == other.value;
     }
 };
+
+} // namespace
 
 TEST(SparseSetTest, emplace) {
     SparseSet<TestEntity> storage;
