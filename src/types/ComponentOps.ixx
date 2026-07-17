@@ -77,6 +77,13 @@ export namespace helios::ecs::types {
         using DisableFn = void(*)(void*);
 
         /**
+         * @brief Function signature for Entity enabled checks.
+         *
+         * @param ptr Raw pointer to the component instance.
+         */
+        using IsEnabledFn = bool(*)(void*);
+
+        /**
          * @brief Function signature for component cloning.
          *
          * @param manager Raw pointer to the EntityManager.
@@ -100,6 +107,22 @@ export namespace helios::ecs::types {
          * @param ptr Raw pointer to the component instance.
          */
         using OnDeactivateFn = void(*)(void*);
+
+        /**
+         * @brief Function signature for querying whether the component has uncommitted changes.
+         *
+         * @param ptr Raw pointer to the component instance.
+         *
+         * @return `true` if there are pending changes, otherwise `false`.
+         */
+        using HasChangesFn = bool(*)(void*);
+
+        /**
+         * @brief Function signature for committing tracked component changes.
+         *
+         * @param ptr Raw pointer to the component instance.
+         */
+        using CommitFn = void(*)(void*);
 
         /**
          * @brief Called when entity is acquired from an object pool.
@@ -127,6 +150,11 @@ export namespace helios::ecs::types {
         DisableFn disable = nullptr;
 
         /**
+         * @brief Called to check if the component is currently enabled.
+         */
+        IsEnabledFn isEnabled = nullptr;
+
+        /**
          * @brief Called to clone the component to a target entity.
          */
         CloneFn clone = nullptr;
@@ -141,7 +169,15 @@ export namespace helios::ecs::types {
          */
         OnDeactivateFn onDeactivate = nullptr;
 
+        /**
+         * @brief Called to query whether the component currently has uncommitted changes.
+         */
+        HasChangesFn hasChanges = nullptr;
 
+        /**
+         * @brief Called to commit tracked component changes.
+         */
+        CommitFn commit = nullptr;
     };
 
 }
