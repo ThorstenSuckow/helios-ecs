@@ -6,6 +6,7 @@ import helios.ecs;
 
 using namespace helios::ecs;
 using namespace helios::ecs::types;
+using namespace helios::ecs::components;
 
 // Wrapped in an anonymous namespace so these test-local helper types get
 // internal linkage. Without this, other test TUs that declare identically
@@ -24,30 +25,18 @@ using TestReflector = ComponentReflector<TestEntityManager>;
 using ViewWorld = TypedHandleWorld<TestEntityManager>;
 
 
+template <typename TOwnerHandle>
 class MyComponent {
 
     public:
     int value = 0;
     bool remove = true;
 
-    unsigned int currentVersion = 0;
-    unsigned int previousVersion = 0;
-
     bool onRemove() {
         return remove;
     }
 
-    void setValue() {
-        currentVersion++;
-    }
-    bool hasChanges() const noexcept {
-        return currentVersion != previousVersion;
-    }
-
-    void commit() {
-        previousVersion = currentVersion;
-    }
-
+    void setValue() {}
 
 };
 
@@ -56,7 +45,7 @@ class MyComponent {
 
 TEST(View, find) {
 
-    TestReflector::registerType<MyComponent>();
+    TestReflector::registerType<MyComponent<TestHandle>>();
 
     TestEntityManager em{};
 
@@ -64,30 +53,33 @@ TEST(View, find) {
     EXPECT_EQ(handle.entityId, 0);
     EXPECT_EQ(handle.versionId, 1);
 
-    EXPECT_FALSE(em.has<MyComponent>(handle));
+    EXPECT_FALSE(em.has<MyComponent<TestHandle>>(handle));
+    EXPECT_FALSE(em.has<DirtyComponentSpec<MyComponent<TestHandle>>>(handle));
 
-    auto* cmp = em.emplace<MyComponent>(handle, 10);
-    EXPECT_TRUE(em.has<MyComponent>(handle));
+    auto* cmp = em.emplace<MyComponent<TestHandle>>(handle, 10);
+    EXPECT_TRUE(em.has<MyComponent<TestHandle>>(handle));
 
-    auto view = View<TestEntityManager, MyComponent>(&em);
+    auto view = View<TestEntityManager, MyComponent<TestHandle>>(&em);
 
     int i = 0;
-    for (auto [entity, component] : view.whereEnabled().whereAnyChanged()) {
+    for (auto [entity, component] : view.whereAnyDirty<MyComponent<TestHandle>>()) {
         i++;
     }
     EXPECT_EQ(i, 0);
 
     cmp->setValue();
+    em.emplace<DirtyComponentSpec<MyComponent<TestHandle>>>(handle);
+
     i = 0;
-    for (auto [entity, component] : view.whereEnabled().whereAnyChanged()) {
+    for (auto [entity, component] : view.whereAnyDirty<MyComponent<TestHandle>>()) {
         i++;
     }
     EXPECT_EQ(i, 1);
 
-    cmp->commit();
+    em.clearDirtySet<MyComponent<TestHandle>>();
 
     i = 0;
-    for (auto [entity, component] : view.whereEnabled().whereAnyChanged()) {
+    for (auto [entity, component] : view.whereAnyDirty<MyComponent<TestHandle>>()) {
         i++;
     }
     EXPECT_EQ(i, 0);
