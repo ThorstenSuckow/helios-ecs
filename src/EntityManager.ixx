@@ -15,11 +15,13 @@ import helios.ecs.EntityRegistry;
 import helios.ecs.ComponentOpsRegistry;
 
 import helios.ecs.types;
+import helios.ecs.components;
 
 import helios.ecs.concepts.Traits;
 
 
 using namespace helios::ecs::types;
+using namespace helios::ecs::components;
 using namespace helios::ecs::concepts;
 export namespace helios::ecs {
     
@@ -446,6 +448,21 @@ export namespace helios::ecs {
             }
 
             return components_[typeId.value()]->remove(handle.entityId);
+        }
+
+        /**
+         * @brief Checks if the Sparse Set for the specified DirtyComponentSpec<T> exists and clears it.
+         *
+         * @tparam T
+         */
+        template<typename... T>
+        void clearDirty() {
+            ([this] {
+                const auto typeId = ComponentTypeId_type::template id<DirtyComponentSpec<T>>().value();
+                if (typeId < components_.size() && components_[typeId]) {
+                    components_[typeId]->clear();
+                }
+            }(), ...);
         }
 
         /**
