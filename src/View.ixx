@@ -10,7 +10,7 @@ module;
 
 export module helios.ecs.View;
 
-import helios.ecs.components.Active;
+import helios.ecs.components;
 import helios.ecs.SparseSet;
 import helios.ecs.types.TypeDefs;
 import helios.ecs.EntityManager;
@@ -47,13 +47,14 @@ export namespace helios::ecs {
      *                        iterate over. Determines the handle type and
      *                        component storage used.
      * @tparam TRequiredComponents Tuple of required component types.
+     * @tparam TDirtyComponents Tuple of dirty component types.
      * @tparam TOptionalComponents Tuple of optional component types.
      *
      * @see EntityManager
      * @see SparseSet
      * @see TypedHandleWorld
      */
-    template<typename TEntityManager, typename TRequiredComponents, typename TOptionalComponents>
+    template<typename TEntityManager, typename TRequiredComponents, typename TDirtyComponents, typename TOptionalComponents>
     class PartialView;
 
     /**
@@ -65,10 +66,10 @@ export namespace helios::ecs {
      * @tparam TRequired Required component types that must be present.
      */
     template<typename TEntityManager, typename... TRequired>
-    using View = PartialView<TEntityManager, std::tuple<TRequired...>, std::tuple<>>;
+    using View = PartialView<TEntityManager, std::tuple<TRequired...>, std::tuple<>, std::tuple<>>;
 
-    template<typename TEntityManager, typename... TRequired, typename... TOptional>
-    class PartialView<TEntityManager, std::tuple<TRequired...>, std::tuple<TOptional...>> {
+    template<typename TEntityManager, typename... TRequired, typename... TDirty, typename... TOptional>
+    class PartialView<TEntityManager, std::tuple<TRequired...>, std::tuple<TDirty...>, std::tuple<TOptional...>> {
 
     private:
         TEntityManager* em_;
@@ -84,6 +85,12 @@ export namespace helios::ecs {
         std::tuple<SparseSet<TOptional>*... > optionalSets_;
 
         /**
+         * @brief Pointers to the SparseSets of the dirty component sets.
+         */
+        std::tuple<SparseSet<DirtyComponentSpec<TDirty>>*... > anyDirtySets_;
+
+
+        /**
          * @brief List of exclusion predicates.
          * Stores functions that return true if an entity should be EXCLUDED.
          * Operates on EntityId (index) because the SparseSet uses it internally.
@@ -95,12 +102,6 @@ export namespace helios::ecs {
          */
         bool filterEnabledOnly_ = false;
 
-        /**
-         * @brief Flag to filter sets with at least one changed components.
-         *
-         * @see HasVersioning
-         */
-        bool filterAnyChangedOnly_ = false;
 
         /**
          * @brief SparseSet for Active component, required with filterActiveOnly_.
@@ -118,31 +119,41 @@ export namespace helios::ecs {
          *
          * @param em Pointer to the EntityManager to retrieve sets and construct Entities.
          */
-
-        explicit PartialView(TEntityManager* em) : em_(em) {
+        explicit PartialView(TEntityManager* em)
+            requires (sizeof...(TOptional) == 0 && sizeof...(TDirty) == 0)
+        : em_(em) {
             // Retrieve pointers to the specific component sets immediately.
             includeSets_ = std::make_tuple(em_->template getSparseSet<TRequired>()...);
-            optionalSets_ = std::make_tuple(em_->template getSparseSet<TOptional>()...);
         };
 
+
+        /**
+         * @brief Constructs the view with the specified component sets and filters.
+         *
+         * @param em Pointer to the EntityManager to retrieve sets and construct Entities.
+         * @param includeSets Tuple of pointers to the SparseSets of the required components.
+         * @param excludeChecks Vector of functions to determine if an entity should be excluded.
+         * @param filterEnabledOnly Flag to filter only enabled components.
+         * @param filterActiveOnly Flag to filter only entities with Active component.
+         * @param activeSet Pointer to the SparseSet of Active components.
+         */
         explicit PartialView(
             TEntityManager* em,
             std::tuple<SparseSet<TRequired>*...> includeSets,
             std::vector<std::function<bool(EntityId)>> excludeChecks,
             const bool filterEnabledOnly,
-            const bool filterAnyChangedOnly,
             const bool filterActiveOnly,
             SparseSet<Active<typename TEntityManager::Handle_type>>* activeSet
-        ) : em_(em),
-            includeSets_(includeSets),
+        )  : em_(em),
+            includeSets_(std::move(includeSets)),
             excludeChecks_(std::move(excludeChecks)),
             filterEnabledOnly_(filterEnabledOnly),
-            filterAnyChangedOnly_(filterAnyChangedOnly),
             filterActiveOnly_(filterActiveOnly),
-            activeSet_(activeSet) {
-            static_assert(sizeof...(TOptional) == 0, "withOptional() should provide all optional components types in a single call.");
-            optionalSets_ = std::make_tuple(em_->template getSparseSet<TOptional>()...);
-        }
+            activeSet_(activeSet),
+
+            optionalSets_(std::make_tuple(em_->template getSparseSet<TOptional>()...)),
+            anyDirtySets_(std::make_tuple(em_->template getSparseSet<DirtyComponentSpec<TDirty>>()...))
+        {}
 
         /**
          * @brief Adds optional component types to the current view.
@@ -167,10 +178,49 @@ export namespace helios::ecs {
          *         the provided optional component types.
          */
         template<typename... TNewOptional>
-        PartialView<TEntityManager, std::tuple<TRequired...>, std::tuple<TNewOptional...>> withOptional() {
-            return PartialView<TEntityManager, std::tuple<TRequired...>, std::tuple<TNewOptional...>>(
-                em_, includeSets_, excludeChecks_, filterEnabledOnly_, filterAnyChangedOnly_, filterActiveOnly_, activeSet_
+        auto withOptional()
+            requires (sizeof...(TOptional) == 0)
+        {
+            return PartialView<
+                TEntityManager,
+                std::tuple<TRequired...>,
+                std::tuple<TDirty...>,
+                std::tuple<TNewOptional...>>(
+                em_,
+                includeSets_,
+                excludeChecks_,
+                filterEnabledOnly_,
+                filterActiveOnly_,
+                activeSet_,
+                anyDirtySets_
             );
+        }
+
+        /**
+         * @brief Filters to only include entities with changed components.
+         *
+         * @details Components must implement `hasChanges()` returning bool.
+         * Components without this method are assumed to have changes.
+         *
+         * @return Reference to this View for method chaining.
+         */
+        template<typename... TNewDirty>
+        auto whereAnyDirty() requires (sizeof...(TOptional) == 0 && sizeof...(TDirty) == 0)  {
+
+            return PartialView<
+                TEntityManager,
+                std::tuple<TRequired...>,
+                std::tuple<TNewDirty...>,
+                std::tuple<>
+            >(
+                em_,
+                includeSets_,
+                excludeChecks_,
+                filterEnabledOnly_,
+                filterActiveOnly_,
+                activeSet_
+            );
+
         }
 
         /**
@@ -241,18 +291,6 @@ export namespace helios::ecs {
             return *this;
         }
 
-        /**
-         * @brief Filters to only include entities with changed components.
-         *
-         * @details Components must implement `hasChanges()` returning bool.
-         * Components without this method are assumed to have changes.
-         *
-         * @return Reference to this View for method chaining.
-         */
-        PartialView& whereAnyChanged() {
-            filterAnyChangedOnly_ = true;
-            return *this;
-        }
 
         /**
          * @brief Forward iterator for View traversal.
@@ -331,6 +369,17 @@ export namespace helios::ecs {
                     return false;
                 }
 
+                // dirty check
+                if constexpr (sizeof...(TDirty) > 0) {
+                    const bool hasAnyDirtyIncludes = std::apply([entityId](auto*... sets) {
+                       return ((sets && sets->contains(entityId)) || ...);
+                   }, view_->anyDirtySets_);
+
+                    if (!hasAnyDirtyIncludes) {
+                        return false;
+                    }
+                }
+
                 // 3. EXCLUDE CHECK (Must NOT be present)
                 for (const auto& excludeCheck : view_->excludeChecks_) {
                     if (excludeCheck(entityId)) {
@@ -362,29 +411,6 @@ export namespace helios::ecs {
                     }, view_->includeSets_);
 
                     if (!allEnabled) {
-                        return false;
-                    }
-                }
-
-                // 5. CHANGED CHECK (State)
-                if (view_->filterAnyChangedOnly_) {
-
-                    // SFINAE Helper Lambda: Checks if .hasChanges() exists.
-                    auto hasChanges = [](const auto& comp) -> bool {
-                        if constexpr ( HasVersioning<std::remove_cvref_t<decltype(comp)>> ) {
-                            return comp.hasChanges();
-                        } else {
-                            return true; // Assume any changed if method is missing.
-                        }
-                    };
-
-                    // Check included components
-                    const bool anyChanged = std::apply([&](auto*... sets) {
-                        // sets->get(id) returns a pointer, *ptr gives the reference.
-                        return (hasChanges(*sets->get(entityId)) || ...);
-                    }, view_->includeSets_);
-
-                    if (!anyChanged) {
                         return false;
                     }
                 }
@@ -452,11 +478,10 @@ export namespace helios::ecs {
 
                     std::apply([
                         entityId,
-                        filterEnabledOnly = view_->filterEnabledOnly_,
-                        filterAnyChangedOnly = view_->filterAnyChangedOnly_
+                        filterEnabledOnly = view_->filterEnabledOnly_
                     ](auto*... sets) {
                         return std::make_tuple(
-                        ([filterEnabledOnly, filterAnyChangedOnly, entityId, &sets]() {
+                        ([filterEnabledOnly, entityId, &sets]() {
                             if (!sets || !sets->contains(entityId)) {
                                 return nullptr;
                             }
