@@ -199,9 +199,6 @@ export namespace helios::ecs {
         /**
          * @brief Filters to only include entities with changed components.
          *
-         * @details Components must implement `hasChanges()` returning bool.
-         * Components without this method are assumed to have changes.
-         *
          * @return Reference to this View for method chaining.
          */
         template<typename... TNewDirty>

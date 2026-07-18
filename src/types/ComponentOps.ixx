@@ -109,15 +109,6 @@ export namespace helios::ecs::types {
         using OnDeactivateFn = void(*)(void*);
 
         /**
-         * @brief Function signature for querying whether the component has uncommitted changes.
-         *
-         * @param ptr Raw pointer to the component instance.
-         *
-         * @return `true` if there are pending changes, otherwise `false`.
-         */
-        using HasChangesFn = bool(*)(void*);
-
-        /**
          * @brief Function signature for committing tracked component changes.
          *
          * @param ptr Raw pointer to the component instance.
@@ -168,11 +159,6 @@ export namespace helios::ecs::types {
          * @brief Called when the owning Entity is deactivated.
          */
         OnDeactivateFn onDeactivate = nullptr;
-
-        /**
-         * @brief Called to query whether the component currently has uncommitted changes.
-         */
-        HasChangesFn hasChanges = nullptr;
 
         /**
          * @brief Called to commit tracked component changes.

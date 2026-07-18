@@ -59,7 +59,6 @@ export namespace helios::ecs {
      * - `HasToggleable` - `isEnabled()`, enable()` and `disable()` methods
      * - `HasClone` - `onClone(const T&)` method
      * - `HasActivatable` - `onActivate()` and `onDeactivate()` methods
-     * - `HasVersioning` - `commit()` and `hasChanges()` methods
      *
      * @tparam THandle The concrete `EntityHandle<TDomainTag>` specialization.
      *                 Used to scope `ComponentTypeId` and `ComponentOpsRegistry`.
@@ -163,19 +162,6 @@ export namespace helios::ecs {
                     }
                 },
 
-                .hasChanges = [](void *ptr) -> bool {
-                    if constexpr (HasVersioning<T>) {
-                        return static_cast<T *>(ptr)->hasChanges();
-                    }
-
-                    return true;
-                },
-
-                .commit = [](void *ptr) {
-                    if constexpr (HasVersioning<T>) {
-                        static_cast<T *>(ptr)->commit();
-                    }
-                },
 
             };
 

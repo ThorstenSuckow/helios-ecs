@@ -155,11 +155,6 @@ export namespace helios::ecs::concepts::traits {
         {t.onDeactivate()} -> std::same_as<void>;
     };
 
-    template<typename T>
-    concept HasVersioning = requires(T t) {
-        {t.hasChanges()} -> std::same_as<bool>;
-        {t.commit()} -> std::same_as<void>;
-    };
 
 
 }
