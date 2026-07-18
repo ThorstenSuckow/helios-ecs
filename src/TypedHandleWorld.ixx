@@ -281,6 +281,19 @@ export namespace helios::ecs {
             return View<EM, TComponents...>(&em);
         }
 
+        /**
+         * @brief Clears the dirty components managed by the specified EntityManager.
+         *
+         * @tparam THandle
+         * @tparam TComponents
+         * @return
+         */
+        template<typename THandle, typename ...TComponents>
+        void clearDirtySets() {
+            auto& em = entityManager<THandle>();
+            (em.template clearDirtySet<TComponents>(),...);
+        }
+
     private:
 
         EntityManager_types entityManagers_;
