@@ -22,6 +22,7 @@ import helios.ecs.ComponentOpsRegistry;
 import helios.ecs.types.ComponentTypeId;
 
 using namespace helios::ecs::types;
+using namespace helios::ecs::components;
 export namespace helios::ecs {
 
     /**
@@ -200,6 +201,32 @@ export namespace helios::ecs {
         }
 
         /**
+         * @brief Tracks the specified component which will be added if not already existing.
+         *
+         * @tparam T The component type to track.
+         * @tparam Args Constructor argument types.
+         * @param args Arguments forwarded to the component constructor.
+         * @return Reference to the tracked component.
+         *
+         * @see markDirty
+         */
+        template<typename T, typename ...Args>
+        T& track(Args&& ...args) {
+            markDirty<T>();
+            return getOrAdd<T>(std::forward<Args>(args)...);
+        }
+
+        /**
+         * @brief Marks the specified component as dirty.
+         *
+         * @tparam T The component type to mark as dirty.
+         */
+        template<typename T>
+        void markDirty() {
+            getOrAdd<DirtyComponentSpec<T>>();
+        }
+
+        /**
          * @brief Removes a component from this entity.
          *
          * @tparam T The component type to remove.
@@ -294,12 +321,14 @@ export namespace helios::ecs {
          * - The `Active` tag component is removed
          * - `onDeactivate()` is called on components that support it
          * - If a `HierarchyComponent` is present, it is marked dirty for propagation
+         * - Inactive will be marked as dirty component to indicate state change.
          *
          * When activated:
          * - The `Inactive` tag component is removed
          * - An `Active` tag component is added
          * - `onActivate()` is called on components that support it
          * - If a `HierarchyComponent` is present, it is marked dirty for propagation
+         * - Active will be marked as dirty component to indicate state change.
          *
          * @note Does **not** call `enable()`/`disable()` on components.
          *
@@ -317,7 +346,7 @@ export namespace helios::ecs {
                 if (hc) {
                     hc->markDirty();
                 }
-
+                markDirty<Active<Handle_type>>();
                 entityManager_->template emplaceOrGet<ActiveComponent_type>(entityHandle_);
             }
 
@@ -327,6 +356,7 @@ export namespace helios::ecs {
                     hc->markDirty();
                 }
 
+                markDirty<Inactive<Handle_type>>();
                 entityManager_->template  remove<ActiveComponent_type>(entityHandle_);
             }
 
