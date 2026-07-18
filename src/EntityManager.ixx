@@ -456,7 +456,7 @@ export namespace helios::ecs {
          * @tparam T
          */
         template<typename... T>
-        void clearDirty() {
+        void clearDirtySet() {
             ([this] {
                 const auto typeId = ComponentTypeId_type::template id<DirtyComponentSpec<T>>().value();
                 if (typeId < components_.size() && components_[typeId]) {
