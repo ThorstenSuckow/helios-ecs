@@ -48,6 +48,14 @@ export namespace helios::ecs {
         virtual bool remove(EntityId id) = 0;
 
         /**
+         * @brief Clears all elements from the sparse set.
+         *
+         * This operation removes all elements and resets the internal
+         * data structures, effectively making the set empty.
+         */
+        virtual void clear() = 0;
+
+        /**
          * @brief Checks whether an element exists for the specified EntityId.
          *
          * @param id The EntityId to test.
@@ -154,7 +162,6 @@ export namespace helios::ecs {
             storage_.reserve(capacity);
             denseToSparse_.reserve(capacity);
         };
-
 
         /**
          * @brief Copy operations are deleted to prevent accidental duplication.
@@ -332,6 +339,15 @@ export namespace helios::ecs {
         [[nodiscard]] void* raw(const EntityId id) override {
             T* ptr = get(id);
             return static_cast<void*>(ptr);
+        }
+
+        /**
+         * @copydoc SparseSetBase::clear
+         */
+        void clear() override {
+            sparse_.clear();
+            denseToSparse_.clear();
+            storage_.clear();
         }
 
 
