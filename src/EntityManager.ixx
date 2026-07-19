@@ -289,55 +289,6 @@ export namespace helios::ecs {
             return false;
         }
 
-        /**
-         * @brief Enables a component by type ID.
-         *
-         * @details Calls the component's `enable()` method if registered.
-         *
-         * @param handle The entity whose component to enable.
-         * @param typeId The component type identifier.
-         */
-        void enable(const Handle_type handle, const ComponentTypeId_type typeId) const {
-            enable(handle, typeId, true);
-        }
-
-        /**
-         * @brief Disables a component by type ID.
-         *
-         * @details Calls the component's `disable()` method if registered.
-         *
-         * @param handle The entity whose component to disable.
-         * @param typeId The component type identifier.
-         */
-        void disable(const Handle_type handle, const ComponentTypeId_type typeId) const {
-            enable(handle, typeId, false);
-        }
-
-        /**
-         * @brief Enables or disables a component by type ID.
-         *
-         * @param handle The entity whose component to modify.
-         * @param typeId The component type identifier.
-         * @param enable `true` to enable, `false` to disable.
-         */
-        void enable(const Handle_type handle, const ComponentTypeId_type typeId, const bool enable) const {
-
-            if (!has(handle, typeId)) {
-                return;
-            }
-
-            void* rawCmp = raw(handle, typeId);
-            if (!rawCmp) {
-                return;
-            }
-            const auto& ops = ComponentOpsRegistry_type::ops(typeId);
-
-            if (enable && ops.enable) {
-                ops.enable(rawCmp);
-            } else if (!enable && ops.disable) {
-                ops.disable(rawCmp);
-            }
-        }
 
         /**
          * @brief Constructs and attaches a component to an entity.
@@ -451,6 +402,55 @@ export namespace helios::ecs {
         }
 
         /**
+         * @brief Returns true if the specified ComponentType is managed by this EntityManager.
+         *
+         * @tparam TComponent The component to check.
+         *
+         * @returns true if this component is managed by this Entitymanager.
+         */
+        template<typename TComponent>
+        [[nodiscard]] bool managesDirty() {
+
+            auto typeId = ComponentTypeId_type::template id<DirtyComponentSpec<TComponent>>().value();
+
+            return typeId < components_.size() && components_[typeId];
+        }
+
+        /**
+         * @brief Tracks this ComponentType with DirtyComponentSpec.
+         *
+         * @tparam TComponent The Component-type to track.
+         *
+         * @see clearAllDirtySets()
+         */
+        template<typename TComponent>
+        void trackDirty() {
+            auto typeId = ComponentTypeId_type::template id<DirtyComponentSpec<TComponent>>().value();
+
+            if (typeId >= components_.size()) {
+                components_.resize(typeId + 1);
+            }
+
+            if (!components_[typeId]) {
+                components_[typeId] = std::make_unique<SparseSet<DirtyComponentSpec<TComponent>>>(capacity_);
+                registeredDirtySets_.push_back(typeId);
+            }
+
+        }
+
+        /**
+         * @brief Clears all dirty sets that have been registered with `registerDirtySet()`.
+         */
+        void clearAllDirtySets() {
+
+            for (const auto id : registeredDirtySets_) {
+                if (id < components_.size() && components_[id]) {
+                    components_[id]->clear();
+                }
+            }
+        }
+
+        /**
          * @brief Checks if the Sparse Set for the specified DirtyComponentSpec<T> exists and clears it.
          *
          * @tparam T
@@ -543,6 +543,10 @@ export namespace helios::ecs {
         }
 
     private:
+
+        std::vector<size_t> registeredDirtySets_;
+
+
         /**
          * @brief Component storage indexed by type ID.
          *
