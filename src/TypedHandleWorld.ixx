@@ -291,7 +291,13 @@ export namespace helios::ecs {
         template<typename THandle, typename ...TComponents>
         void clearDirtySets() {
             auto& em = entityManager<THandle>();
-            (em.template clearDirtySet<TComponents>(),...);
+
+            if constexpr (sizeof...(TComponents) == 0) {
+                em.clearAllDirtySets();
+            } else {
+                (em.template clearDirtySet<TComponents>(),...);
+            }
+
         }
 
     private:
