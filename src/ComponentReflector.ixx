@@ -56,7 +56,6 @@ export namespace helios::ecs {
      * - `HasOnAcquire` - `onAcquire()` method
      * - `HasOnRelease` - `onRelease()` method
      * - `HasOnRemove` - `onRemove()` method returning bool
-     * - `HasToggleable` - `isEnabled()`, enable()` and `disable()` methods
      * - `HasClone` - `onClone(const T&)` method
      * - `HasActivatable` - `onActivate()` and `onDeactivate()` methods
      *
@@ -104,25 +103,6 @@ export namespace helios::ecs {
                 .onRemove = [](void *ptr) -> bool {
                     if constexpr (HasOnRemove<T>) {
                         return static_cast<T *>(ptr)->onRemove();
-                    }
-                    return true;
-                },
-
-                .enable = [](void *ptr) {
-                    if constexpr (HasToggleable<T>) {
-                        static_cast<T *>(ptr)->enable();
-                    }
-                },
-
-                .disable = [](void *ptr) {
-                    if constexpr (HasToggleable<T>) {
-                        static_cast<T *>(ptr)->disable();
-                    }
-                },
-
-                .isEnabled = [](void* ptr) -> bool {
-                    if constexpr (HasToggleable<T>) {
-                        return static_cast<T*>(ptr)->isEnabled();
                     }
                     return true;
                 },

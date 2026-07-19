@@ -77,13 +77,6 @@ export namespace helios::ecs::types {
         using DisableFn = void(*)(void*);
 
         /**
-         * @brief Function signature for Entity enabled checks.
-         *
-         * @param ptr Raw pointer to the component instance.
-         */
-        using IsEnabledFn = bool(*)(void*);
-
-        /**
          * @brief Function signature for component cloning.
          *
          * @param manager Raw pointer to the EntityManager.
@@ -139,11 +132,6 @@ export namespace helios::ecs::types {
          * @brief Called to disable the component.
          */
         DisableFn disable = nullptr;
-
-        /**
-         * @brief Called to check if the component is currently enabled.
-         */
-        IsEnabledFn isEnabled = nullptr;
 
         /**
          * @brief Called to clone the component to a target entity.
