@@ -42,11 +42,6 @@ export namespace helios::ecs::components {
          */
         bool isDirty_ = false;
 
-        /**
-         * @brief Whether this component is enabled.
-         */
-        bool isEnabled_ = true;
-
     public:
 
         /**
