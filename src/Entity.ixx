@@ -93,14 +93,29 @@ export namespace helios::ecs {
          */
         TEntityManager* entityManager_;
 
+        /**
+         * @brief Marks the specified component as dirty and registers the dirty set with the EntityManager.
+         *
+         * @tparam T The component type to mark as dirty.
+         */
+        template<typename T>
+        void markDirty() {
+            if (!entityManager_->template  managesDirty<T>()) {
+                bool mg = entityManager_->template  managesDirty<T>();
+                assert((entityManager_->template managesDirty<T>()) && "Cannot mark component as dirty, not tracked by EntityManager." );
+
+            }
+            getOrAdd<DirtyComponentSpec<T>>();
+        }
 
     public:
 
         using Handle_type = TEntityManager::Handle_type;
         using ComponentTypeId_type = ComponentTypeId<Handle_type>;
         using ComponentOpsRegistry_type = ComponentOpsRegistry<Handle_type>;
-        using HierarchyComponent_type = components::HierarchyComponent<Handle_type>;
-        using ActiveComponent_type = components::Active<Handle_type>;
+        using HierarchyComponent_type = HierarchyComponent<Handle_type>;
+        using ActiveComponent_type = Active<Handle_type>;
+        using InactiveComponent_type = Inactive<Handle_type>;
         
         /**
          * @brief Constructs a Entity wrapper.
@@ -212,21 +227,11 @@ export namespace helios::ecs {
          * @see markDirty
          */
         template<typename T, typename ...Args>
-        T& track(Args&& ...args) {
+        T& trackDirty(Args&& ...args) {
+            entityManager_->template trackDirty<T>();
             markDirty<T>();
             return getOrAdd<T>(std::forward<Args>(args)...);
         }
-
-        /**
-         * @brief Marks the specified component as dirty.
-         *
-         * @tparam T The component type to mark as dirty.
-         */
-        template<typename T>
-        void markDirty() {
-            getOrAdd<DirtyComponentSpec<T>>();
-        }
-
 
         /**
          * @brief Updates the component's value and marks the component type dirty.
@@ -377,26 +382,23 @@ export namespace helios::ecs {
          * @see HierarchyPropagationSystem
          */
         void setActive(const bool active) {
-            bool isActive = entityManager_->template has<ActiveComponent_type>(entityHandle_);
-            bool isInActive = !isActive;
+            const bool isActive = entityManager_->template has<ActiveComponent_type>(entityHandle_);
+            const bool isInActive = !isActive;
 
             if (!isActive && active) {
-                auto* hc =  entityManager_->template get<HierarchyComponent_type>(entityHandle_);
-                if (hc) {
+                if (auto* hc =  entityManager_->template get<HierarchyComponent_type>(entityHandle_)) {
                     hc->markDirty();
                 }
-                markDirty<Active<Handle_type>>();
-                entityManager_->template emplaceOrGet<ActiveComponent_type>(entityHandle_);
+                remove<InactiveComponent_type>();
+                trackDirty<ActiveComponent_type>();
             }
 
             if (!isInActive && !active) {
-                auto* hc = entityManager_->template get<HierarchyComponent_type>(entityHandle_);
-                if (hc) {
+                if (auto* hc = entityManager_->template get<HierarchyComponent_type>(entityHandle_)) {
                     hc->markDirty();
                 }
-
-                markDirty<Inactive<Handle_type>>();
-                entityManager_->template  remove<ActiveComponent_type>(entityHandle_);
+                remove<ActiveComponent_type>();
+                trackDirty<InactiveComponent_type>();
             }
 
             forEachComponentTypeId(
