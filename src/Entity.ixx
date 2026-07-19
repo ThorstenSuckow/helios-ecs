@@ -5,8 +5,7 @@
 module;
 
 #include <cassert>
-#include <type_traits>
-#include <typeindex>
+#include <utility>
 
 
 export module helios.ecs.Entity;
@@ -16,12 +15,14 @@ import helios.ecs.types.EntityHandle;
 
 import helios.ecs.EntityManager;
 import helios.ecs.components;
+import helios.ecs.concepts.Traits;
 
 import helios.ecs.ComponentOpsRegistry;
 
 import helios.ecs.types.ComponentTypeId;
 
 using namespace helios::ecs::types;
+using namespace helios::ecs::concepts::traits;
 using namespace helios::ecs::components;
 export namespace helios::ecs {
 
@@ -225,6 +226,44 @@ export namespace helios::ecs {
         void markDirty() {
             getOrAdd<DirtyComponentSpec<T>>();
         }
+
+
+        /**
+         * @brief Updates the component's value and marks the component type dirty.
+         *
+         * @tparam TComponent The component type to update. Must be existing for this entity.
+         * @tparam TValue The value type to set. Must be compatible with TComponent::Value_type.
+         * @param component Pointer to the TComponent
+         * @param value The value to update the component with.
+         */
+        template<typename TComponent, typename TValue>
+        requires IsValueSettingDirtyTrackable<TComponent, TValue>
+            && std::is_trivially_copyable_v<TValue>
+            && (sizeof(TValue) <= 2* sizeof(void*))
+        void setTrackedValue(TComponent* component, TValue value) {
+            assert(component != nullptr && "Unexpected nullptr for component.");
+            component->setValue(value);
+            markDirty<TComponent>();
+        }
+
+        /**
+         * @brief Updates the component's value and marks the component type dirty.
+         *
+         * @tparam TComponent The component type to update. Must be existing for this entity.
+         * @tparam TValue The value type to set. Must be compatible with TComponent::Value_type.
+         * @param component Pointer to the TComponent
+         * @param value The value to update the component with.
+         */
+        template<typename TComponent, typename TValue>
+        requires IsValueSettingDirtyTrackable<TComponent, TValue>
+            && (!(std::is_trivially_copyable_v<TValue>
+            && (sizeof(TValue) <= 2* sizeof(void*))))
+        void setTrackedValue(TComponent* component, const TValue& value) {
+            assert(component != nullptr && "Unexpected nullptr for component.");
+            component->setValue(value);
+            markDirty<TComponent>();
+        }
+
 
         /**
          * @brief Removes a component from this entity.

@@ -5,6 +5,7 @@
 module;
 
 #include <concepts>
+#include <utility>
 
 export module helios.ecs.concepts.Traits;
 
@@ -38,6 +39,19 @@ export namespace helios::ecs::concepts::traits {
     template<typename T>
     concept HasOnRemove = requires(T t) {
         {t.onRemove()} -> std::convertible_to<bool>;
+    };
+
+    /**
+     * @brief Trait that allows components to be trackable.
+     *
+     * @param T the type to check.
+     *
+     * @see Entity::setTrackedValue
+     */
+    template<typename TComponent, typename TValue>
+    concept IsValueSettingDirtyTrackable = requires(TComponent& component, const TValue& value) {
+        typename TComponent::Value_type;
+        {component.setValue(value)} -> std::same_as<void>;
     };
 
 
