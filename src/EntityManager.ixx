@@ -7,6 +7,9 @@ module;
 #include <memory>
 #include <vector>
 #include <cstddef>
+#include <cassert>
+
+#include "helios-ecs-config.h"
 
 export module helios.ecs.EntityManager;
 
@@ -435,11 +438,30 @@ export namespace helios::ecs {
                 components_[typeId] = std::make_unique<SparseSet<DirtyComponentSpec<TComponent>>>(capacity_);
                 registeredDirtySets_.push_back(typeId);
             }
+            #if HELIOS_DEBUG
+            else {
+                bool found = false;
+                for (auto id : registeredDirtySets_) {
+                    if (id == typeId) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    assert(false && "typeId found, but was missing in registeredSets_");
+                    //registeredDirtySets_.push_back(typeId);
+                }
+
+            }
+            #endif
+
 
         }
 
         /**
          * @brief Clears all dirty sets that have been registered with `registerDirtySet()`.
+         *
+         * @todo garbage management when components are entirely removed and not managed by this manager anymore
          */
         void clearAllDirtySets() {
 
