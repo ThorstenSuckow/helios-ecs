@@ -49,7 +49,7 @@ export namespace helios::ecs::concepts::traits {
      * @see Entity::setTrackedValue
      */
     template<typename TComponent, typename TValue>
-    concept IsValueSettingDirtyTrackable = requires(TComponent& component, const TValue& value) {
+    concept IsComponentDirtyTrackable = requires(TComponent& component, const TValue& value) {
         typename TComponent::Value_type;
         {component.setValue(value)} -> std::same_as<void>;
     };

@@ -237,7 +237,7 @@ export namespace helios::ecs {
          * @param value The value to update the component with.
          */
         template<typename TComponent, typename TValue>
-        requires IsValueSettingDirtyTrackable<TComponent, TValue>
+        requires IsComponentDirtyTrackable<TComponent, TValue>
             && std::is_trivially_copyable_v<TValue>
             && (sizeof(TValue) <= 2* sizeof(void*))
         void setTrackedValue(TComponent* component, TValue value) {
@@ -255,7 +255,7 @@ export namespace helios::ecs {
          * @param value The value to update the component with.
          */
         template<typename TComponent, typename TValue>
-        requires IsValueSettingDirtyTrackable<TComponent, TValue>
+        requires IsComponentDirtyTrackable<TComponent, TValue>
             && (!(std::is_trivially_copyable_v<TValue>
             && (sizeof(TValue) <= 2* sizeof(void*))))
         void setTrackedValue(TComponent* component, const TValue& value) {
