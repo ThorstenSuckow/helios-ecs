@@ -38,7 +38,7 @@ export namespace helios::ecs {
      *     TransformComponent,
      *     VelocityComponent,
      *     Active
-     * >().whereAllEnabled().whereAnyChanged().withOptional<MaybeComponent>()) {
+     * >().whereAnyChanged().withOptional<MaybeComponent>()) {
      *     // Process entity
      * }
      * ```
@@ -80,7 +80,7 @@ export namespace helios::ecs {
         std::tuple<SparseSet<TRequired>*... > includeSets_;
 
         /**
-         * @brief Optional components, might return nullptr. Are not considered by whereAllEnabled() or whereAnyChanged().
+         * @brief Optional components, might return nullptr. Are not considered by whereAnyChanged().
          */
         std::tuple<SparseSet<TOptional>*... > optionalSets_;
 
@@ -96,12 +96,6 @@ export namespace helios::ecs {
          * Operates on EntityId (index) because the SparseSet uses it internally.
          */
         std::vector<std::function<bool(EntityId)>> excludeChecks_;
-
-        /**
-         * @brief Flag to filter only enabled components.
-         */
-        bool filterEnabledOnly_ = false;
-
 
         /**
          * @brief SparseSet for Active component, required with filterActiveOnly_.
@@ -133,7 +127,6 @@ export namespace helios::ecs {
          * @param em Pointer to the EntityManager to retrieve sets and construct Entities.
          * @param includeSets Tuple of pointers to the SparseSets of the required components.
          * @param excludeChecks Vector of functions to determine if an entity should be excluded.
-         * @param filterEnabledOnly Flag to filter only enabled components.
          * @param filterActiveOnly Flag to filter only entities with Active component.
          * @param activeSet Pointer to the SparseSet of Active components.
          */
@@ -141,13 +134,11 @@ export namespace helios::ecs {
             TEntityManager* em,
             std::tuple<SparseSet<TRequired>*...> includeSets,
             std::vector<std::function<bool(EntityId)>> excludeChecks,
-            const bool filterEnabledOnly,
             const bool filterActiveOnly,
             SparseSet<Active<typename TEntityManager::Handle_type>>* activeSet
         )  : em_(em),
             includeSets_(std::move(includeSets)),
             excludeChecks_(std::move(excludeChecks)),
-            filterEnabledOnly_(filterEnabledOnly),
             filterActiveOnly_(filterActiveOnly),
             activeSet_(activeSet),
 
@@ -189,7 +180,6 @@ export namespace helios::ecs {
                 em_,
                 includeSets_,
                 excludeChecks_,
-                filterEnabledOnly_,
                 filterActiveOnly_,
                 activeSet_,
                 anyDirtySets_
@@ -213,7 +203,6 @@ export namespace helios::ecs {
                 em_,
                 includeSets_,
                 excludeChecks_,
-                filterEnabledOnly_,
                 filterActiveOnly_,
                 activeSet_
             );
@@ -276,24 +265,10 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Filters to only include entities with enabled components.
-         *
-         * @details Components must implement `isEnabled()` returning bool.
-         * Components without this method are assumed to be enabled.
-         *
-         * @return Reference to this View for method chaining.
-         */
-        PartialView& whereAllEnabled() {
-            filterEnabledOnly_ = true;
-            return *this;
-        }
-
-
-        /**
          * @brief Forward iterator for View traversal.
          *
          * @details Uses the first component type as the "lead" iterator and
-         * validates each entity against all include/exclude/enabled criteria
+         * validates each entity against all include/exclude criteria
          * before yielding.
          */
         struct Iterator {
@@ -336,7 +311,6 @@ export namespace helios::ecs {
              * 1. Entity validity in the registry
              * 2. Include check - entity has all required components
              * 3. Exclude check - entity has none of the excluded components
-             * 4. Enabled check - all components pass isEnabled() (if filtered)
              *
              * @return True if the entity passes all checks, false otherwise.
              */
@@ -384,33 +358,6 @@ export namespace helios::ecs {
                     }
                 }
 
-                // 4. ENABLED CHECK (State)
-                if (view_->filterEnabledOnly_) {
-
-                    // SFINAE Helper Lambda: Checks if .isEnabled() exists.
-                    auto isComponentEnabled = [](const auto& comp) -> bool {
-                        if constexpr (concepts::traits::HasToggleable<std::remove_cvref_t<decltype(comp)>>) {
-                            return comp.isEnabled();
-                        } else {
-                            return true; // Assume enabled if method is missing.
-                        }
-                    };
-
-                    // Check the Lead component (*current_ returns the component reference)
-                    if (!isComponentEnabled(*current_)) {
-                        return false;
-                    }
-
-                    // Check all other included components
-                    const bool allEnabled = std::apply([&](auto*... sets) {
-                        // sets->get(id) returns a pointer, *ptr gives the reference.
-                        return (isComponentEnabled(*sets->get(entityId)) && ...);
-                    }, view_->includeSets_);
-
-                    if (!allEnabled) {
-                        return false;
-                    }
-                }
 
                 return true;
             }
@@ -457,8 +404,7 @@ export namespace helios::ecs {
              *         3) pointers to all optional components.
              *
              * Optional component pointers may be `nullptr` when the current
-             * entity does not own the respective component (or it is filtered by
-             * `whereAllEnabled()` when `isEnabled()` is available).
+             * entity does not own the respective component.
              *
              * @note Returns by value to support C++17 structured binding.
              */
@@ -474,11 +420,10 @@ export namespace helios::ecs {
                     }, view_->includeSets_),
 
                     std::apply([
-                        entityId,
-                        filterEnabledOnly = view_->filterEnabledOnly_
+                        entityId
                     ](auto*... sets) {
                         return std::make_tuple(
-                        ([filterEnabledOnly, entityId, &sets]() {
+                        ([entityId, &sets]() {
                             if (!sets || !sets->contains(entityId)) {
                                 return nullptr;
                             }
