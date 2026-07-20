@@ -20,4 +20,5 @@ export import helios.ecs.EntityResolver;
 export import helios.ecs.SparseSet;
 export import helios.ecs.concepts.Traits;
 export import helios.ecs.TypedHandleWorld;
+export import helios.ecs.TypeIndexer;
 export import helios.ecs.View;
