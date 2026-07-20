@@ -102,13 +102,6 @@ export namespace helios::ecs::types {
         using OnDeactivateFn = void(*)(void*);
 
         /**
-         * @brief Function signature for committing tracked component changes.
-         *
-         * @param ptr Raw pointer to the component instance.
-         */
-        using CommitFn = void(*)(void*);
-
-        /**
          * @brief Called when entity is acquired from an object pool.
          */
         OnAcquireFn onAcquire = nullptr;
@@ -148,10 +141,6 @@ export namespace helios::ecs::types {
          */
         OnDeactivateFn onDeactivate = nullptr;
 
-        /**
-         * @brief Called to commit tracked component changes.
-         */
-        CommitFn commit = nullptr;
     };
 
 }
