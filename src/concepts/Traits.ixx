@@ -9,7 +9,9 @@ module;
 
 export module helios.ecs.concepts.Traits;
 
+import helios.ecs.commands;
 
+using namespace helios::ecs::commands;
 export namespace helios::ecs::concepts::traits {
 
     /**
@@ -141,6 +143,64 @@ export namespace helios::ecs::concepts::traits {
         {t.onDeactivate()} -> std::same_as<void>;
     };
 
+    /**
+     * @brief Type trait – `true` for `ActivateEntityCommand<THandle>` specialisations.
+     */
+    template<typename T>
+    struct IsActivateEntityCommand : std::false_type {};
 
+    template<typename THandle>
+    struct IsActivateEntityCommand<ActivateEntityCommand<THandle>> : std::true_type {};
+
+    /**
+     * @brief Convenience variable template for `IsActivateEntityCommand`.
+     */
+    template<typename T>
+    inline constexpr bool IsActivateEntityCommand_v = IsActivateEntityCommand<std::remove_cvref_t<T>>::value;
+
+    /**
+     * @brief Type trait – `true` for `DeactivateEntityCommand<THandle>` specialisations.
+     */
+    template<typename T>
+    struct IsDeactivateEntityCommand : std::false_type {};
+
+    template<typename THandle>
+    struct IsDeactivateEntityCommand<DeactivateEntityCommand<THandle>> : std::true_type {};
+
+    /**
+     * @brief Convenience variable template for `IsDeactivateEntityCommand`.
+     */
+    template<typename T>
+    inline constexpr bool IsDeactivateEntityCommand_v = IsDeactivateEntityCommand<std::remove_cvref_t<T>>::value;
+
+    /**
+     * @brief Type trait – `true` for `AddComponentCommand<TComponent>` specialisations.
+     */
+    template<typename T>
+    struct IsAddComponentCommand : std::false_type {};
+
+    template<typename TComponent>
+    struct IsAddComponentCommand<AddComponentCommand<TComponent>> : std::true_type {};
+
+    /**
+     * @brief Convenience variable template for `IsAddComponentCommand`.
+     */
+    template<typename T>
+    inline constexpr bool IsAddComponentCommand_v = IsAddComponentCommand<std::remove_cvref_t<T>>::value;
+
+    /**
+     * @brief Type trait – `true` for `RemoveComponentCommand<TComponent>` specialisations.
+     */
+    template<typename T>
+    struct IsRemoveComponentCommand : std::false_type {};
+
+    template<typename TComponent>
+    struct IsRemoveComponentCommand<RemoveComponentCommand<TComponent>> : std::true_type {};
+
+    /**
+     * @brief Convenience variable template for `IsRemoveComponentCommand`.
+     */
+    template<typename T>
+    inline constexpr bool IsRemoveComponentCommand_v = IsRemoveComponentCommand<std::remove_cvref_t<T>>::value;
 
 }
