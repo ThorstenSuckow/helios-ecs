@@ -15,6 +15,7 @@ import helios.ecs.types.EntityHandle;
 
 import helios.ecs.EntityManager;
 import helios.ecs.components;
+import helios.ecs.commands;
 import helios.ecs.concepts.Traits;
 
 import helios.ecs.ComponentOpsRegistry;
@@ -22,6 +23,7 @@ import helios.ecs.ComponentOpsRegistry;
 import helios.ecs.types.ComponentTypeId;
 
 using namespace helios::ecs::types;
+using namespace helios::ecs::commands;
 using namespace helios::ecs::concepts::traits;
 using namespace helios::ecs::components;
 export namespace helios::ecs {
@@ -111,10 +113,15 @@ export namespace helios::ecs {
     public:
 
         using Handle_type = TEntityManager::Handle_type;
+        /** @brief Concrete `ComponentTypeId` bound to this entity's handle type. */
         using ComponentTypeId_type = ComponentTypeId<Handle_type>;
+        /** @brief Concrete `ComponentOpsRegistry` bound to this entity's handle type. */
         using ComponentOpsRegistry_type = ComponentOpsRegistry<Handle_type>;
+        /** @brief `HierarchyComponent` specialisation for this entity's handle type. */
         using HierarchyComponent_type = HierarchyComponent<Handle_type>;
+        /** @brief `Active` tag component specialisation for this entity's handle type. */
         using ActiveComponent_type = Active<Handle_type>;
+        /** @brief `Inactive` tag component specialisation for this entity's handle type. */
         using InactiveComponent_type = Inactive<Handle_type>;
         
         /**
@@ -196,6 +203,70 @@ export namespace helios::ecs {
             }
 
             return *cmp;
+        }
+
+        /**
+         * @brief Enqueues a deferred add-component command into `buffer`.
+         *
+         * The component is not attached immediately; the command is applied
+         * when the buffer is flushed by the `EntityMutationManager`.
+         *
+         * @tparam TComponent Component type to add.
+         * @tparam TBuffer    Command buffer type. Its `Handle_type` must match this entity's.
+         * @tparam Args       Constructor argument types for `TComponent`.
+         * @param  buffer     Target command buffer to enqueue into.
+         * @param  args       Arguments forwarded to the `TComponent` constructor.
+         */
+        template<typename TComponent, typename TBuffer, typename ...Args>
+        requires std::is_same_v<typename TEntityManager::Handle_type, typename TBuffer::Handle_type>
+        void deferAdd(TBuffer& buffer, Args&& ...args) {
+            buffer.template add<AddComponentCommand<TComponent>>(entityHandle_, std::forward<Args>(args)...);
+        }
+
+        /**
+         * @brief Enqueues a deferred remove-component command into `buffer`.
+         *
+         * The component is not detached immediately; the command is applied
+         * when the buffer is flushed by the `EntityMutationManager`.
+         *
+         * @tparam TComponent Component type to remove.
+         * @tparam TBuffer    Command buffer type. Its `Handle_type` must match this entity's.
+         * @param  buffer     Target command buffer to enqueue into.
+         */
+        template<typename TComponent, typename TBuffer>
+        requires std::is_same_v<typename TEntityManager::Handle_type, typename TBuffer::Handle_type>
+        void deferRemove(TBuffer& buffer) {
+            buffer.template add<RemoveComponentCommand<TComponent>>(entityHandle_);
+        }
+
+        /**
+         * @brief Enqueues a deferred activate-entity command into `buffer`.
+         *
+         * Activation is not applied immediately; the command is processed
+         * when the buffer is flushed by the `EntityMutationManager`.
+         *
+         * @tparam TBuffer Command buffer type. Its `Handle_type` must match this entity's.
+         * @param  buffer  Target command buffer to enqueue into.
+         */
+        template<typename TBuffer>
+        requires std::is_same_v<typename TEntityManager::Handle_type, typename TBuffer::Handle_type>
+        void deferSetActive(TBuffer& buffer) {
+            buffer.template add<ActivateEntityCommand<typename TEntityManager::Handle_type>>(entityHandle_);
+        }
+
+        /**
+         * @brief Enqueues a deferred deactivate-entity command into `buffer`.
+         *
+         * Deactivation is not applied immediately; the command is processed
+         * when the buffer is flushed by the `EntityMutationManager`.
+         *
+         * @tparam TBuffer Command buffer type. Its `Handle_type` must match this entity's.
+         * @param  buffer  Target command buffer to enqueue into.
+         */
+        template<typename TBuffer>
+        requires std::is_same_v<typename TEntityManager::Handle_type, typename TBuffer::Handle_type>
+        void deferSetInactive(TBuffer& buffer) {
+            buffer.template add<DeactivateEntityCommand<typename TEntityManager::Handle_type>>(entityHandle_);
         }
 
         /**
