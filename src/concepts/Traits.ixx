@@ -10,8 +10,10 @@ module;
 export module helios.ecs.concepts.Traits;
 
 import helios.ecs.commands;
+import helios.ecs.components;
 
 using namespace helios::ecs::commands;
+using namespace helios::ecs::components;
 export namespace helios::ecs::concepts::traits {
 
     /**
@@ -142,6 +144,21 @@ export namespace helios::ecs::concepts::traits {
         {t.onActivate()} -> std::same_as<void>;
         {t.onDeactivate()} -> std::same_as<void>;
     };
+
+    /**
+     * @brief Type trait – `true` for `DirtyComponentSpec<TComponent>` specialisations.
+     */
+    template<typename T>
+    struct IsDirtyComponentSpec : std::false_type {};
+
+    template<typename TComponent>
+    struct IsDirtyComponentSpec<DirtyComponentSpec<TComponent>> : std::true_type {};
+
+    /**
+     * @brief Convenience variable template for `IsDirtyComponentSpec`.
+     */
+    template<typename T>
+    inline constexpr bool IsDirtyComponentSpec_v = IsDirtyComponentSpec<std::remove_cvref_t<T>>::value;
 
     /**
      * @brief Type trait – `true` for `ActivateEntityCommand<THandle>` specialisations.
