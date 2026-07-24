@@ -80,10 +80,15 @@ export namespace helios::ecs {
 
     public:
 
+        /** @brief The `EntityRegistry` type used for handle allocation and versioning. */
         using EntityRegistry_type = TEntityRegistry;
+        /** @brief The entity handle type managed by this instance. */
         using Handle_type = THandle;
+        /** @brief Strong identifier type derived from the handle. */
         using StrongId_type = Handle_type::StrongId_type;
+        /** @brief `ComponentTypeId` specialisation bound to `THandle`. */
         using ComponentTypeId_type = ComponentTypeId<Handle_type>;
+        /** @brief `ComponentOpsRegistry` specialisation bound to `THandle`. */
         using ComponentOpsRegistry_type = ComponentOpsRegistry<Handle_type>;
 
         /**
@@ -92,7 +97,14 @@ export namespace helios::ecs {
         EntityManager(const EntityManager&) = delete;
         EntityManager& operator=(const EntityManager&) = delete;
 
+        /**
+         * @brief Move constructor.
+         */
         EntityManager(EntityManager&&) noexcept = default;
+
+        /**
+         * @brief Move-assignment operator.
+         */
         EntityManager& operator=(EntityManager&&) noexcept = default;
 
 
@@ -214,11 +226,11 @@ export namespace helios::ecs {
          * @return Pointer to the SparseSet, or `nullptr` if the type has no storage.
          */
         template<typename T>
-        [[nodiscard]] SparseSet<T>* getSparseSet() {
+        [[nodiscard]] SparseSet<T>* sparseSet() {
 
             const auto typeId = ComponentTypeId_type::template id<T>().value();
 
-            if (typeId >= components_.size()) {
+            if (typeId >= components_.size() || !components_[typeId]) {
                 return nullptr;
             }
 
@@ -233,7 +245,7 @@ export namespace helios::ecs {
          * @return Const pointer to the SparseSet, or `nullptr` if the type has no storage.
          */
         template<typename T>
-        [[nodiscard]] const SparseSet<T>* getSparseSet() const {
+        [[nodiscard]] const SparseSet<T>* sparseSet() const {
 
             const auto typeId = ComponentTypeId_type::template id<T>().value();
 
@@ -292,6 +304,30 @@ export namespace helios::ecs {
             return false;
         }
 
+        /**
+         * @brief Ensures that a `SparseSet` for `TComponent` exists, creating it if necessary.
+         *
+         * Resizes the component storage vector and allocates a new `SparseSet`
+         * when the type has not been seen before. Safe to call multiple times.
+         *
+         * @tparam TComponent Component type whose storage should be guaranteed.
+         * @return Non-owning pointer to the (potentially newly created) `SparseSet`.
+         */
+        template<typename TComponent>
+        [[nodiscard]] SparseSet<TComponent>* ensureSparseSet() {
+
+            const auto typeId = ComponentTypeId_type::template id<TComponent>().value();
+
+            if (typeId >= components_.size()) {
+                components_.resize(typeId + 1);
+            }
+
+            if (!components_[typeId]) {
+                components_[typeId] = std::make_unique<SparseSet<TComponent>>(capacity_);
+            }
+
+            return static_cast<SparseSet<TComponent>*>(components_[typeId].get());
+        }
 
         /**
          * @brief Constructs and attaches a component to an entity.
@@ -321,15 +357,7 @@ export namespace helios::ecs {
 
             const auto typeId = ComponentTypeId_type::template id<T>().value();
 
-            if (typeId >= components_.size()) {
-                components_.resize(typeId + 1);
-            }
-
-            if (!components_[typeId]) {
-                components_[typeId] = std::make_unique<SparseSet<T>>(capacity_);
-            }
-
-            auto* sparseSet = static_cast<SparseSet<T>*>(components_[typeId].get());
+            auto* sparseSet = ensureSparseSet<T>();
 
             if (sparseSet->contains(entityId)) {
                 return nullptr;
@@ -384,7 +412,7 @@ export namespace helios::ecs {
          * @see SparseSet::remove
          */
         template<typename T>
-        bool remove(const Handle_type& handle) {
+        [[nodiscard]] bool remove(const Handle_type& handle) {
 
             if (!has<T>(handle)) {
                 return false;
@@ -434,6 +462,8 @@ export namespace helios::ecs {
                 components_.resize(typeId + 1);
             }
 
+            // not calling ensureSparseSet() since we need to make sure registeredDirtySets
+            // is pushed once with typeId
             if (!components_[typeId]) {
                 components_[typeId] = std::make_unique<SparseSet<DirtyComponentSpec<TComponent>>>(capacity_);
                 registeredDirtySets_.push_back(typeId);
@@ -448,7 +478,7 @@ export namespace helios::ecs {
                     }
                 }
                 if (!found) {
-                    assert(false && "typeId found, but was missing in registeredSets_");
+                    assert(false && "typeId found, but was missing in registeredDirtySets_");
                     //registeredDirtySets_.push_back(typeId);
                 }
 
@@ -459,7 +489,7 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Clears all dirty sets that have been registered with `registerDirtySet()`.
+         * @brief Clears all dirty sets that have been registered via `trackDirty()`.
          *
          * @todo garbage management when components are entirely removed and not managed by this manager anymore
          */
@@ -473,9 +503,11 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Checks if the Sparse Set for the specified DirtyComponentSpec<T> exists and clears it.
+         * @brief Checks if the `SparseSet` for `DirtyComponentSpec<T>` exists and clears it.
          *
-         * @tparam T
+         * Accepts a variadic list of component types; all matching dirty sets are cleared.
+         *
+         * @tparam T Component types whose dirty sets should be cleared.
          */
         template<typename... T>
         void clearDirtySet() {
@@ -488,9 +520,15 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Returns a span over all component type IDs attached to an entity.
+         * @brief Invokes `func` for every component type ID attached to an entity.
          *
+         * Iterates over all allocated component slots and calls `func(ComponentTypeId)`
+         * for each type whose `SparseSet` contains the given entity.
+         * Does nothing if the handle is invalid.
+         *
+         * @tparam TFunc Callable with signature `void(ComponentTypeId_type)`.
          * @param handle The entity to query.
+         * @param func   Callback invoked for each attached component type.
          */
         template<typename TFunc>
         void forEachComponentTypeId(const Handle_type handle, TFunc&& func) const {
@@ -566,6 +604,7 @@ export namespace helios::ecs {
 
     private:
 
+        /** @brief Type IDs of all dirty sets registered via `trackDirty()`, used by `clearAllDirtySets()`. */
         std::vector<size_t> registeredDirtySets_;
 
 
