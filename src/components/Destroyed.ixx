@@ -16,6 +16,10 @@ export namespace helios::ecs::components {
  * @tparam THandle Entity handle type associated with the owning world.
  */
 template<typename THandle>
-struct Destroyed{};
+struct Destroyed {
+
+    using Handle_type = THandle;
+
+};
 
 }

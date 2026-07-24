@@ -24,6 +24,7 @@ export namespace helios::ecs::components {
 
     public:
 
+        using Handle_type = TOwnerHandle;
         /**
          * @brief Creates a binding from an explicit target handle.
          *

@@ -21,6 +21,9 @@ export namespace helios::ecs::components {
      * @see Entity::setActive
      */
     template<typename THandle>
-    struct Active {};
+    struct Active {
+
+        using Handle_type = THandle;
+    };
 
 }
