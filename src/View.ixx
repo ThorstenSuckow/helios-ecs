@@ -117,7 +117,7 @@ export namespace helios::ecs {
             requires (sizeof...(TOptional) == 0 && sizeof...(TDirty) == 0)
         : em_(em) {
             // Retrieve pointers to the specific component sets immediately.
-            includeSets_ = std::make_tuple(em_->template getSparseSet<TRequired>()...);
+            includeSets_ = std::make_tuple(em_->template sparseSet<TRequired>()...);
         };
 
 
@@ -142,8 +142,8 @@ export namespace helios::ecs {
             filterActiveOnly_(filterActiveOnly),
             activeSet_(activeSet),
 
-            optionalSets_(std::make_tuple(em_->template getSparseSet<TOptional>()...)),
-            anyDirtySets_(std::make_tuple(em_->template getSparseSet<DirtyComponentSpec<TDirty>>()...))
+            optionalSets_(std::make_tuple(em_->template sparseSet<TOptional>()...)),
+            anyDirtySets_(std::make_tuple(em_->template sparseSet<DirtyComponentSpec<TDirty>>()...))
         {}
 
         /**
@@ -230,7 +230,7 @@ export namespace helios::ecs {
          */
         template<typename T>
         PartialView& exclude() {
-            auto* set = em_->template getSparseSet<T>();
+            auto* set = em_->template sparseSet<T>();
 
             if (set) {
                 excludeChecks_.emplace_back([set](EntityId entityId) {
@@ -259,7 +259,7 @@ export namespace helios::ecs {
          * @return Reference to this View for method chaining.
          */
         PartialView& withActive() {
-            activeSet_ = em_->template getSparseSet<Active<typename TEntityManager::Handle_type>>();
+            activeSet_ = em_->template sparseSet<Active<typename TEntityManager::Handle_type>>();
             filterActiveOnly_ = true;
             return *this;
         }
