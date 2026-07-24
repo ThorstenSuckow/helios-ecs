@@ -112,6 +112,7 @@ export namespace helios::ecs {
 
     public:
 
+        /** @brief The entity handle type managed by the bound `TEntityManager`. */
         using Handle_type = TEntityManager::Handle_type;
         /** @brief Concrete `ComponentTypeId` bound to this entity's handle type. */
         using ComponentTypeId_type = ComponentTypeId<Handle_type>;
@@ -240,10 +241,11 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Enqueues a deferred activate-entity command into `buffer`.
+         * @brief Enqueues the commands required to activate this entity into `buffer`.
          *
-         * Activation is not applied immediately; the command is processed
-         * when the buffer is flushed by the `EntityMutationManager`.
+         * Adds `Active`, removes `Inactive`, and adds `DirtyComponentSpec<Active>`
+         * via deferred commands. Also registers `Active` for dirty tracking immediately.
+         * Commands are applied when the buffer is flushed by the `EntityMutationManager`.
          *
          * @tparam TBuffer Command buffer type. Its `Handle_type` must match this entity's.
          * @param  buffer  Target command buffer to enqueue into.
@@ -251,14 +253,19 @@ export namespace helios::ecs {
         template<typename TBuffer>
         requires std::is_same_v<typename TEntityManager::Handle_type, typename TBuffer::Handle_type>
         void deferSetActive(TBuffer& buffer) {
-            buffer.template add<ActivateEntityCommand<typename TEntityManager::Handle_type>>(entityHandle_);
+            buffer.template add<AddComponentCommand<Active<typename TEntityManager::Handle_type>>>(entityHandle_);
+            buffer.template add<RemoveComponentCommand<Active<typename TEntityManager::Handle_type>>>(entityHandle_);
+            buffer.template add<AddComponentCommand<DirtyComponentSpec<Active<typename TEntityManager::Handle_type>>>>(entityHandle_);
+
+            trackDirty<Active<typename TEntityManager::Handle_type>>();
         }
 
         /**
-         * @brief Enqueues a deferred deactivate-entity command into `buffer`.
+         * @brief Enqueues the commands required to deactivate this entity into `buffer`.
          *
-         * Deactivation is not applied immediately; the command is processed
-         * when the buffer is flushed by the `EntityMutationManager`.
+         * Adds `Inactive`, removes `Active`, and adds `DirtyComponentSpec<Inactive>`
+         * via deferred commands. Also registers `Inactive` for dirty tracking immediately.
+         * Commands are applied when the buffer is flushed by the `EntityMutationManager`.
          *
          * @tparam TBuffer Command buffer type. Its `Handle_type` must match this entity's.
          * @param  buffer  Target command buffer to enqueue into.
@@ -266,7 +273,11 @@ export namespace helios::ecs {
         template<typename TBuffer>
         requires std::is_same_v<typename TEntityManager::Handle_type, typename TBuffer::Handle_type>
         void deferSetInactive(TBuffer& buffer) {
-            buffer.template add<DeactivateEntityCommand<typename TEntityManager::Handle_type>>(entityHandle_);
+            buffer.template add<AddComponentCommand<Inactive<typename TEntityManager::Handle_type>>>(entityHandle_);
+            buffer.template add<RemoveComponentCommand<Active<typename TEntityManager::Handle_type>>>(entityHandle_);
+            buffer.template add<AddComponentCommand<DirtyComponentSpec<Inactive<typename TEntityManager::Handle_type>>>>(entityHandle_);
+
+            trackDirty<Inactive<typename TEntityManager::Handle_type>>();
         }
 
         /**
