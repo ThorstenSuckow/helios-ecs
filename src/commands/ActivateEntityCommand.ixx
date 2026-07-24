@@ -6,6 +6,9 @@ module;
 
 export module helios.ecs.commands:ActivateEntityCommand;
 
+import helios.ecs.components.Active;
+
+using namespace helios::ecs::components;
 export namespace helios::ecs::commands {
 
     /**
@@ -21,6 +24,8 @@ export namespace helios::ecs::commands {
 
         /** @brief The handle type identifying the target entity. */
         using Handle_type = TMemberHandle;
+
+        using Component_type = Active<TMemberHandle>;
 
         /** @brief Handle of the entity to activate. */
         Handle_type handle;

@@ -6,6 +6,9 @@ module;
 
 export module helios.ecs.commands:DeactivateEntityCommand;
 
+import helios.ecs.components.Inactive;
+
+using namespace helios::ecs::components;
 export namespace helios::ecs::commands {
 
     /**
@@ -21,6 +24,8 @@ export namespace helios::ecs::commands {
 
         /** @brief The handle type identifying the target entity. */
         using Handle_type = TMemberHandle;
+
+        using Component_type = Inactive<TMemberHandle>;
 
         /** @brief Handle of the entity to deactivate. */
         Handle_type handle;
