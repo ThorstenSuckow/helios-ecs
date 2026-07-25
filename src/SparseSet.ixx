@@ -8,18 +8,19 @@ module;
 #include <functional>
 #include <vector>
 #include <cstddef>
+#include <span>
 
 export module helios.ecs.SparseSet;
 
 import helios.ecs.types.EntityHandle;
-import helios.ecs.types.TypeDefs;
+import helios.ecs.types;
 
 
 using namespace helios::ecs::types;
 export namespace helios::ecs {
 
     /**
-     * @brief Abstract base class for type-erased sparse set access.
+     * @brief Abstract base class for type-erased, non thread-safe sparse set access.
      *
      * `SparseSetBase` provides a non-templated interface for polymorphic
      * operations on sparse sets. This enables containers to store
@@ -72,6 +73,40 @@ export namespace helios::ecs {
          * @return Raw pointer to the element, or `nullptr` if not found.
          */
         [[nodiscard]] virtual void* raw(EntityId id) = 0;
+
+
+        /**
+         * @brief Returns the highest `EntityId` currently stored in this set.
+         *
+         * Returns `Tombstone` if the set is empty.
+         *
+         * @return The maximum `EntityId`, or `Tombstone` if the set is empty.
+         */
+        [[nodiscard]] virtual EntityId maxEntityId() const noexcept = 0;
+
+        /**
+         * @brief Returns the number of elements currently stored in this set.
+         *
+         * @return Dense element count.
+         */
+        [[nodiscard]] virtual size_t componentCount() const noexcept = 0;
+
+        /**
+         * @brief Returns a non-owning span over all `EntityId`s currently in the set.
+         *
+         * The span is backed by the internal dense-to-sparse mapping and is
+         * invalidated by any mutating operation on the set.
+         *
+         * @return Span of `EntityId`s in dense storage order.
+         */
+        [[nodiscard]] virtual std::span<const EntityId> entityIds() const noexcept = 0;
+
+        /**
+         * @brief Refreshes internal metadata after mutations.
+         *
+         * @warning Not Thread safe, requires exlusive access to an instance of this class.
+         */
+        virtual void finalizeMutations() noexcept = 0;
     };
 
 
@@ -145,7 +180,29 @@ export namespace helios::ecs {
          */
         std::vector<T> storage_;
 
+        /**
+         * @brief Max EntityId available in this SparseSet, defaults to `Tombstone`.
+         */
+        mutable EntityId maxEntityId_ = Tombstone;
+
+        /**
+         * @brief Flag indicating if the maxEntityId_ needs to be updated.
+         */
+        mutable bool needsMaxUpdate_ = false;
+
+        /**
+         * @brief Helper for updating Max EntityId.
+         *
+         * @param idx New EntityId.
+         */
+        inline void updateMaxEntityId(EntityId idx) {
+            maxEntityId_ = maxEntityId_ == Tombstone ? idx : std::max(maxEntityId_, idx);
+        }
     public:
+
+
+        using Component_type = T;
+
 
         /**
          * @brief Default constructor creating an empty sparse set.
@@ -183,6 +240,9 @@ export namespace helios::ecs {
          */
         SparseSet& operator=(SparseSet&&) noexcept = default;
 
+        ComponentTypeId<T> componentTypeId() {
+            return ComponentTypeId<typename T::Handle_type>::template id<T>();
+        };
 
         /**
          * @brief Constructs and inserts an element at the given index.
@@ -215,6 +275,8 @@ export namespace helios::ecs {
 
             sparse_[idx] = denseIndex;
 
+            updateMaxEntityId(idx);
+
             return &storage_.back();
         }
 
@@ -246,6 +308,8 @@ export namespace helios::ecs {
             storage_.emplace_back(std::move(obj));
 
             sparse_[idx] = denseIndex;
+
+            updateMaxEntityId(idx);
 
             return &storage_.back();
         }
@@ -285,6 +349,10 @@ export namespace helios::ecs {
             denseToSparse_.pop_back();
 
             sparse_[idx] = Tombstone;
+
+            if (!needsMaxUpdate_ && idx == maxEntityId_) {
+                needsMaxUpdate_ = true;
+            }
 
             return true;
         }
@@ -348,8 +416,49 @@ export namespace helios::ecs {
             sparse_.clear();
             denseToSparse_.clear();
             storage_.clear();
+            maxEntityId_ = Tombstone;
+            needsMaxUpdate_ = false;
         }
 
+        /**
+         * @brief Returns a non-owning span of all EntityIds currently in the set.
+         *
+         * @return A span of EntityIds.
+         */
+        [[nodiscard]] std::span<const EntityId> entityIds() const noexcept override {
+            return denseToSparse_;
+        }
+
+        /**
+         * @brief Returns the number of components currently stored in this set.
+         *
+         * @return The number of components.
+         */
+        [[nodiscard]] size_t componentCount() const noexcept override {
+            return storage_.size();
+        }
+
+        /**
+         * @brief Returns the current maxEntityId of this set, which might equal to Tombstone.
+         * In this case this set has currently no valid maxEntityId.
+         *
+         * @return The max EntityId occuring in this SparseSet.
+         */
+        [[nodiscard]] EntityId maxEntityId() const noexcept override {
+            return maxEntityId_;
+        }
+
+        /**
+         * @copydocs SparseSetBase::finalizeMutations()
+         */
+        void finalizeMutations() noexcept override {
+            if (needsMaxUpdate_) {
+                maxEntityId_ = denseToSparse_.empty()
+                            ? Tombstone
+                            : *std::max_element(denseToSparse_.begin(), denseToSparse_.end());
+                needsMaxUpdate_ = false;
+            }
+        }
 
         /**
          * @brief Forward iterator for traversing the sparse set.

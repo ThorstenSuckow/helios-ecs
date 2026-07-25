@@ -146,6 +146,21 @@ export namespace helios::ecs::concepts::traits {
     };
 
     /**
+     * @brief Type trait – `true` for `Active<Thandle>` specialisations.
+     */
+    template<typename T>
+    struct IsActiveComponent : std::false_type {};
+
+    template<typename THandle>
+    struct IsActiveComponent<Active<THandle>> : std::true_type {};
+
+    /**
+     * @brief Convenience variable template for `IsActiveComponent`.
+     */
+    template<typename T>
+    inline constexpr bool IsActiveComponent_v = IsActiveComponent<std::remove_cvref_t<T>>::value;
+
+    /**
      * @brief Type trait – `true` for `DirtyComponentSpec<TComponent>` specialisations.
      */
     template<typename T>
