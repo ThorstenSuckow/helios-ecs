@@ -133,7 +133,7 @@ export namespace helios::ecs {
         void initializeRequiredSets() {
             (sortedRequires_.push_back(em_->template sparseSet<TIncluded>()), ...);
 
-            maxEntityId_ = std::ranges::min(sortedRequires_ | std::views::transform([](const auto* set){
+            maxEntityId_ = std::ranges::min(std::views::transform(sortedRequires_, [](const auto* set){
                 return set ? set->maxEntityId() : Tombstone;
             }));
 
