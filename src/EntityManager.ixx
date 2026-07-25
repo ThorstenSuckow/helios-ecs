@@ -8,7 +8,7 @@ module;
 #include <vector>
 #include <cstddef>
 #include <cassert>
-
+#include <algorithm>
 #include "helios-ecs-config.h"
 
 export module helios.ecs.EntityManager;
@@ -27,7 +27,15 @@ using namespace helios::ecs::types;
 using namespace helios::ecs::components;
 using namespace helios::ecs::concepts;
 export namespace helios::ecs {
-    
+
+    /**
+     * @brief Defines the criteria for sorting entities in the `EntityManager`.
+     */
+    enum class SortCriteria {
+        MaxEntityId,
+        ComponentCount
+    };
+
     /**
      * @brief Manages entities and their associated components.
      *
@@ -76,6 +84,7 @@ export namespace helios::ecs {
         size_t TCapacity
     > 
     class EntityManager {
+
 
 
     public:
@@ -602,6 +611,66 @@ export namespace helios::ecs {
             return Handle_type{entityId, registry_.version(entityId), registry_.strongId(entityId)};
         }
 
+        /**
+         * @brief Sorts the submitted list of SparseSets in a ascending order.
+         *
+         * Nullptr entries are treated as having the lowest value.
+         *
+         * @warning The caller must ensure exclusive access to the SparseSets since componentCount() is not thread-safe.
+         *
+         * @param sparseSets The list of SparseSets to sort.
+         * @param sortCriteria The criteria to sort by.
+         */
+        void sort(std::vector<SparseSetBase*>& sparseSets, const SortCriteria sortCriteria) noexcept {
+
+            switch (sortCriteria) {
+                case SortCriteria::MaxEntityId:
+                    std::sort(sparseSets.begin(), sparseSets.end(),
+                        [this](const auto a, const auto b) noexcept{
+                        const auto aMax = a ? a->maxEntityId() : Tombstone;
+                        const auto bMax = b ? b->maxEntityId() : Tombstone;
+
+                        const bool aTombstone = aMax == Tombstone;
+                        const bool bTombstone = bMax == Tombstone;
+
+                        if (aTombstone && bTombstone) {
+                            return false;
+                        }
+
+                        if (aTombstone || bTombstone) {
+                            return aTombstone && !bTombstone;
+                        }
+
+                        return aMax < bMax;
+                    });
+                return;
+                case SortCriteria::ComponentCount:
+                    std::sort(sparseSets.begin(), sparseSets.end(),
+                        [this](const auto a, const auto b) noexcept{
+                        const auto aMax = a ? a->componentCount() : 0;
+                        const auto bMax = b ? b->componentCount() : 0;
+
+                        return aMax < bMax;
+                    });
+                return;
+            }
+
+            std::unreachable();
+        }
+
+        /**
+         * @brief Finalizes any outstanding mutations of the managed data containers.
+         *
+         * @warning This method is not thread safe.
+         */
+        void finalizeMutations() {
+            for (const auto& set : components_) {
+                if (set) {
+                    set->finalizeMutations();
+                }
+            }
+        }
+
     private:
 
         /** @brief Type IDs of all dirty sets registered via `trackDirty()`, used by `clearAllDirtySets()`. */
@@ -624,7 +693,6 @@ export namespace helios::ecs {
          * @brief Initial capacity for the underlying sparse sets.
          */
         const size_t capacity_;
-
     };
 
 
