@@ -7,16 +7,20 @@ module;
 #include <tuple>
 #include <vector>
 #include <functional>
+#include <scoped_allocator>
+#include <algorithm>
+#include <ranges>
 
 export module helios.ecs.View;
 
 import helios.ecs.components;
 import helios.ecs.SparseSet;
-import helios.ecs.types.TypeDefs;
 import helios.ecs.EntityManager;
 import helios.ecs.Entity;
 import helios.ecs.concepts.Traits;
 import helios.ecs.types.EntityHandle;
+
+import helios.ecs.types;
 
 using namespace helios::ecs::types;
 using namespace helios::ecs::components;
@@ -46,7 +50,7 @@ export namespace helios::ecs {
      * @tparam TEntityManager The concrete `EntityManager` specialisation to
      *                        iterate over. Determines the handle type and
      *                        component storage used.
-     * @tparam TRequiredComponents Tuple of required component types.
+     * @tparam TIncludedComponents Tuple of required component types.
      * @tparam TDirtyComponents Tuple of dirty component types.
      * @tparam TOptionalComponents Tuple of optional component types.
      *
@@ -54,7 +58,7 @@ export namespace helios::ecs {
      * @see SparseSet
      * @see TypedHandleWorld
      */
-    template<typename TEntityManager, typename TRequiredComponents, typename TDirtyComponents, typename TOptionalComponents>
+    template<typename TEntityManager, typename TIncludedComponents, typename TDirtyComponents, typename TOptionalComponents>
     class PartialView;
 
     /**
@@ -65,11 +69,11 @@ export namespace helios::ecs {
      * @tparam TEntityManager Concrete entity manager type.
      * @tparam TRequired Required component types that must be present.
      */
-    template<typename TEntityManager, typename... TRequired>
-    using View = PartialView<TEntityManager, std::tuple<TRequired...>, std::tuple<>, std::tuple<>>;
+    template<typename TEntityManager, typename... TIncluded>
+    using View = PartialView<TEntityManager, std::tuple<TIncluded...>, std::tuple<>, std::tuple<>>;
 
-    template<typename TEntityManager, typename... TRequired, typename... TDirty, typename... TOptional>
-    class PartialView<TEntityManager, std::tuple<TRequired...>, std::tuple<TDirty...>, std::tuple<TOptional...>> {
+    template<typename TEntityManager, typename... TIncluded, typename... TDirty, typename... TOptional>
+    class PartialView<TEntityManager, std::tuple<TIncluded...>, std::tuple<TDirty...>, std::tuple<TOptional...>> {
 
     private:
         TEntityManager* em_;
@@ -77,10 +81,10 @@ export namespace helios::ecs {
         /**
          * @brief Pointers to the SparseSets of the included components.
          */
-        std::tuple<SparseSet<TRequired>*... > includeSets_;
+        std::tuple<SparseSet<TIncluded>*... > includeSets_;
 
         /**
-         * @brief Optional components, might return nullptr. Are not considered by whereAnyChanged().
+         * @brief Optional components, might return nullptr. Are not considered by whereAnyDirty().
          */
         std::tuple<SparseSet<TOptional>*... > optionalSets_;
 
@@ -98,14 +102,43 @@ export namespace helios::ecs {
         std::vector<std::function<bool(EntityId)>> excludeChecks_;
 
         /**
-         * @brief SparseSet for Active component, required with filterActiveOnly_.
-         */
-        SparseSet<Active<typename TEntityManager::Handle_type>>* activeSet_ = nullptr;
-
-        /**
          * @brief Flag to filter only entities with Active component.
          */
         bool filterActiveOnly_ = false;
+
+        /**
+         * @brief Required SparseSets sorted by `componentCount` ascending.
+         *
+         * The set with fewest elements drives iteration (smallest lead set),
+         * minimising the number of entities that must be validated against
+         * the remaining sets.
+         */
+        std::vector<SparseSetBase*> sortedRequires_;
+
+        /**
+         * @brief Upper bound on `EntityId` values present in all required sets.
+         *
+         * Computed as the minimum `maxEntityId()` across all required sets
+         * during construction. Used to short-circuit `isValid()` early.
+         */
+        EntityId maxEntityId_ = 0;
+
+        /**
+         * @brief Populates `sortedRequires_` and computes `maxEntityId_`.
+         *
+         * Gathers all required-component SparseSets, determines the effective
+         * entity-ID upper bound, and sorts the sets by `componentCount` so the
+         * smallest set leads iteration.
+         */
+        void initializeRequiredSets() {
+            (sortedRequires_.push_back(em_->template sparseSet<TIncluded>()), ...);
+
+            maxEntityId_ = std::ranges::min(sortedRequires_ | std::views::transform([](const auto* set){
+                return set ? set->maxEntityId() : Tombstone;
+            }));
+
+            em_->sort(sortedRequires_, SortCriteria::ComponentCount);
+        };
 
     public:
         /**
@@ -115,9 +148,12 @@ export namespace helios::ecs {
          */
         explicit PartialView(TEntityManager* em)
             requires (sizeof...(TOptional) == 0 && sizeof...(TDirty) == 0)
-        : em_(em) {
+        : em_(em),
+        includeSets_(std::make_tuple(em_->template sparseSet<TIncluded>()...))
+        {
             // Retrieve pointers to the specific component sets immediately.
-            includeSets_ = std::make_tuple(em_->template sparseSet<TRequired>()...);
+
+            initializeRequiredSets();
         };
 
 
@@ -132,19 +168,19 @@ export namespace helios::ecs {
          */
         explicit PartialView(
             TEntityManager* em,
-            std::tuple<SparseSet<TRequired>*...> includeSets,
+            std::tuple<SparseSet<TIncluded>*...> includeSets,
             std::vector<std::function<bool(EntityId)>> excludeChecks,
-            const bool filterActiveOnly,
-            SparseSet<Active<typename TEntityManager::Handle_type>>* activeSet
+            const bool filterActiveOnly
         )  : em_(em),
             includeSets_(std::move(includeSets)),
             excludeChecks_(std::move(excludeChecks)),
             filterActiveOnly_(filterActiveOnly),
-            activeSet_(activeSet),
 
             optionalSets_(std::make_tuple(em_->template sparseSet<TOptional>()...)),
-            anyDirtySets_(std::make_tuple(em_->template sparseSet<DirtyComponentSpec<TDirty>>()...))
-        {}
+            anyDirtySets_(std::make_tuple(em_->template sparseSet<DirtyComponentSpec<TDirty>>()...)) {
+
+            initializeRequiredSets();
+        }
 
         /**
          * @brief Adds optional component types to the current view.
@@ -174,14 +210,13 @@ export namespace helios::ecs {
         {
             return PartialView<
                 TEntityManager,
-                std::tuple<TRequired...>,
+                std::tuple<TIncluded...>,
                 std::tuple<TDirty...>,
                 std::tuple<TNewOptional...>>(
                 em_,
                 includeSets_,
                 excludeChecks_,
                 filterActiveOnly_,
-                activeSet_,
                 anyDirtySets_
             );
         }
@@ -193,18 +228,16 @@ export namespace helios::ecs {
          */
         template<typename... TNewDirty>
         auto whereAnyDirty() requires (sizeof...(TOptional) == 0 && sizeof...(TDirty) == 0)  {
-
             return PartialView<
                 TEntityManager,
-                std::tuple<TRequired...>,
+                std::tuple<TIncluded...>,
                 std::tuple<TNewDirty...>,
                 std::tuple<>
             >(
                 em_,
                 includeSets_,
                 excludeChecks_,
-                filterActiveOnly_,
-                activeSet_
+                filterActiveOnly_
             );
 
         }
@@ -240,6 +273,7 @@ export namespace helios::ecs {
             return *this;
         }
 
+
         /**
          * @brief Returns true if the view has no entities to iterate over.
          *
@@ -258,10 +292,24 @@ export namespace helios::ecs {
          *
          * @return Reference to this View for method chaining.
          */
-        PartialView& withActive() {
-            activeSet_ = em_->template sparseSet<Active<typename TEntityManager::Handle_type>>();
-            filterActiveOnly_ = true;
-            return *this;
+        auto withActive()
+            requires (sizeof...(TOptional) == 0 && sizeof...(TDirty) == 0)
+        {
+            using ActiveComponent = Active<typename TEntityManager::Handle_type>;
+
+            return PartialView<
+               TEntityManager,
+               std::tuple<ActiveComponent, TIncluded...>,
+               std::tuple<>,
+               std::tuple<>
+           >(
+               em_,
+               std::tuple_cat(
+                    std::make_tuple(em_->template sparseSet<ActiveComponent>()), includeSets_
+                ),
+               excludeChecks_,
+               true
+           );
         }
 
         /**
@@ -273,20 +321,19 @@ export namespace helios::ecs {
          */
         struct Iterator {
 
+            /** @brief `Entity` wrapper type produced on dereference. */
             using Entity_type = Entity<TEntityManager>;
 
-            /**
-             * @brief The first component type determines iteration order.
-             */
-            using LeadComponent = std::tuple_element_t<0, std::tuple<TRequired...>>;
+            /** @brief Iterator over the lead set's dense entity-ID span. */
+            using LeadIterator = std::span<const EntityId>::iterator;
 
-            /**
-             * @brief Iterator type from the lead component's SparseSet.
-             */
-            using LeadIterator  = typename SparseSet<LeadComponent>::Iterator;
-
+            /** @brief Current position in the lead set's entity-ID span. */
             LeadIterator current_;
+
+            /** @brief Sentinel past the last entity in the lead set. */
             LeadIterator end_;
+
+            /** @brief Non-owning pointer to the owning `PartialView` for filter access. */
             const PartialView* view_;
 
             /**
@@ -320,30 +367,24 @@ export namespace helios::ecs {
                 }
 
                 // 1. Get Entity ID (from the Lead Iterator)
-                EntityId entityId = current_.entityId();
+                EntityId entityId = *current_;
 
-                if (!view_->em_->isValid(entityId)) {
+                if (entityId > view_->maxEntityId_ || !view_->em_->isValid(entityId)) {
                     return false;
                 }
 
-                // 2. INCLUDE CHECK (Do we have all other required components?)
-                // We iterate over the tuple of sets and check 'contains' for each.
-                const bool hasAllIncludes = std::apply([entityId](auto*... sets) {
-                    return ((sets && sets->contains(entityId)) && ...);
-                }, view_->includeSets_);
-
-                if (view_->filterActiveOnly_ && (!view_->activeSet_ || !view_->activeSet_->contains(entityId))) {
-                    return false;
+                // 2. INCLUDE CHECK (Do we have all required components?)
+                for (auto* set : view_->sortedRequires_) {
+                    if (entityId > set->maxEntityId() || !set->contains(entityId)) {
+                        return false;
+                    }
                 }
 
-                if (!hasAllIncludes) {
-                    return false;
-                }
 
                 // dirty check
                 if constexpr (sizeof...(TDirty) > 0) {
                     const bool hasAnyDirtyIncludes = std::apply([entityId](auto*... sets) {
-                       return ((sets && sets->contains(entityId)) || ...);
+                       return ((sets && entityId <= sets->maxEntityId() && sets->contains(entityId)) || ...);
                    }, view_->anyDirtySets_);
 
                     if (!hasAnyDirtyIncludes) {
@@ -396,6 +437,26 @@ export namespace helios::ecs {
             }
 
             /**
+             * @brief Active components are never part of the returned tuple.
+             *
+             * @tparam TSet The type of the component set.
+             * @param entityId The ID of the entity.
+             * @param set The component set.
+             * @return A tuple containing the component if it's not active, otherwise an empty tuple.
+             */
+            template<typename TSet>
+            static auto includeComponent(EntityId entityId, TSet* set) {
+                using Component_type = typename TSet::Component_type;
+
+                if constexpr(IsActiveComponent_v<Component_type>) {
+                    return std::tuple{};
+                } else {
+                    return std::make_tuple(set->get(entityId));
+                }
+
+            }
+
+            /**
              * @brief Dereference operator.
              *
              * @return A tuple containing:
@@ -409,14 +470,15 @@ export namespace helios::ecs {
              * @note Returns by value to support C++17 structured binding.
              */
             [[nodiscard]] auto operator*() const {
-                EntityId entityId = current_.entityId();
+                EntityId entityId = *current_;
                 auto handle = view_->em_->handle(entityId);
-
+                auto filterActiveOnly = view_->filterActiveOnly_;
 
                 return std::tuple_cat(
                     std::make_tuple(Entity_type(handle, view_->em_)),
+
                     std::apply([entityId](auto*... sets) {
-                        return std::make_tuple(sets->get(entityId)...);
+                        return std::tuple_cat(includeComponent(entityId, sets)...);
                     }, view_->includeSets_),
 
                     std::apply([
@@ -451,13 +513,21 @@ export namespace helios::ecs {
          * @return Iterator to the first valid entity, or end() if none found.
          */
         [[nodiscard]] Iterator begin() {
-            auto* leadSet = std::get<0>(includeSets_);
 
-            if (!leadSet) {
+            if (sortedRequires_.empty()) {
                 return Iterator{};
             }
 
-            Iterator it{leadSet->begin(), leadSet->end(), this};
+            // check if any nullptr occurs
+            for (const auto* set : sortedRequires_) {
+                if (!set) {
+                    return Iterator{};
+                }
+            }
+
+            const auto entities = sortedRequires_.front()->entityIds();
+
+            Iterator it{entities.begin(), entities.end(), this};
 
             if (!it.isValid()) {
                 it.advance();
@@ -472,13 +542,19 @@ export namespace helios::ecs {
          * @return End iterator for comparison.
          */
         [[nodiscard]] Iterator end() {
-            auto* leadSet = std::get<0>(includeSets_);
-
-            if (!leadSet) {
+            if (sortedRequires_.empty()) {
                 return Iterator{};
             }
 
-            return Iterator{leadSet->end(), leadSet->end(), this};
+            // check if any nullptr occurs
+            for (const auto* set : sortedRequires_) {
+                if (!set) {
+                    return Iterator{};
+                }
+            }
+
+            const auto entities = sortedRequires_.front()->entityIds();
+            return Iterator{entities.end(), entities.end(), this};
         }
 
     };
