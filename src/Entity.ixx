@@ -104,7 +104,7 @@ export namespace helios::ecs {
         void markDirty() {
             if (!entityManager_->template  managesDirty<T>()) {
                 bool mg = entityManager_->template  managesDirty<T>();
-                assert((entityManager_->template managesDirty<T>()) && "Cannot mark component as dirty, not tracked by EntityManager." );
+                assert(mg && "Cannot mark component as dirty, not tracked by EntityManager." );
 
             }
             getOrAdd<DirtyComponentSpec<T>>();
