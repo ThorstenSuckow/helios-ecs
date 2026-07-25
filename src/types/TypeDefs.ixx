@@ -54,7 +54,7 @@ export namespace helios::ecs::types {
      * @see EntityPool
      * @see EntityPool
      */
-    constexpr size_t EntityTombstone = std::numeric_limits<size_t>::max();
+    constexpr EntityId EntityTombstone = std::numeric_limits<EntityId>::max();
 
     /**
      * @brief Underlying integer type for all strong identifiers.
