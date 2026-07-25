@@ -369,18 +369,6 @@ export namespace helios::ecs {
                 // 1. Get Entity ID (from the Lead Iterator)
                 EntityId entityId = *current_;
 
-                if (entityId > view_->maxEntityId_ || !view_->em_->isValid(entityId)) {
-                    return false;
-                }
-
-                // 2. INCLUDE CHECK (Do we have all required components?)
-                for (auto* set : view_->sortedRequires_) {
-                    if (entityId > set->maxEntityId() || !set->contains(entityId)) {
-                        return false;
-                    }
-                }
-
-
                 // dirty check
                 if constexpr (sizeof...(TDirty) > 0) {
                     const bool hasAnyDirtyIncludes = std::apply([entityId](auto*... sets) {
@@ -391,6 +379,15 @@ export namespace helios::ecs {
                         return false;
                     }
                 }
+
+                // 2. INCLUDE CHECK (Do we have all required components? - leadset mustnt be considered)
+                for (std::size_t i = 1; i < view_->sortedRequires_.size(); ++i) {
+                    auto* set = view_->sortedRequires_[i];
+                    if (entityId > set->maxEntityId() || !set->contains(entityId)) {
+                        return false;
+                    }
+                }
+
 
                 // 3. EXCLUDE CHECK (Must NOT be present)
                 for (const auto& excludeCheck : view_->excludeChecks_) {
@@ -472,7 +469,6 @@ export namespace helios::ecs {
             [[nodiscard]] auto operator*() const {
                 EntityId entityId = *current_;
                 auto handle = view_->em_->handle(entityId);
-                auto filterActiveOnly = view_->filterActiveOnly_;
 
                 return std::tuple_cat(
                     std::make_tuple(Entity_type(handle, view_->em_)),
@@ -515,13 +511,24 @@ export namespace helios::ecs {
         [[nodiscard]] Iterator begin() {
 
             if (sortedRequires_.empty()) {
-                return Iterator{};
+                return end();
             }
 
             // check if any nullptr occurs
             for (const auto* set : sortedRequires_) {
                 if (!set) {
-                    return Iterator{};
+                    return end();
+                }
+            }
+
+            // dirty check. If dirty checks are required, but empty, there is no result set
+            if constexpr (sizeof...(TDirty) > 0) {
+                const bool dirtyIncludesEmpty = std::apply([](auto*... sets) {
+                    return ((sets && sets->componentCount() == 0) && ...);
+                }, anyDirtySets_);
+
+                if (dirtyIncludesEmpty) {
+                    return end();
                 }
             }
 
