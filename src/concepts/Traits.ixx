@@ -161,36 +161,6 @@ export namespace helios::ecs::concepts::traits {
     inline constexpr bool IsDirtyComponentSpec_v = IsDirtyComponentSpec<std::remove_cvref_t<T>>::value;
 
     /**
-     * @brief Type trait – `true` for `ActivateEntityCommand<THandle>` specialisations.
-     */
-    template<typename T>
-    struct IsActivateEntityCommand : std::false_type {};
-
-    template<typename THandle>
-    struct IsActivateEntityCommand<ActivateEntityCommand<THandle>> : std::true_type {};
-
-    /**
-     * @brief Convenience variable template for `IsActivateEntityCommand`.
-     */
-    template<typename T>
-    inline constexpr bool IsActivateEntityCommand_v = IsActivateEntityCommand<std::remove_cvref_t<T>>::value;
-
-    /**
-     * @brief Type trait – `true` for `DeactivateEntityCommand<THandle>` specialisations.
-     */
-    template<typename T>
-    struct IsDeactivateEntityCommand : std::false_type {};
-
-    template<typename THandle>
-    struct IsDeactivateEntityCommand<DeactivateEntityCommand<THandle>> : std::true_type {};
-
-    /**
-     * @brief Convenience variable template for `IsDeactivateEntityCommand`.
-     */
-    template<typename T>
-    inline constexpr bool IsDeactivateEntityCommand_v = IsDeactivateEntityCommand<std::remove_cvref_t<T>>::value;
-
-    /**
      * @brief Type trait – `true` for `AddComponentCommand<TComponent>` specialisations.
      */
     template<typename T>
