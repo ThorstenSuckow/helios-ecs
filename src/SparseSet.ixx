@@ -186,16 +186,27 @@ export namespace helios::ecs {
         mutable EntityId maxEntityId_ = Tombstone;
 
         /**
-         * @brief Flag indicating if the maxEntityId_ needs to be updated.
+         * @brief Holds the last maxEntityId-value before removal happend.
+         * Used to compare with new maxEntityIds: If a new maxEntityId is higher than this value,
+         * no maxEntityId needs to be recalculated in finalizeMutations().
          */
-        mutable bool needsMaxUpdate_ = false;
+        EntityId invalidatedMaxEntityId_ = Tombstone;
 
         /**
          * @brief Helper for updating Max EntityId.
          *
+         * Keeps a possible maxEntityId_-Tombstone as long valid as a invalidatedMaxEntityId_
+         * couldnt be resolved.
+         *
          * @param idx New EntityId.
          */
-        inline void updateMaxEntityId(EntityId idx) {
+        inline void updateMaxEntityId(const EntityId idx) {
+            if (invalidatedMaxEntityId_ != Tombstone && invalidatedMaxEntityId_ <= idx) {
+                invalidatedMaxEntityId_ = Tombstone;
+                maxEntityId_ = idx;
+                return;
+            }
+            
             maxEntityId_ = maxEntityId_ == Tombstone ? idx : std::max(maxEntityId_, idx);
         }
     public:
@@ -350,8 +361,12 @@ export namespace helios::ecs {
 
             sparse_[idx] = Tombstone;
 
-            if (!needsMaxUpdate_ && idx == maxEntityId_) {
-                needsMaxUpdate_ = true;
+            if (denseToSparse_.empty()) {
+                maxEntityId_ = Tombstone;
+                invalidatedMaxEntityId_ = Tombstone;
+            } else if (invalidatedMaxEntityId_ == Tombstone && idx == maxEntityId_) {
+                invalidatedMaxEntityId_ = maxEntityId_;
+                maxEntityId_ = Tombstone;
             }
 
             return true;
@@ -417,7 +432,7 @@ export namespace helios::ecs {
             denseToSparse_.clear();
             storage_.clear();
             maxEntityId_ = Tombstone;
-            needsMaxUpdate_ = false;
+            invalidatedMaxEntityId_ = Tombstone;
         }
 
         /**
@@ -452,11 +467,11 @@ export namespace helios::ecs {
          * @copydocs SparseSetBase::finalizeMutations()
          */
         void finalizeMutations() noexcept override {
-            if (needsMaxUpdate_) {
+            if (invalidatedMaxEntityId_ != Tombstone) {
                 maxEntityId_ = denseToSparse_.empty()
                             ? Tombstone
                             : *std::max_element(denseToSparse_.begin(), denseToSparse_.end());
-                needsMaxUpdate_ = false;
+                invalidatedMaxEntityId_ = Tombstone;
             }
         }
 
