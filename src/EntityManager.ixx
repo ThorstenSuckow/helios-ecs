@@ -671,6 +671,16 @@ export namespace helios::ecs {
             }
         }
 
+        /**
+         * @brief Allow for finalizing mutations of a specific component type's SparseSet.
+         *
+         * @param typeId The type ID of the component whose SparseSet should be finalized.
+         */
+        void finalizeMutations(const ComponentTypeId_type typeId) {
+            assert (components_[typeId.value()] && "Component-group not existing.");
+            components_[typeId.value()]->finalizeMutations();
+        }
+
     private:
 
         /** @brief Type IDs of all dirty sets registered via `trackDirty()`, used by `clearAllDirtySets()`. */
