@@ -213,15 +213,15 @@ export namespace helios::ecs {
          * @return True if the handle is valid and the entity is alive.
          */
         [[nodiscard]] bool isValid(const EntityHandle<TDomainTag> handle) const noexcept {
-            const auto index = handle.entityId;
+            const auto index = handle.entityId();
 
             if (index >= static_cast<EntityId>(versions_.size())) {
                 return false;
             }
 
-            return handle.strongId.value() == strongIds_[index] &&
-                   handle.versionId == versions_[index] &&
-                   handle.strongId.isValid();
+            return handle.strongId().value() == strongIds_[index] &&
+                   handle.versionId() == versions_[index] &&
+                   handle.strongId().isValid();
         }
 
 
@@ -250,12 +250,12 @@ export namespace helios::ecs {
                 return false;
             }
 
-            const auto index = handle.entityId;
+            const auto index = handle.entityId();
 
             versions_[index] += 1;
             strongIds_[index] = 0;
 
-            const bool removed = lookupStrategy_.remove(handle.strongId.value());
+            const bool removed = lookupStrategy_.remove(handle.strongId().value());
             assert(removed && "EntityRegistry: failed to remove strongId from lookupStrategy");
 
             freeList_.push_back(index);

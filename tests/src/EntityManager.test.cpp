@@ -37,9 +37,11 @@ public:
 class MyComponent {
 
     public:
+
+    using Handle_type = TestHandle;
+
     int value = 0;
     bool remove = true;
-
     bool onRemove() {
         return remove;
     }
@@ -57,8 +59,8 @@ TEST(EntityManager, create) {
     TestEntityManager em;
 
     const auto handle = em.create();
-    EXPECT_EQ(handle.entityId, 0);
-    EXPECT_EQ(handle.versionId, 1);
+    EXPECT_EQ(handle.entityId(), 0);
+    EXPECT_EQ(handle.versionId(), 1);
 }
 
 TEST(EntityManager, destroy) {
@@ -69,8 +71,8 @@ TEST(EntityManager, destroy) {
     TestEntityManager em;
 
     const auto handle = em.create();
-    EXPECT_EQ(handle.entityId, 0);
-    EXPECT_EQ(handle.versionId, 1);
+    EXPECT_EQ(handle.entityId(), 0);
+    EXPECT_EQ(handle.versionId(), 1);
 
     em.emplace<MyComponent>(handle, 10);
     em.emplace<TestEntity>(handle, 10);
@@ -91,8 +93,8 @@ TEST(EntityManager, emplace) {
     TestEntityManager em;
 
     const auto handle = em.create();
-    EXPECT_EQ(handle.entityId, 0);
-    EXPECT_EQ(handle.versionId, 1);
+    EXPECT_EQ(handle.entityId(), 0);
+    EXPECT_EQ(handle.versionId(), 1);
 
     EXPECT_FALSE(em.has<MyComponent>(handle));
 
@@ -119,8 +121,8 @@ TEST(EntityManager, remove) {
     TestEntityManager em;
 
     const auto handle = em.create();
-    EXPECT_EQ(handle.entityId, 0);
-    EXPECT_EQ(handle.versionId, 1);
+    EXPECT_EQ(handle.entityId(), 0);
+    EXPECT_EQ(handle.versionId(), 1);
 
     EXPECT_FALSE(em.has<MyComponent>(handle));
 

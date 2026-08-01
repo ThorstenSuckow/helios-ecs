@@ -23,15 +23,15 @@ TEST(EntityRegistryTest, create) {
     {
         auto handle = registry.create();
 
-        EXPECT_EQ(handle.entityId, 0);
-        EXPECT_EQ(handle.versionId, 1);
+        EXPECT_EQ(handle.entityId(), 0);
+        EXPECT_EQ(handle.versionId(), 1);
     }
 
     {
         auto handle = registry.create();
 
-        EXPECT_EQ(handle.entityId, 1);
-        EXPECT_EQ(handle.versionId, 1);
+        EXPECT_EQ(handle.entityId(), 1);
+        EXPECT_EQ(handle.versionId(), 1);
     }
 }
 
@@ -53,8 +53,8 @@ TEST(EntityRegistryTest, destroyAndreuse) {
 
     auto handle = registry.create();
 
-    EXPECT_EQ(handle.entityId, 0);
-    EXPECT_EQ(handle.versionId, 1);
+    EXPECT_EQ(handle.entityId(), 0);
+    EXPECT_EQ(handle.versionId(), 1);
 
 
     EXPECT_FALSE(registry.destroy({EntityId{1}, VersionId{2}}));
@@ -65,7 +65,7 @@ TEST(EntityRegistryTest, destroyAndreuse) {
     handle = registry.create();
 
     // reused id, updated version
-    EXPECT_EQ(handle.entityId, 0);
-    EXPECT_EQ(handle.versionId, 2);
+    EXPECT_EQ(handle.entityId(), 0);
+    EXPECT_EQ(handle.versionId(), 2);
 
 }

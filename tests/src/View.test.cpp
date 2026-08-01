@@ -29,6 +29,9 @@ template <typename TOwnerHandle>
 class MyComponent {
 
     public:
+
+    using Handle_type = TOwnerHandle;
+
     int value = 0;
     bool remove = true;
 
@@ -50,8 +53,8 @@ TEST(View, find) {
     TestEntityManager em{};
 
     const auto handle = em.create();
-    EXPECT_EQ(handle.entityId, 0);
-    EXPECT_EQ(handle.versionId, 1);
+    EXPECT_EQ(handle.entityId(), 0);
+    EXPECT_EQ(handle.versionId(), 1);
 
     EXPECT_FALSE(em.has<MyComponent<TestHandle>>(handle));
     EXPECT_FALSE(em.has<DirtyComponentSpec<MyComponent<TestHandle>>>(handle));

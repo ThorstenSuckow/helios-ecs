@@ -8,6 +8,7 @@ module;
 #include <functional>
 #include <cstdint>
 #include <cstddef>
+#include <cassert>
 
 export module helios.ecs.types.EntityHandle;
 
@@ -39,33 +40,78 @@ export namespace helios::ecs::types {
      * registered entities. The version ensures that handles to removed
      * entities are detected as stale.
      *
+     * Default constructed EntityHandles with EntityId and VersionId == 0 are treated as invalid.
+     * An invalid EntityId is guaranteed to provide the EntityId == 0.
+     *
      * @tparam TDomainTag Domain tag used to derive `StrongId<TDomainTag>`.
      *
      * @see EntityRegistry
      */
     template<typename TDomainTag>
-    struct EntityHandle {
+    class EntityHandle {
 
         /**
          * @brief The unique identifier for the entity within the registry.
          */
-        EntityId entityId{0};
+        EntityId entityId_{0};
 
         /**
          * @brief The version number for stale handle detection.
          *
          * Incremented when an entity is removed from the registry.
          */
-        VersionId versionId = InvalidVersion;
+        VersionId versionId_ = InvalidVersion;
 
         /**
          * @brief The domain-specific strong ID associated with this handle.
          */
-        StrongId<TDomainTag> strongId{};
+        StrongId<TDomainTag> strongId_{};
+
+    public:
 
         using DomainTag_type = TDomainTag;
 
         using StrongId_type = StrongId<TDomainTag>;
+
+        /**
+         * @brief Default constructs invalid handle.
+         */
+        EntityHandle() noexcept = default;
+
+        /**
+         * @brief Constructs an EntityHandle with a valid version.
+         *
+         * @param entityId The entity id to use.
+         * @param versionId The versionId, must not equal to InvalidVersion.
+         * @param strongId An optional StrongId.
+         */
+        EntityHandle(const EntityId entityId, const VersionId versionId, const StrongId_type strongId = {}) noexcept : entityId_(entityId), versionId_(versionId), strongId_(strongId) {
+            assert(versionId_ != InvalidVersion && "EntityHandle must not be constructed with InvalidVersion.");
+        }
+
+        /**
+         * @brief Returns the entity ID associated with this handle.
+         * @return The entity ID.
+         */
+        [[nodiscard]] EntityId entityId() const noexcept {
+            return entityId_;
+        }
+
+        /**
+         * @brief Returns the version ID associated with this handle.
+         * @return The version ID.
+         */
+        [[nodiscard]] VersionId versionId() const noexcept {
+            return versionId_;
+        }
+
+        /**
+         * @brief Returns the strong ID associated with this handle.
+         * @return The strong ID.
+         */
+        [[nodiscard]] StrongId_type strongId() const noexcept {
+            return strongId_;
+        }
 
         /**
          * @brief Compares two handles for equality.
@@ -80,7 +126,7 @@ export namespace helios::ecs::types {
          * @return True if this handle's entity ID is less than the other.
          */
         constexpr bool operator<(const EntityHandle<TDomainTag>& entityHandle) const noexcept {
-            return entityId < entityHandle.entityId;
+            return entityId_ < entityHandle.entityId_;
         }
 
         /**
@@ -91,7 +137,7 @@ export namespace helios::ecs::types {
          * @return True if this handle's entity ID is greater than the other.
          */
         constexpr bool operator>(const EntityHandle<TDomainTag>& entityHandle) const noexcept {
-            return entityId > entityHandle.entityId;
+            return entityId_ > entityHandle.entityId_;
         }
 
 
@@ -101,7 +147,7 @@ export namespace helios::ecs::types {
          * @return True if the version is at least 1 (initial version).
          */
         [[nodiscard]] bool isValid() const noexcept {
-            return versionId >= 1;
+            return versionId_ != InvalidVersion;
         }
 
     };

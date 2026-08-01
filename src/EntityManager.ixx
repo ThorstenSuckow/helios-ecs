@@ -195,7 +195,7 @@ export namespace helios::ecs {
                     }
                 }
 
-                components_[i]->remove(handle.entityId);
+                components_[i]->remove(handle.entityId());
             }
 
             registry_.destroy(handle);
@@ -219,7 +219,7 @@ export namespace helios::ecs {
                 return nullptr;
             }
 
-            const auto entityId = handle.entityId;
+            const auto entityId = handle.entityId();
             const auto typeId = ComponentTypeId_type::template id<T>().value();
 
             auto* sparseSet = static_cast<SparseSet<T>*>(components_[typeId].get());
@@ -284,7 +284,7 @@ export namespace helios::ecs {
             const auto typeId = ComponentTypeId_type::template id<T>().value();
 
             if (typeId < components_.size() && components_[typeId]) {
-                return components_[typeId]->contains(handle.entityId);
+                return components_[typeId]->contains(handle.entityId());
             }
 
             return false;
@@ -307,7 +307,7 @@ export namespace helios::ecs {
             const auto tvalue = typeId.value();
 
             if (tvalue < components_.size() && components_[tvalue]) {
-                return components_[tvalue]->contains(handle.entityId);
+                return components_[tvalue]->contains(handle.entityId());
             }
 
             return false;
@@ -362,7 +362,7 @@ export namespace helios::ecs {
                 return nullptr;
             }
 
-            const auto entityId = handle.entityId;
+            const auto entityId = handle.entityId();
 
             const auto typeId = ComponentTypeId_type::template id<T>().value();
 
@@ -438,7 +438,7 @@ export namespace helios::ecs {
                 return false;
             }
 
-            return components_[typeId.value()]->remove(handle.entityId);
+            return components_[typeId.value()]->remove(handle.entityId());
         }
 
         /**
@@ -546,7 +546,7 @@ export namespace helios::ecs {
             }
 
             for (size_t i = 0; i < components_.size(); i++) {
-                if (components_[i] && components_[i]->contains(handle.entityId)) {
+                if (components_[i] && components_[i]->contains(handle.entityId())) {
                     std::forward<TFunc>(func)(ComponentTypeId_type{i});
                 }
             }
@@ -597,7 +597,7 @@ export namespace helios::ecs {
                 return nullptr;
             }
 
-            return components_[typeId.value()]->raw(handle.entityId);
+            return components_[typeId.value()]->raw(handle.entityId());
         }
 
         /**
