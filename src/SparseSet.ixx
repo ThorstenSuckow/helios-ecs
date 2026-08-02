@@ -84,7 +84,7 @@ export namespace helios::ecs {
          * @param sourceId The EntityId of the source component.
          * @param targetId The EntityId of the target component.
          *
-         * @return Pointer to the cloned component, or `nullptr` if cloning failed, e.g.
+         * @return Pointer to the copy component, or `nullptr` if cloning failed, e.g.
          * because the component is not copy-constructible or the target already contains the component.
          */
         [[nodiscard]] virtual void* copy(EntityId sourceId, EntityId targetId) = 0;

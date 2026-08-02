@@ -97,8 +97,6 @@ export namespace helios::ecs {
         using StrongId_type = Handle_type::StrongId_type;
         /** @brief `ComponentTypeId` specialisation bound to `THandle`. */
         using ComponentTypeId_type = ComponentTypeId<Handle_type>;
-        /** @brief `ComponentOpsRegistry` specialisation bound to `THandle`. */
-        using ComponentOpsRegistry_type = ComponentOpsRegistry<Handle_type>;
 
         /**
          * @brief Non-copyable: copying an EntityManager is explicitly disabled.
@@ -187,12 +185,6 @@ export namespace helios::ecs {
 
                 if (!components_[i]) {
                     continue;
-                }
-                const auto typeId = ComponentTypeId_type{i};
-                if (void* rawCmp = raw(handle, typeId)) {
-                    if (const auto& ops = ComponentOpsRegistry_type::ops(typeId); ops.onRemove) {
-                        ops.onRemove(rawCmp);
-                    }
                 }
 
                 components_[i]->remove(handle.entityId());
@@ -298,8 +290,7 @@ export namespace helios::ecs {
          *
          * @return `true` if the entity has the component, `false` otherwise.
          */
-        [[nodiscard]] bool has(const Handle_type handle, 
-            const ComponentTypeId_type typeId) const {
+        [[nodiscard]] bool has(const Handle_type handle, const ComponentTypeId_type typeId) const {
             if (!registry_.isValid(handle)) {
                 return false;
             }
@@ -414,8 +405,7 @@ export namespace helios::ecs {
          * @param handle The entity whose component to remove.
          *
          * @return `true` if the component was removed, `false` if the handle was
-         *         invalid, the component was not attached, or removal was blocked
-         *         by `onRemove`.
+         *         invalid or the component was not attached.
          *
          * @see destroy
          * @see SparseSet::remove
@@ -428,15 +418,6 @@ export namespace helios::ecs {
             }
 
             const auto typeId = ComponentTypeId_type::template id<T>();
-            void* rawCmp = raw(handle, typeId);
-            if (!rawCmp) {
-                return false;
-            }
-            const auto& ops = ComponentOpsRegistry_type::ops(typeId);
-
-            if (ops.onRemove && !ops.onRemove(rawCmp)) {
-                return false;
-            }
 
             return components_[typeId.value()]->remove(handle.entityId());
         }
@@ -553,31 +534,27 @@ export namespace helios::ecs {
          }
 
         /**
-         * @brief Clones all components from source entity to target entity.
+         * @brief Copies all components from source entity to target entity.
          *
          * @details Iterates through all components on the source and copies them
-         * to the target using the registered clone function. Skips components
-         * that already exist on the target.
+         * to the target by invoking `SparseSet::copy()` for each component type.
+         * Skips component types that already exist on the target entity.
          *
-         * @param source The entity to clone from.
-         * @param target The entity to clone to.
+         * @param source The entity to copy from.
+         * @param target The entity to copy to.
          */
-        void clone(const Handle_type source, const Handle_type target) {
+        void copy(const Handle_type source, const Handle_type target) {
 
             if (!registry_.isValid(source)) {
                 return;
             }
 
             forEachComponentTypeId(
+                    source,
                 [&](const ComponentTypeId_type typeId) {
                     if (!has(target, typeId)) {
 
-                        const auto& ops = ComponentOpsRegistry_type::ops(typeId);
-                        const void* sourceCmp = raw(source, typeId);
-
-                        if (sourceCmp && ops.clone) {
-                            ops.clone(this, sourceCmp, &target);
-                        }
+                        components_[typeId.value()]->copy(source.entityId(), target.entityId());
                     }
                 }
             );

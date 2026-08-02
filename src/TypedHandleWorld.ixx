@@ -238,10 +238,10 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Clones all components from a source entity into a new entity.
+         * @brief Copies all components from a source entity into a new entity.
          *
          * @details Creates a new entity in the same domain and copies every
-         * component attached to `source` into it via `EntityManager::clone()`.
+         * component attached to `source` into it via `EntityManager::copy()`.
          *
          * @tparam THandle The handle type identifying the target domain.
          *
@@ -250,12 +250,12 @@ export namespace helios::ecs {
          * @return An `Entity` wrapping the newly created clone.
          */
         template<typename THandle>
-        [[nodiscard]] auto cloneEntity(THandle source) noexcept {
+        [[nodiscard]] auto copyEntity(THandle source) noexcept {
             auto& em = entityManager<THandle>();
 
             auto entity = addEntity<THandle>();
 
-            em.clone(source, entity.handle());
+            em.copy(source, entity.handle());
 
             return entity;
         }

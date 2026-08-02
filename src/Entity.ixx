@@ -183,25 +183,9 @@ export namespace helios::ecs {
         template<typename T, typename ...Args>
         T& add(Args&& ...args) {
 
-            bool active = true;
-
-            if (entityManager_->template  has<ActiveComponent_type>(entityHandle_)) {
-                active = true;
-            } else {
-                active = false;
-            }
-
-            auto* cmp = entityManager_->template  emplace<T>(entityHandle_, std::forward<Args>(args)...);
-
             auto typeId = ComponentTypeId_type::template id<T>();
-            const auto ops = ComponentOpsRegistry_type::ops(typeId);
-            void* raw = entityManager_->raw(entityHandle_, typeId);
 
-            if (active && ops.onActivate) {
-                ops.onActivate(raw);
-            } else if (!active && ops.onDeactivate) {
-                ops.onDeactivate(raw);
-            }
+            auto* cmp = entityManager_->template emplace<T>(entityHandle_, std::forward<Args>(args)...);
 
             return *cmp;
         }
@@ -483,19 +467,6 @@ export namespace helios::ecs {
                 trackDirty<InactiveComponent_type>();
             }
 
-            forEachComponentTypeId(
-                [&](const ComponentTypeId_type typeId) {
-                    const auto& ops = ComponentOpsRegistry_type::ops(typeId);
-
-                    if (active && ops.onActivate) {
-                        void* raw = entityManager_->raw(entityHandle_, typeId);
-                        ops.onActivate(raw);
-                    } else if (!active && ops.onDeactivate) {
-                        void* raw = entityManager_->raw(entityHandle_, typeId);
-                        ops.onDeactivate(raw);
-                    }
-                }
-            );
         }
 
         /**
