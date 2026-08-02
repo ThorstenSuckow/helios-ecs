@@ -74,6 +74,20 @@ export namespace helios::ecs {
          */
         [[nodiscard]] virtual void* raw(EntityId id) = 0;
 
+        /**
+         * @brief Copy-constructs a component from one entity slot into another.
+         *
+         * @details Copies a component for the specified sourceId to the targetId. Checks
+         * if the component is copy-constructible. Resulting data is depending on the
+         * source components constructor.
+         *
+         * @param sourceId The EntityId of the source component.
+         * @param targetId The EntityId of the target component.
+         *
+         * @return Pointer to the cloned component, or `nullptr` if cloning failed, e.g.
+         * because the component is not copy-constructible or the target already contains the component.
+         */
+        [[nodiscard]] virtual void* copy(EntityId sourceId, EntityId targetId) = 0;
 
         /**
          * @brief Returns the highest `EntityId` currently stored in this set.
@@ -323,6 +337,42 @@ export namespace helios::ecs {
             updateMaxEntityId(idx);
 
             return &storage_.back();
+        }
+
+        /**
+         * @copydoc SparseSetBase::copy
+         */
+        [[nodiscard]] void* copy(const EntityId sourceId, const EntityId targetId) override {
+
+            if constexpr (!std::copy_constructible<T>) {
+                return nullptr;
+            } else {
+                // not existing
+                if (sourceId >= sparse_.size() || sparse_[sourceId] == Tombstone) {
+                    return nullptr;
+                }
+
+                // already in use
+                if (targetId < sparse_.size() && sparse_[targetId] != Tombstone) {
+                    return nullptr;
+                }
+
+                if (targetId >= sparse_.size()) {
+                    sparse_.resize(targetId + 1, Tombstone);
+                }
+
+                const auto denseIndex = storage_.size();
+
+                denseToSparse_.push_back(targetId);
+                const T& cmp = storage_[sparse_[sourceId]];
+                storage_.emplace_back(cmp);
+
+                sparse_[targetId] = denseIndex;
+
+                updateMaxEntityId(targetId);
+
+                return &storage_.back();
+            }
         }
 
         /**
