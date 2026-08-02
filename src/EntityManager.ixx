@@ -15,7 +15,6 @@ export module helios.ecs.EntityManager;
 
 import helios.ecs.SparseSet;
 import helios.ecs.EntityRegistry;
-import helios.ecs.ComponentOpsRegistry;
 
 import helios.ecs.types;
 import helios.ecs.components;

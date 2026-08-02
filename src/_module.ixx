@@ -12,8 +12,6 @@ export import helios.ecs.strategies;
 export import helios.ecs.components;
 export import helios.ecs.commands;
 
-export import helios.ecs.ComponentOpsRegistry;
-export import helios.ecs.ComponentReflector;
 export import helios.ecs.Entity;
 export import helios.ecs.EntityManager;
 export import helios.ecs.EntityRegistry;

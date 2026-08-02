@@ -18,8 +18,6 @@ import helios.ecs.components;
 import helios.ecs.commands;
 import helios.ecs.concepts.Traits;
 
-import helios.ecs.ComponentOpsRegistry;
-
 import helios.ecs.types.ComponentTypeId;
 
 using namespace helios::ecs::types;
@@ -70,7 +68,7 @@ export namespace helios::ecs {
      * }
      *
      * // Activation state (propagates to children if HierarchyComponent present)
-     * player.setActive(false);  // Calls onDeactivate() on components
+     * player.setActive(false);
      * ```
      *
      * @tparam TEntityManager The entity manager type providing handle and component storage.
@@ -116,8 +114,6 @@ export namespace helios::ecs {
         using Handle_type = TEntityManager::Handle_type;
         /** @brief Concrete `ComponentTypeId` bound to this entity's handle type. */
         using ComponentTypeId_type = ComponentTypeId<Handle_type>;
-        /** @brief Concrete `ComponentOpsRegistry` bound to this entity's handle type. */
-        using ComponentOpsRegistry_type = ComponentOpsRegistry<Handle_type>;
         /** @brief `HierarchyComponent` specialisation for this entity's handle type. */
         using HierarchyComponent_type = HierarchyComponent<Handle_type>;
         /** @brief `Active` tag component specialisation for this entity's handle type. */
@@ -169,9 +165,6 @@ export namespace helios::ecs {
 
         /**
          * @brief Constructs and attaches a component to this entity.
-         *
-         * @details If the entity is active, calls `onActivate()` on the new component.
-         * If inactive, calls `onDeactivate()`.
          *
          * @tparam T The component type to add.
          * @tparam Args Constructor argument types.
@@ -429,14 +422,12 @@ export namespace helios::ecs {
          *
          * @details When deactivated:
          * - The `Active` tag component is removed
-         * - `onDeactivate()` is called on components that support it
          * - If a `HierarchyComponent` is present, it is marked dirty for propagation
          * - Inactive will be marked as dirty component to indicate state change.
          *
          * When activated:
          * - The `Inactive` tag component is removed
          * - An `Active` tag component is added
-         * - `onActivate()` is called on components that support it
          * - If a `HierarchyComponent` is present, it is marked dirty for propagation
          * - Active will be marked as dirty component to indicate state change.
          *
@@ -478,46 +469,6 @@ export namespace helios::ecs {
             return entityManager_->template has<ActiveComponent_type>(entityHandle_);
         }
 
-        /**
-         * @brief Notifies all components that the entity is being released to a pool.
-         *
-         * @details Iterates through all attached components and calls `onRelease()`
-         * on those that implement it.
-         */
-        void onRelease() {
-
-            forEachComponentTypeId(
-                [&](const ComponentTypeId_type typeId) {
-                    const auto& ops = ComponentOpsRegistry_type::ops(typeId);
-
-                    if (ops.onRelease) {
-                        void* raw = entityManager_->raw(entityHandle_, typeId);
-                        ops.onRelease(raw);
-                    }
-                }
-            );
-
-
-        }
-
-        /**
-         * @brief Notifies all components that the entity is being acquired from a pool.
-         *
-         * @details Iterates through all attached components and calls `onAcquire()`
-         * on those that implement it.
-         */
-        void onAcquire() {
-            forEachComponentTypeId(
-                [&](const ComponentTypeId_type typeId) {
-                    const auto& ops = ComponentOpsRegistry_type::ops(typeId);
-
-                    if (ops.onAcquire) {
-                        void* raw = entityManager_->raw(entityHandle_, typeId);
-                        ops.onAcquire(raw);
-                    }
-                }
-            );
-        }
 
     };
 
