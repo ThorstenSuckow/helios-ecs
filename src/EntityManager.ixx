@@ -6,7 +6,7 @@ module;
 
 #include <memory>
 #include <vector>
-#include <cstddef>
+#include <utility>
 #include <cassert>
 #include <algorithm>
 #include "helios-ecs-config.h"
@@ -223,10 +223,10 @@ export namespace helios::ecs {
          *
          * @tparam T The component type.
          *
-         * @return Pointer to the SparseSet, or `nullptr` if the type has no storage.
+         * @return Const Pointer to the SparseSet, or `nullptr` if the type has no storage.
          */
         template<typename T>
-        [[nodiscard]] SparseSet<T>* sparseSet() {
+        [[nodiscard]] const SparseSet<T>* sparseSet() const noexcept {
 
             const auto typeId = ComponentTypeId_type::template id<T>().value();
 
@@ -242,18 +242,11 @@ export namespace helios::ecs {
          *
          * @tparam T The component type.
          *
-         * @return Const pointer to the SparseSet, or `nullptr` if the type has no storage.
+         * @return Pointer to the SparseSet, or `nullptr` if the type has no storage.
          */
         template<typename T>
-        [[nodiscard]] const SparseSet<T>* sparseSet() const {
-
-            const auto typeId = ComponentTypeId_type::template id<T>().value();
-
-            if (typeId >= components_.size()) {
-                return nullptr;
-            }
-
-            return static_cast<SparseSet<T>*>(components_[typeId].get());
+        [[nodiscard]] SparseSet<T>* sparseSet() {
+            return const_cast<SparseSet<T>*>(std::as_const(*this).template sparseSet<T>());
         }
 
         /**
@@ -553,7 +546,7 @@ export namespace helios::ecs {
                 [&](const ComponentTypeId_type typeId) {
                     if (!has(target, typeId)) {
 
-                        components_[typeId.value()]->copy(source.entityId(), target.entityId());
+                        std::ignore = components_[typeId.value()]->copy(source.entityId(), target.entityId());
                     }
                 }
             );
