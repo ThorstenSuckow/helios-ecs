@@ -7,7 +7,6 @@ module;
 #include <vector>
 #include <algorithm>
 #include <ranges>
-#include <cstddef>
 
 export module helios.ecs.strategies.LinearLookupStrategy;
 
@@ -24,12 +23,11 @@ export namespace helios::ecs::strategies {
      * O(1) removal. Suitable for small registries where hash overhead is
      * undesirable.
      *
-     * @tparam TCapacity Default initial capacity for pre-allocation.
      *
      * @see EntityRegistry
      * @see HashedLookupStrategy
      */
-    template<size_t TCapacity>
+    template<typename THandle = void>
     class LinearLookupStrategy {
 
         /**
@@ -44,7 +42,7 @@ export namespace helios::ecs::strategies {
          *
          * @param capacity The initial capacity to reserve.
          */
-        explicit LinearLookupStrategy(const size_t capacity = TCapacity) {
+        explicit LinearLookupStrategy(const size_t capacity) {
             strongIds_.reserve(capacity);
         };
 

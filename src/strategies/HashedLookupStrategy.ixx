@@ -24,6 +24,7 @@ export namespace helios::ecs::strategies {
      * @see EntityRegistry
      * @see LinearLookupStrategy
      */
+    template<typename THandle = void>
     class HashedLookupStrategy {
 
         /**
@@ -32,6 +33,8 @@ export namespace helios::ecs::strategies {
         std::unordered_set<StrongId_t> strongIds_;
 
     public:
+
+        explicit HashedLookupStrategy() = default;
 
         /**
          * @brief Constructs a strategy with pre-allocated capacity.
