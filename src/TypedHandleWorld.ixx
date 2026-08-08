@@ -126,6 +126,14 @@ export namespace helios::ecs {
         using EntityManager_types = std::tuple<TEntityManagers...>;
 
         /**
+         * @brief Inits a TypedHandle world with the specified managers.
+         *
+         * @param managers
+         */
+        TypedHandleWorld(TEntityManagers&&... managers)
+            : entityManagers_(std::forward<TEntityManagers>(managers)...) {}
+
+        /**
          * @brief Returns a reference to the EntityManager that owns handles
          *        of type `THandle`.
          *

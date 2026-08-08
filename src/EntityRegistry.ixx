@@ -60,17 +60,15 @@ export namespace helios::ecs {
      * @tparam TDomainTag      Domain tag used to derive `StrongId<TDomainTag>`.
      * @tparam TLookupStrategy The strategy used for strong ID collision detection.
      * @tparam TAllowRemoval   If false, `destroy()` triggers an assertion instead of removing.
-     * @tparam TCapacity       Default initial capacity for pre-allocation.
-     *
+      *
      * @see EntityHandle
      * @see HashedLookupStrategy
      * @see LinearLookupStrategy
      */
     template<
         typename TDomainTag,
-        typename TLookupStrategy = HashedLookupStrategy,
-        bool TAllowRemoval = true,
-        size_t TCapacity = DEFAULT_ENTITY_MANAGER_CAPACITY
+        typename TLookupStrategy = HashedLookupStrategy<>,
+        bool TAllowRemoval = true
     >
     requires helios::ecs::concepts::IsStrongIdCollisionResolverLike<TLookupStrategy>
     class EntityRegistry {
@@ -116,7 +114,7 @@ export namespace helios::ecs {
          *
          * @param capacity The initial capacity to reserve.
          */
-        explicit EntityRegistry(const size_t capacity = TCapacity)
+        explicit EntityRegistry(const size_t capacity)
           : lookupStrategy_(capacity) {
             versions_.reserve(capacity);
             strongIds_.reserve(capacity);

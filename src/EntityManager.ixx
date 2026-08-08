@@ -70,7 +70,6 @@ export namespace helios::ecs {
      *
      * @tparam THandle       Handle type used to identify entities (e.g. `EntityHandle<GameDomainTag>`).
      * @tparam TEntityRegistry Registry type that manages handle allocation and versioning.
-     * @tparam TCapacity     Default initial capacity for the registry and sparse sets.
      *
      * @see EntityRegistry
      * @see SparseSet
@@ -79,8 +78,7 @@ export namespace helios::ecs {
      */
     template<
         typename THandle, 
-        typename TEntityRegistry,
-        size_t TCapacity
+        typename TEntityRegistry
     > 
     class EntityManager {
 
@@ -120,10 +118,9 @@ export namespace helios::ecs {
          * Creates an internally owned `EntityRegistry` initialized with the
          * specified capacity.
          *
-         * @param capacity Initial capacity for the registry and sparse sets.
-         *                 Defaults to `TCapacity`.
+         * @param capacity Initial capacity for the registry and sparse sets.´
          */
-        explicit EntityManager(const size_t capacity = TCapacity)
+        explicit EntityManager(const size_t capacity)
         : registry_(EntityRegistry_type{capacity}), capacity_(capacity) {
             int i = 1;
         }
