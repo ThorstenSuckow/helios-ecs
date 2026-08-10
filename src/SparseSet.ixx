@@ -20,14 +20,9 @@ using namespace helios::ecs::types;
 export namespace helios::ecs {
 
     /**
-     * @brief Abstract base class for type-erased, non thread-safe sparse set access.
+     * @brief Type-erased sparse-set interface.
      *
-     * `SparseSetBase` provides a non-templated interface for polymorphic
-     * operations on sparse sets. This enables containers to store
-     * heterogeneous pools and perform common operations (e.g., removal)
-     * without knowing the concrete element type.
-     *
-     * @see SparseSet
+     * Enables polymorphic access to sparse sets of different component types.
      */
     class SparseSetBase {
 
@@ -118,9 +113,16 @@ export namespace helios::ecs {
         /**
          * @brief Refreshes internal metadata after mutations.
          *
-         * @warning Not Thread safe, requires exlusive access to an instance of this class.
+         * @warning Not thread-safe. Requires exclusive access.
          */
         virtual void finalizeMutations() noexcept = 0;
+
+        /**
+         * @brief Reserves capacity for internal storage.
+         *
+         * @param capacity Requested capacity.
+         */
+        virtual void reserve(const size_t capacity) = 0;
     };
 
 
@@ -133,43 +135,12 @@ export namespace helios::ecs {
 
 
     /**
-     * @brief A generic sparse set providing O(1) insertion, lookup, and removal.
+     * @brief Sparse-set storage for values keyed by `EntityId`.
      *
-     * `SparseSet` implements the sparse set data structure pattern, commonly used
-     * in Entity Component Systems (ECS) for efficient storage. It maps `EntityId`
-     * indices to densely packed data of type `T`.
+     * Uses sparse and dense arrays with swap-and-pop removal for O(1) average
+     * insert, lookup, and erase.
      *
-     * ## Data Structure
-     *
-     * ```
-     * SPARSE ARRAY (indexed by EntityId)
-     * [  2  |  x  |  0  |  x  |  1  |  x  |  x  ]   (dense idx)
-     *
-     * DENSE STORAGE (contiguous)
-     * [  T[0] (id=2)  |  T[1] (id=4)  |  T[2] (id=0)  ]
-     *
-     * DENSE-TO-SPARSE (reverse mapping for swap-and-pop)
-     * [  2  |  4  |  0  ]   (EntityId)
-     *
-     * x = Tombstone (empty slot)
-     * ```
-     *
-     * ## Complexity
-     *
-     * | Operation | Time    | Space        |
-     * |-----------|---------|--------------|
-     * | emplace   | O(1)*   | O(max_id)    |
-     * | insert    | O(1)*   | O(max_id)    |
-     * | get       | O(1)    | -            |
-     * | remove    | O(1)    | -            |
-     *
-     * *Amortized due to potential sparse array resize.
-     *
-     * @tparam T             The type of elements stored in the set. Must be move-assignable.
-     *
-     * @see SparseSetBase
-     * @see EntityId
-     * @see EntityTombstone
+     * @tparam T Stored value type.
      */
     template <typename T>
     class SparseSet : public SparseSetBase {
@@ -200,19 +171,19 @@ export namespace helios::ecs {
         mutable EntityId maxEntityId_ = Tombstone;
 
         /**
-         * @brief Holds the last maxEntityId-value before removal happend.
-         * Used to compare with new maxEntityIds: If a new maxEntityId is higher than this value,
-         * no maxEntityId needs to be recalculated in finalizeMutations().
+         * @brief Tracks an invalidated previous max id after removals.
          */
         EntityId invalidatedMaxEntityId_ = Tombstone;
 
         /**
-         * @brief Helper for updating Max EntityId.
+         * @brief Reserved capacity for internal vectors.
+         */
+        std::size_t capacity_ = 0;
+
+        /**
+         * @brief Updates cached max entity id after insertion.
          *
-         * Keeps a possible maxEntityId_-Tombstone as long valid as a invalidatedMaxEntityId_
-         * couldnt be resolved.
-         *
-         * @param idx New EntityId.
+         * @param idx Inserted entity id.
          */
         inline void updateMaxEntityId(const EntityId idx) {
             if (invalidatedMaxEntityId_ != Tombstone && invalidatedMaxEntityId_ <= idx) {
@@ -240,9 +211,7 @@ export namespace helios::ecs {
          * @param capacity The initial capacity to reserve for all internal vectors.
          */
         explicit SparseSet(const size_t capacity) {
-            sparse_.reserve(capacity);
-            storage_.reserve(capacity);
-            denseToSparse_.reserve(capacity);
+            SparseSet::reserve(capacity);
         };
 
         /**
@@ -265,9 +234,28 @@ export namespace helios::ecs {
          */
         SparseSet& operator=(SparseSet&&) noexcept = default;
 
+        /**
+         * @brief Returns the component type id for `T`.
+         *
+         * @return Type id of this sparse-set component type.
+         */
         ComponentTypeId<T> componentTypeId() {
             return ComponentTypeId<typename T::Handle_type>::template id<T>();
         };
+
+        /**
+         * @brief Set the capacity of the underlying storages.
+         *
+         * @param capacity The capacity to reserve. In effect only if current capacity is lower than the new capacity.
+         */
+        void reserve(const size_t capacity) override {
+            if (capacity > capacity_) {
+                sparse_.reserve(capacity);
+                storage_.reserve(capacity);
+                denseToSparse_.reserve(capacity);
+                capacity_ = capacity;
+            }
+        }
 
         /**
          * @brief Constructs and inserts an element at the given index.
@@ -376,17 +364,10 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Removes the element at the given index using swap-and-pop.
+         * @brief Removes an element via swap-and-pop.
          *
-         * @details Uses the swap-and-pop technique for O(1) removal:
-         * 1. Move the last element to the position of the removed element
-         * 2. Update the sparse array entry for the moved element
-         * 3. Pop the last element from dense storage
-         * 4. Mark the removed slot as Tombstone
-         *
-         * @param idx The EntityId of the element to remove.
-         *
-         * @return True if the element was removed, false if not found.
+         * @param idx Entity id to remove.
+         * @return `true` if the element existed and was removed.
          */
         [[nodiscard]] bool remove(const EntityId idx) override {
 
@@ -514,7 +495,7 @@ export namespace helios::ecs {
         }
 
         /**
-         * @copydocs SparseSetBase::finalizeMutations()
+         * @brief Recomputes cached max id if removals invalidated it.
          */
         void finalizeMutations() noexcept override {
             if (invalidatedMaxEntityId_ != Tombstone) {
@@ -526,10 +507,7 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Forward iterator for traversing the sparse set.
-         *
-         * @details Iterates over the dense storage array, providing access to both
-         * the stored element and its associated EntityId.
+         * @brief Forward iterator over dense values and corresponding entity ids.
          */
         struct Iterator {
             using DataIt = typename std::vector<T>::iterator;
@@ -559,9 +537,9 @@ export namespace helios::ecs {
             pointer operator->() const { return &*dataIt_; }
 
             /**
-             * @brief Returns the EntityId for the current element.
+             * @brief Returns the `EntityId` of the current element.
              *
-             * @return The EntityId associated with the current element.
+             * @return Current `EntityId`.
              */
             [[nodiscard]] EntityId entityId() const { return *idIt_; }
 
@@ -580,9 +558,7 @@ export namespace helios::ecs {
         };
 
         /**
-         * @brief Const forward iterator for traversing the sparse set.
-         *
-         * @details Provides read-only access to elements and their EntityIds.
+         * @brief Const forward iterator over dense values and entity ids.
          */
         struct ConstIterator {
             using DataIt = typename std::vector<T>::const_iterator;
@@ -612,9 +588,9 @@ export namespace helios::ecs {
             pointer operator->() const { return &*dataIt_; }
 
             /**
-             * @brief Returns the EntityId for the current element.
+             * @brief Returns the `EntityId` of the current element.
              *
-             * @return The EntityId associated with the current element.
+             * @return Current `EntityId`.
              */
             [[nodiscard]] EntityId entityId() const { return *idIt_; }
 
