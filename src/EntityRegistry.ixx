@@ -32,12 +32,8 @@ export namespace helios::ecs {
      * and index reuse via a free list.
      *
      * @tparam THandle Handle type managed by this registry.
-     * @tparam TAllowRemoval If `false`, `destroy()` asserts and returns `false`.
      */
-    template<
-        typename THandle,
-        bool TAllowRemoval = true
-    >
+    template<typename THandle>
     class EntityRegistry {
 
 
@@ -154,11 +150,6 @@ export namespace helios::ecs {
          * @return `true` if destroyed, otherwise `false`.
          */
         bool destroy(const THandle handle) {
-
-            if constexpr (!TAllowRemoval) {
-                assert(false && "EntityRegistry: Entity removal is not allowed");
-                return false;
-            }
 
             if (!isValid(handle)) {
                 return false;
