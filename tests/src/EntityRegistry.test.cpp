@@ -12,7 +12,7 @@ namespace {
 
 struct TestDomainTag {};
 using TestHandle = EntityHandle<TestDomainTag>;
-using TestRegistry = EntityRegistry<TestDomainTag>;
+using TestRegistry = EntityRegistry<TestHandle>;
 
 } // namespace
 

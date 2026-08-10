@@ -19,8 +19,7 @@ namespace {
 struct TestDomainTag {};
 using TestHandle = EntityHandle<TestDomainTag>;
 using TestRegistry = EntityRegistry<TestDomainTag>;
-using TestEntityManager = EntityManager<TestHandle, TestRegistry, DEFAULT_ENTITY_MANAGER_CAPACITY>;
-using TestReflector = ComponentReflector<TestEntityManager>;
+using TestEntityManager = EntityManager<TestHandle>;
 
 using ViewWorld = TypedHandleWorld<TestEntityManager>;
 
@@ -47,8 +46,6 @@ class MyComponent {
 
 
 TEST(View, find) {
-
-    TestReflector::registerType<MyComponent<TestHandle>>();
 
     TestEntityManager em{};
 

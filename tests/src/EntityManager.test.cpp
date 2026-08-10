@@ -15,8 +15,7 @@ namespace {
 struct TestDomainTag {};
 using TestHandle = EntityHandle<TestDomainTag>;
 using TestRegistry = EntityRegistry<TestDomainTag>;
-using TestEntityManager = EntityManager<TestHandle, TestRegistry, DEFAULT_ENTITY_MANAGER_CAPACITY>;
-using TestReflector = ComponentReflector<TestEntityManager>;
+using TestEntityManager = EntityManager<TestHandle>;
 
 class TestEntity {
 
@@ -41,10 +40,6 @@ class MyComponent {
     using Handle_type = TestHandle;
 
     int value = 0;
-    bool remove = true;
-    bool onRemove() {
-        return remove;
-    }
 
 
 };
@@ -52,9 +47,6 @@ class MyComponent {
 } // namespace
 
 TEST(EntityManager, create) {
-
-    TestReflector::registerType<TestEntity>();
-    TestReflector::registerType<MyComponent>();
 
     TestEntityManager em;
 
@@ -65,8 +57,6 @@ TEST(EntityManager, create) {
 
 TEST(EntityManager, destroy) {
 
-    TestReflector::registerType<TestEntity>();
-    TestReflector::registerType<MyComponent>();
 
     TestEntityManager em;
 
@@ -86,9 +76,6 @@ TEST(EntityManager, destroy) {
 }
 
 TEST(EntityManager, emplace) {
-
-    TestReflector::registerType<TestEntity>();
-    TestReflector::registerType<MyComponent>();
 
     TestEntityManager em;
 
@@ -115,9 +102,6 @@ TEST(EntityManager, emplace) {
 
 TEST(EntityManager, remove) {
 
-    TestReflector::registerType<TestEntity>();
-    TestReflector::registerType<MyComponent>();
-
     TestEntityManager em;
 
     const auto handle = em.create();
@@ -129,11 +113,7 @@ TEST(EntityManager, remove) {
     auto* cmp = em.emplace<MyComponent>(handle, 10);
     EXPECT_TRUE(em.has<MyComponent>(handle));
 
-    cmp->remove = false;
-    EXPECT_FALSE(em.remove<MyComponent>(handle));
-    cmp->remove = true;
     EXPECT_TRUE(em.remove<MyComponent>(handle));
-
     EXPECT_FALSE(em.has<MyComponent>(handle));
 
 }
