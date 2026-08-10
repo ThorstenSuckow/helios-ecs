@@ -1,6 +1,6 @@
 /**
  * @file EntityRegistry.ixx
- * @brief Generic, policy-based entity registry for managing entity lifecycles.
+ * @brief Versioned registry for creating, validating, and recycling entity handles.
  */
 module;
 
@@ -11,9 +11,7 @@ module;
 
 export module helios.ecs.EntityRegistry;
 
-import helios.ecs.types.StrongId;
 import helios.ecs.types.TypeDefs;
-import helios.ecs.concepts.IsStrongIdLike;
 import helios.ecs.types.TypeDefs;
 import helios.ecs.types.EntityHandle;
 import helios.ecs.strategies.LinearLookupStrategy;
@@ -28,113 +26,73 @@ export namespace helios::ecs {
 
 
     /**
-     * @brief Generic registry for creating and managing strongly-typed entity handles.
+     * @brief Registry for typed, versioned entity handles.
      *
-     * `EntityRegistry` serves as the authoritative source for entity lifecycle
-     * management. It is responsible for:
+     * Manages entity creation, liveness checks, version-based stale-handle detection,
+     * and index reuse via a free list.
      *
-     * - **Handle Creation:** Generates unique `EntityHandle<TDomainTag>` instances
-     *   with versioned IDs and domain-specific strong IDs.
-     * - **Validation:** Determines whether a given handle refers to a currently alive entity.
-     * - **Destruction:** Marks entities as destroyed by incrementing their version and
-     *   recycling the index for future use (when `TAllowRemoval` is true).
-     *
-     * ## Versioning
-     *
-     * Each entity slot maintains a version number. When an entity is destroyed, its
-     * version is incremented. This allows the registry to detect stale handles —
-     * handles that reference an entity that has been destroyed and potentially replaced
-     * by a new entity at the same index.
-     *
-     * ## Index Recycling
-     *
-     * Destroyed entity indices are added to a free list and reused when creating new
-     * entities. This keeps the dense version array compact and minimizes memory growth.
-     *
-     * ## Strong ID Collision Detection
-     *
-     * The registry delegates collision checks to a configurable `TLookupStrategy`,
-     * which tracks which strong IDs are currently in use. The default strategy
-     * (`HashedLookupStrategy`) provides O(1) amortized lookups.
-     *
-     * @tparam TDomainTag      Domain tag used to derive `StrongId<TDomainTag>`.
-     * @tparam TLookupStrategy The strategy used for strong ID collision detection.
-     * @tparam TAllowRemoval   If false, `destroy()` triggers an assertion instead of removing.
-      *
-     * @see EntityHandle
-     * @see HashedLookupStrategy
-     * @see LinearLookupStrategy
+     * @tparam THandle Handle type managed by this registry.
+     * @tparam TAllowRemoval If `false`, `destroy()` asserts and returns `false`.
      */
     template<
-        typename TDomainTag,
-        typename TLookupStrategy = HashedLookupStrategy<>,
+        typename THandle,
         bool TAllowRemoval = true
     >
-    requires helios::ecs::concepts::IsStrongIdCollisionResolverLike<TLookupStrategy>
     class EntityRegistry {
 
 
         /**
-         * @brief Free list of recycled entity indices available for reuse.
+         * @brief Recycled entity indices available for reuse.
          */
         std::vector<EntityId> freeList_;
 
 
         /**
-         * @brief Version numbers for each entity slot.
-         *
-         * The version is incremented when an entity at that index is destroyed,
-         * allowing detection of stale handles.
+         * @brief Current version value for each entity slot.
          */
         std::vector<VersionId> versions_;
-        
 
         /**
-         * @brief Strong ID values for each entity slot.
+         * @brief Reserved capacity for internal storage.
          */
-        std::vector<StrongId_t> strongIds_;
-
-        /**
-         * @brief Lookup strategy instance for strong ID collision detection.
-         */
-        TLookupStrategy lookupStrategy_;
-
-        /**
-         * @brief Auto-increment counter for generating strong IDs when none is provided.
-         */
-        size_t strongIdCounter_ = 0;
-
+        std::size_t capacity_ = 0;
     public:
 
         /**
-         * @brief Constructs a registry with pre-allocated capacity.
-         *
-         * Reserving capacity upfront can improve performance when the approximate
-         * number of entities is known in advance.
-         *
-         * @param capacity The initial capacity to reserve.
+         * @brief Constructs an empty registry.
          */
-        explicit EntityRegistry(const size_t capacity)
-          : lookupStrategy_(capacity) {
-            versions_.reserve(capacity);
-            strongIds_.reserve(capacity);
-            freeList_.reserve(capacity);
-        }
-
+        EntityRegistry() = default;
 
         /**
-         * @brief Creates a new entity and returns its handle.
+         * @brief Constructs a registry with pre-reserved capacity.
          *
-         * If recycled indices are available in the free list, one is reused.
-         * Otherwise, a new index is allocated at the end of the version vector.
-         * If the provided `strongId` is invalid, one is auto-assigned from the
-         * entity index.
-         *
-         * @param strongId Optional domain-specific strong ID. Defaults to auto-assignment.
-         *
-         * @return A valid `EntityHandle` for the newly created entity.
+         * @param capacity Capacity reserved for internal vectors.
          */
-        EntityHandle<TDomainTag> create(StrongId<TDomainTag> strongId = StrongId<TDomainTag>{}) {
+        explicit EntityRegistry(const size_t capacity) {
+            reserve(capacity);
+        }
+
+        /**
+         * @brief Reserves capacity for internal storage.
+         *
+         * @param capacity New capacity target.
+         */
+        void reserve(const std::size_t capacity) {
+            if (capacity > capacity_) {
+                freeList_.reserve(capacity);
+                versions_.reserve(capacity);
+                capacity_ = capacity;
+            }
+        }
+
+        /**
+         * @brief Creates a new entity handle.
+         *
+         * Reuses an index from the free list when available; otherwise appends a new slot.
+         *
+         * @return Valid handle for the created entity.
+         */
+        THandle create() {
 
             EntityId idx;
             VersionId version;
@@ -143,7 +101,6 @@ export namespace helios::ecs {
                 idx = static_cast<EntityId>(versions_.size());
                 version = InitialVersion;
                 versions_.push_back(version);
-                strongIds_.push_back(StrongId_t{});
             } else {
                 idx = freeList_.back();
                 freeList_.pop_back();
@@ -152,29 +109,16 @@ export namespace helios::ecs {
                 version = versions_[idx];
             }
 
-            if (!strongId.isValid()) {
-                strongId = StrongId<TDomainTag>(++strongIdCounter_);
-            }
-            assert(strongId.isValid() && "EntityRegistry: invalid strongId");
 
-            assert(!lookupStrategy_.has(strongId.value()) && "EntityRegistry: strongId collision");
-
-            strongIds_[idx] = strongId.value();
-
-            const bool added = lookupStrategy_.add(strongId.value());
-
-            assert(added && "EntityRegistry: failed to add strongId to lookupStrategy");
-
-            return {idx, version, strongId};
+            return {idx, version};
 
         }
 
         /**
-         * @brief Looks up the version for an EntityId.
+         * @brief Returns the current version for an entity index.
          *
-         * @param entityId The entity to retrieve the version for.
-         *
-         * @return The version for the EntityId, or `InvalidVersion` if not found.
+         * @param entityId Entity index.
+         * @return Current version, or `InvalidVersion` if out of bounds.
          */
         [[nodiscard]] VersionId version(const EntityId entityId) const {
             if (entityId >= static_cast<EntityId>(versions_.size())) {
@@ -183,61 +127,33 @@ export namespace helios::ecs {
             return versions_[entityId];
         }
 
-        /**
-         * @brief Looks up the strong ID for an entity index.
-         *
-         * @param entityId The entity index to retrieve the strong ID for.
-         *
-         * @return The strong ID for the entity, or a default-constructed
-         *         (invalid) `StrongId<TDomainTag>` if out of bounds.
-         */
-        [[nodiscard]] StrongId<TDomainTag> strongId(const EntityId entityId) const {
-            if (entityId >= static_cast<EntityId>(strongIds_.size())) {
-                return StrongId<TDomainTag>{};
-            }
-            return static_cast<StrongId<TDomainTag>>(strongIds_[entityId]);
-        }
-
 
         /**
-         * @brief Checks whether the given handle refers to a currently alive entity.
+         * @brief Returns whether a handle refers to a currently alive entity.
          *
-         * A handle is valid if its index is within bounds, its version matches
-         * the current version stored in the registry, and its strong ID matches
-         * the registered value.
-         *
-         * @param handle The handle to validate.
-         *
-         * @return True if the handle is valid and the entity is alive.
+         * @param handle Handle to validate.
+         * @return `true` if index is in range and version matches.
          */
-        [[nodiscard]] bool isValid(const EntityHandle<TDomainTag> handle) const noexcept {
+        [[nodiscard]] bool isValid(const THandle handle) const noexcept {
             const auto index = handle.entityId();
 
             if (index >= static_cast<EntityId>(versions_.size())) {
                 return false;
             }
 
-            return handle.strongId().value() == strongIds_[index] &&
-                   handle.versionId() == versions_[index] &&
-                   handle.strongId().isValid();
+            return handle.versionId() == versions_[index];
         }
 
 
         /**
-         * @brief Destroys the entity referenced by the given handle.
+         * @brief Destroys an entity and recycles its index.
          *
-         * If the handle is valid, the entity's version is incremented (invalidating
-         * all existing handles to it), the strong ID is unregistered, and the index
-         * is added to the free list for recycling.
+         * Increments the slot version to invalidate stale handles.
          *
-         * If `TAllowRemoval` is false, triggers an assertion failure.
-         *
-         * @param handle The handle of the entity to destroy.
-         *
-         * @return True if the entity was successfully destroyed, false if the handle
-         *         was already invalid.
+         * @param handle Handle to destroy.
+         * @return `true` if destroyed, otherwise `false`.
          */
-        bool destroy(const EntityHandle<TDomainTag> handle) {
+        bool destroy(const THandle handle) {
 
             if constexpr (!TAllowRemoval) {
                 assert(false && "EntityRegistry: Entity removal is not allowed");
@@ -251,11 +167,6 @@ export namespace helios::ecs {
             const auto index = handle.entityId();
 
             versions_[index] += 1;
-            strongIds_[index] = 0;
-
-            const bool removed = lookupStrategy_.remove(handle.strongId().value());
-            assert(removed && "EntityRegistry: failed to remove strongId from lookupStrategy");
-
             freeList_.push_back(index);
 
             return true;
