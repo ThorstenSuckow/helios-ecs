@@ -1,6 +1,6 @@
 /**
  * @file EntityHandle.ixx
- * @brief Versioned, strongly-typed handle for referencing entities.
+ * @brief Versioned handle type for ECS entities.
  */
 module;
 
@@ -19,98 +19,72 @@ using namespace helios::ecs::types;
 export namespace helios::ecs::types {
 
     /**
-     * @brief Sentinel version indicating an invalid or uninitialized handle.
+     * @brief Sentinel version for invalid or default-initialized handles.
      */
     constexpr auto InvalidVersion = VersionId{0};
 
     /**
-     * @brief The initial version assigned to newly created entities.
-     *
-     * Versions start at 1 to distinguish valid handles from default-initialized
-     * handles that may have a version of 0.
+     * @brief Initial version for newly created entities.
      */
     constexpr auto InitialVersion = VersionId{1};
 
 
     /**
-     * @brief A versioned handle for referencing entities in a registry.
+     * @brief Versioned handle used to reference entities in a registry.
      *
-     * `EntityHandle` combines an entity ID with a version number and a
-     * domain-specific strong ID to provide safe, typed references to
-     * registered entities. The version ensures that handles to removed
-     * entities are detected as stale.
+     * A handle is valid when its version is not `InvalidVersion`.
+     * Stale handles are detected via the version value.
      *
-     * Default constructed EntityHandles with EntityId and VersionId == 0 are treated as invalid.
-     * An invalid EntityId is guaranteed to provide the EntityId == 0.
-     *
-     * @tparam TDomainTag Domain tag used to derive `StrongId<TDomainTag>`.
-     *
-     * @see EntityRegistry
+     * @tparam TDomainTag Domain tag of the handle type.
      */
     template<typename TDomainTag>
     class EntityHandle {
 
         /**
-         * @brief The unique identifier for the entity within the registry.
+         * @brief Entity identifier in the registry.
          */
         EntityId entityId_{0};
 
         /**
-         * @brief The version number for stale handle detection.
-         *
-         * Incremented when an entity is removed from the registry.
+         * @brief Version used for stale handle detection.
          */
         VersionId versionId_ = InvalidVersion;
-
-        /**
-         * @brief The domain-specific strong ID associated with this handle.
-         */
-        StrongId<TDomainTag> strongId_{};
 
     public:
 
         using DomainTag_type = TDomainTag;
 
-        using StrongId_type = StrongId<TDomainTag>;
-
         /**
-         * @brief Default constructs invalid handle.
+         * @brief Creates an invalid handle.
          */
         EntityHandle() noexcept = default;
 
         /**
-         * @brief Constructs an EntityHandle with a valid version.
+         * @brief Creates a handle from entity and version IDs.
          *
-         * @param entityId The entity id to use.
-         * @param versionId The versionId, must not equal to InvalidVersion.
-         * @param strongId An optional StrongId.
+         * @param entityId Entity identifier.
+         * @param versionId Version identifier, must not be `InvalidVersion`.
          */
-        EntityHandle(const EntityId entityId, const VersionId versionId, const StrongId_type strongId = {}) noexcept : entityId_(entityId), versionId_(versionId), strongId_(strongId) {
+        EntityHandle(const EntityId entityId, const VersionId versionId) noexcept : entityId_(entityId), versionId_(versionId) {
             assert(versionId_ != InvalidVersion && "EntityHandle must not be constructed with InvalidVersion.");
         }
 
         /**
-         * @brief Returns the entity ID associated with this handle.
-         * @return The entity ID.
+         * @brief Returns the entity ID.
+         *
+         * @return Entity ID.
          */
         [[nodiscard]] EntityId entityId() const noexcept {
             return entityId_;
         }
 
         /**
-         * @brief Returns the version ID associated with this handle.
-         * @return The version ID.
+         * @brief Returns the version ID.
+         *
+         * @return Version ID.
          */
         [[nodiscard]] VersionId versionId() const noexcept {
             return versionId_;
-        }
-
-        /**
-         * @brief Returns the strong ID associated with this handle.
-         * @return The strong ID.
-         */
-        [[nodiscard]] StrongId_type strongId() const noexcept {
-            return strongId_;
         }
 
         /**
@@ -121,9 +95,8 @@ export namespace helios::ecs::types {
         /**
          * @brief Compares two handles by entity ID (less-than).
          *
-         * @param entityHandle The handle to compare against.
-         *
-         * @return True if this handle's entity ID is less than the other.
+         * @param entityHandle Handle to compare with.
+         * @return `true` if this handle has a smaller entity ID.
          */
         constexpr bool operator<(const EntityHandle<TDomainTag>& entityHandle) const noexcept {
             return entityId_ < entityHandle.entityId_;
@@ -132,9 +105,8 @@ export namespace helios::ecs::types {
         /**
          * @brief Compares two handles by entity ID (greater-than).
          *
-         * @param entityHandle The handle to compare against.
-         *
-         * @return True if this handle's entity ID is greater than the other.
+         * @param entityHandle Handle to compare with.
+         * @return `true` if this handle has a greater entity ID.
          */
         constexpr bool operator>(const EntityHandle<TDomainTag>& entityHandle) const noexcept {
             return entityId_ > entityHandle.entityId_;
@@ -142,9 +114,9 @@ export namespace helios::ecs::types {
 
 
         /**
-         * @brief Checks if this handle is potentially valid.
+         * @brief Returns whether this handle is valid.
          *
-         * @return True if the version is at least 1 (initial version).
+         * @return `true` if the version is not `InvalidVersion`.
          */
         [[nodiscard]] bool isValid() const noexcept {
             return versionId_ != InvalidVersion;
@@ -156,9 +128,9 @@ export namespace helios::ecs::types {
 
 
 /**
- * @brief Hash specialization for EntityHandle.
+ * @brief Hash specialization for `EntityHandle`.
  *
- * Packs entityId and versionId into a 64-bit value for hashing.
+ * Hashes a packed `(entityId, versionId)` 64-bit value.
  */
 template<typename TDomainTag>
 struct std::hash<helios::ecs::types::EntityHandle<TDomainTag>> {
