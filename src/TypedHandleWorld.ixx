@@ -1,6 +1,6 @@
 /**
  * @file TypedHandleWorld.ixx
- * @brief Multi-domain entity world with compile-time handle-to-manager dispatch.
+ * @brief Multi-domain ECS world dispatching by handle type.
  */
 module;
 
@@ -17,17 +17,14 @@ export module helios.ecs.TypedHandleWorld;
 
 import helios.ecs.View;
 import helios.ecs.Entity;
+import helios.ecs.EntityManager;
 
 
 /**
- * @brief Maps a handle type to the index of its owning EntityManager in a parameter pack.
+ * @brief Maps a handle type to its `EntityManager` index in a pack.
  *
- * @details Recursively walks the `TEntityManagers...` pack and returns the
- * zero-based index of the first manager whose `Handle_type` matches `THandle`.
- * A `static_assert` fires if no match is found.
- *
- * @tparam THandle          The handle type to look up.
- * @tparam TEntityManagers  The EntityManager types to search.
+ * @tparam THandle Handle type to resolve.
+ * @tparam TEntityManagers Entity-manager pack.
  */
 template<typename THandle, typename... TEntityManagers>
 struct HandleToManager;
@@ -62,118 +59,60 @@ export namespace helios::ecs {
 
 
     /**
-     * @brief A multi-domain entity world that dispatches operations to the
-     *        correct `EntityManager` based on the handle type.
+     * @brief World containing one `EntityManager` per handle domain.
      *
-     * @details `TypedHandleWorld` holds a tuple of `EntityManager` instances,
-     * each responsible for a different entity domain (identified by its handle
-     * type). All public methods accept a handle-type template argument and
-     * resolve the matching manager at **compile time** via `HandleToManager`.
+     * Operations are dispatched at compile time via `THandle`.
      *
-     * This enables a single world object to manage entities from multiple
-     * independent registries — for example game entities, UI entities, and
-     * audio entities — without runtime dispatch overhead.
-     *
-     * ## Domain-Specific Entity Managers
-     *
-     * Each `TEntityManagers` template argument is a fully configured
-     * `EntityManager<THandle, TEntityRegistry, TCapacity>` specialisation.
-     * The handle type (`THandle`) serves as the **domain key**: calling
-     * `addEntity<MyHandle>()` automatically selects the manager whose
-     * `Handle_type` is `MyHandle`.
-     *
-     * ## Usage
-     *
-     * ```cpp
-     * // Define domain-specific handle types
-     * using GameHandle = EntityHandle<GameDomainTag>;
-     * using UiHandle   = EntityHandle<UiDomainTag>;
-     *
-     * // Configure managers
-     * using GameEM = EntityManager<GameHandle, GameRegistry, 4096>;
-     * using UiEM   = EntityManager<UiHandle,   UiRegistry,   512>;
-     *
-     * // Create the world
-     * TypedHandleWorld<GameEM, UiEM> world;
-     *
-     * // Add entities — handle type selects the manager
-     * auto player = world.addEntity<GameHandle>();
-     * auto button = world.addEntity<UiHandle>();
-     *
-     * // Query a specific domain
-     * for (auto [entity, transform, velocity] :
-     *      world.view<GameHandle, TransformComponent, VelocityComponent>()) {
-     *     // ...
-     * }
-     * ```
-     *
-     * ## Template Parameters
-     *
-     * @tparam TEntityManagers  One or more `EntityManager` specialisations.
-     *                          Each must expose a unique `Handle_type` typedef.
-     *
-     * @see Entity
-     * @see EntityManager
-     * @see View
-     * @see HandleToManager
+     * @tparam THandles Handle-domain types managed by this world.
      */
-    template<typename... TEntityManagers>
+    template<typename... THandles>
     class TypedHandleWorld {
 
 
     public:
 
-        using EntityManager_types = std::tuple<TEntityManagers...>;
-
         /**
-         * @brief Inits a TypedHandle world with the specified managers.
-         *
-         * @param managers
+         * @brief Tuple type of all underlying entity managers.
          */
-        TypedHandleWorld(TEntityManagers&&... managers)
-            : entityManagers_(std::forward<TEntityManagers>(managers)...) {}
+        using EntityManager_types = std::tuple<EntityManager<THandles>...>;
+
 
         /**
-         * @brief Returns a reference to the EntityManager that owns handles
-         *        of type `THandle`.
+         * @brief Constructs an empty typed-handle world.
+         */
+        TypedHandleWorld() = default;
+
+        /**
+         * @brief Returns the manager for `THandle`.
          *
-         * @details Uses `HandleToManager` to resolve the tuple index at
-         * compile time.  A `static_assert` fires if no manager matches.
-         *
-         * @tparam THandle The handle type identifying the target domain.
-         *
-         * @return Mutable reference to the matching EntityManager.
+         * @tparam THandle Target handle type.
+         * @return Mutable manager reference.
          */
         template<typename THandle>
         auto& entityManager() {
-            constexpr size_t idx = HandleToManager<THandle, TEntityManagers...>::value;
+            constexpr size_t idx = HandleToManager<THandle, EntityManager<THandles>...>::value;
             return std::get<idx>(entityManagers_);
         }
 
         /**
-         * @brief Returns a const reference to the EntityManager that owns
-         *        handles of type `THandle`.
+         * @brief Returns the const manager for `THandle`.
          *
-         * @tparam THandle The handle type identifying the target domain.
-         *
-         * @return Const reference to the matching EntityManager.
+         * @tparam THandle Target handle type.
+         * @return Const manager reference.
          */
         template<typename THandle>
         const auto& entityManager() const {
-            constexpr size_t idx = HandleToManager<THandle, TEntityManagers...>::value;
+            constexpr size_t idx = HandleToManager<THandle, EntityManager<THandles>...>::value;
             return std::get<idx>(entityManagers_);
         }
 
 
         /**
-         * @brief Creates a new entity in the domain identified by `THandle`.
+         * @brief Creates an entity in the `THandle` domain using a caller-provided id token.
          *
-         * @details Delegates to the matching `EntityManager::create()` and
-         * wraps the result in an `Entity` facade.
-         *
-         * @tparam THandle The handle type identifying the target domain.
-         *
-         * @return An `Entity` wrapping the newly created handle.
+         * @tparam THandle Target handle type.
+         * @param strongId Caller-provided identifier token.
+         * @return Entity facade for the new entity.
          */
         template<typename THandle>
         [[nodiscard]] auto addEntity(typename THandle::StrongId_type strongId) {
@@ -185,11 +124,10 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Creates a new entity with an auto-generated id.
+         * @brief Creates an entity in the `THandle` domain.
          *
-         * @tparam THandle The handle type identifying the target domain.
-         *
-         * @return An `Entity` wrapping the newly created handle.
+         * @tparam THandle Target handle type.
+         * @return Entity facade for the new entity.
          */
         template<typename THandle>
         [[nodiscard]] auto addEntity() {
@@ -201,16 +139,11 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Destroys an entity identified by its handle.
+         * @brief Destroys an entity by handle.
          *
-         * @details Delegates to the owning `EntityManager::destroy()`. The
-         * handle's version is incremented, making all existing copies stale.
-         *
-         * @tparam THandle The handle type identifying the target domain.
-         *
-         * @param handle The handle of the entity to destroy.
-         *
-         * @return True if the entity was valid and successfully destroyed.
+         * @tparam THandle Target handle type.
+         * @param handle Handle to destroy.
+         * @return `true` if destruction succeeded.
          */
         template<typename THandle>
         bool destroy(THandle handle) {
@@ -220,16 +153,11 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Looks up an existing entity by its handle.
+         * @brief Finds an entity by handle.
          *
-         * @details Validates the handle via the owning `EntityManager`. If
-         * valid, returns an `Entity` facade; otherwise returns `std::nullopt`.
-         *
-         * @tparam THandle The handle type (and thus the domain) to search.
-         *
-         * @param handle The entity handle to resolve.
-         *
-         * @return `std::optional<Entity>` — engaged if the handle is valid.
+         * @tparam THandle Target handle type.
+         * @param handle Handle to resolve.
+         * @return Optional entity facade.
          */
         template<typename THandle>
         [[nodiscard]] auto findEntity(THandle handle) {
@@ -246,16 +174,11 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Copies all components from a source entity into a new entity.
+         * @brief Creates a new entity and copies all components from `source`.
          *
-         * @details Creates a new entity in the same domain and copies every
-         * component attached to `source` into it via `EntityManager::copy()`.
-         *
-         * @tparam THandle The handle type identifying the target domain.
-         *
-         * @param source The handle of the entity to clone.
-         *
-         * @return An `Entity` wrapping the newly created clone.
+         * @tparam THandle Target handle type.
+         * @param source Source entity handle.
+         * @return Entity facade for the cloned entity.
          */
         template<typename THandle>
         [[nodiscard]] auto copyEntity(THandle source) noexcept {
@@ -269,18 +192,11 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Creates a `View` for iterating entities with specific components.
+         * @brief Creates a typed view for one handle domain.
          *
-         * @details The view operates on the `EntityManager` identified by
-         * `THandle`.  The first component type in `TComponents` serves as the
-         * lead set for iteration.
-         *
-         * @tparam THandle      The handle type selecting the domain.
-         * @tparam TComponents   The component types to include in the view.
-         *
-         * @return A `View` over the matching EntityManager.
-         *
-         * @see View
+         * @tparam THandle Handle domain.
+         * @tparam TComponents Component filter pack.
+         * @return View object for iterating matching entities.
          */
         template<typename THandle, typename ...TComponents>
         [[nodiscard]] auto view() {
@@ -290,11 +206,10 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Clears the dirty components managed by the specified EntityManager.
+         * @brief Clears dirty sets for one handle domain.
          *
-         * @tparam THandle
-         * @tparam TComponents
-         * @return
+         * @tparam THandle Handle domain.
+         * @tparam TComponents Optional component types to clear selectively.
          */
         template<typename THandle, typename ...TComponents>
         void clearDirtySets() {
@@ -308,9 +223,24 @@ export namespace helios::ecs {
 
         }
 
+        /**
+         * @brief Reserves capacity for one handle domain.
+         *
+         * @tparam THandle Handle domain.
+         * @param capacity Requested capacity.
+         */
+        template<typename THandle>
+        void reserve(std::size_t capacity) {
+            auto& em = entityManager<THandle>();
+            em.reserve(capacity);
+        }
+
     private:
 
-        EntityManager_types entityManagers_;
+        /**
+         * @brief Storage of all domain-specific entity managers.
+         */
+        EntityManager_types entityManagers_{};
     };
 
 }
