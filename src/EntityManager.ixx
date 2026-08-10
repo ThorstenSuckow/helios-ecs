@@ -28,7 +28,7 @@ using namespace helios::ecs::concepts;
 export namespace helios::ecs {
 
     /**
-     * @brief Defines the criteria for sorting entities in the `EntityManager`.
+     * @brief Sorting criteria for `SparseSetBase*` lists.
      */
     enum class SortCriteria {
         MaxEntityId,
@@ -36,63 +36,30 @@ export namespace helios::ecs {
     };
 
     /**
-     * @brief Manages entities and their associated components.
+     * @brief Stores entities and their component sparse sets for one handle domain.
      *
-     * `EntityManager` provides a unified interface for creating entities and
-     * attaching/retrieving components. It delegates handle management to an
-     * `EntityRegistry` and stores component data in type-specific `SparseSet`
-     * containers.
-     *
-     * ## Responsibilities
-     *
-     * - **Entity Creation:** Delegates to `EntityRegistry` for handle allocation.
-     * - **Entity Destruction:** Removes all components and invalidates the handle.
-     * - **Component Storage:** Maintains a vector of `SparseSet` instances, one per
-     *   component type, indexed by `TypeIndexer`.
-     * - **Ownership Semantics:** Copy construction/assignment are deleted;
-     *   `EntityManager` is move-enabled only.
-     *
-     * ## Usage
-     *
-     * ```cpp
-     * EntityManager<MyHandle, MyRegistry, 1024> manager;
-     *
-     * auto entity = manager.create();
-     * auto* transform = manager.emplace<TransformComponent>(entity, glm::vec3{0.0f});
-     *
-     * if (manager.has<TransformComponent>(entity)) {
-     *     auto* t = manager.get<TransformComponent>(entity);
-     * }
-     *
-     * manager.remove<TransformComponent>(entity);  // Remove single component
-     * manager.destroy(entity);                     // Destroy entity and all components
-     * ```
-     *
-     * @tparam THandle       Handle type used to identify entities (e.g. `EntityHandle<GameDomainTag>`).
-     * @tparam TEntityRegistry Registry type that manages handle allocation and versioning.
-     *
-     * @see EntityRegistry
-     * @see SparseSet
-     * @see EntityHandle
-     * @see TypedHandleWorld
+     * @tparam THandle Entity handle type managed by this manager.
      */
-    template<
-        typename THandle, 
-        typename TEntityRegistry
-    > 
+    template<typename THandle>
     class EntityManager {
 
 
 
     public:
 
-        /** @brief The `EntityRegistry` type used for handle allocation and versioning. */
-        using EntityRegistry_type = TEntityRegistry;
-        /** @brief The entity handle type managed by this instance. */
+        /**
+         * @brief Registry type used by this manager.
+         */
+        using EntityRegistry_type = EntityRegistry<THandle>;
+
+        /**
+         * @brief Entity handle type of this manager.
+         */
         using Handle_type = THandle;
-        /** @brief Strong identifier type derived from the handle. */
-        using StrongId_type = Handle_type::StrongId_type;
-        /** @brief `ComponentTypeId` specialisation bound to `THandle`. */
+
+        /**
+         * @brief Component type-id provider bound to `Handle_type`.
+         */
         using ComponentTypeId_type = ComponentTypeId<Handle_type>;
 
         /**
@@ -113,29 +80,39 @@ export namespace helios::ecs {
 
 
         /**
-         * @brief Constructs an EntityManager with the given capacity.
+         * @brief Constructs an `EntityManager` and optionally reserves capacity.
          *
-         * Creates an internally owned `EntityRegistry` initialized with the
-         * specified capacity.
-         *
-         * @param capacity Initial capacity for the registry and sparse sets.´
+         * @param capacity Initial capacity for registry and sparse sets.
          */
-        explicit EntityManager(const size_t capacity)
-        : registry_(EntityRegistry_type{capacity}), capacity_(capacity) {
-            int i = 1;
+        explicit EntityManager(const size_t capacity = 0)
+        : capacity_(capacity) {
+            reserve(capacity);
         }
 
         /**
-         * @brief Creates a new entity.
+         * @brief Reserves capacity for registry and already allocated sparse sets.
          *
-         * Delegates to the underlying `EntityRegistry` to allocate a new handle.
-         *
-         * @return A valid `EntityHandle` for the newly created entity.
-         *
-         * @see EntityRegistry::create
+         * @param capacity Requested capacity.
          */
-        [[nodiscard]] Handle_type create(StrongId_type strongId = StrongId_type{}) {
-            return registry_.create(strongId);
+        void reserve(const std::size_t capacity) {
+            if (capacity > capacity_) {
+                registry_.reserve(capacity);
+                for (auto& component : components_) {
+                    if (component) {
+                        component->reserve(capacity);
+                    }
+                }
+                capacity_ = capacity;
+            }
+        }
+
+        /**
+         * @brief Creates a new entity handle.
+         *
+         * @return Newly created handle.
+         */
+        [[nodiscard]] Handle_type create() {
+            return registry_.create();
         }
 
         /**
@@ -161,15 +138,10 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Destroys an entity and invalidates its handle.
+         * @brief Destroys an entity and removes all attached components.
          *
-         * @details Increments the entity's version in the registry, making all
-         * existing handles to this entity stale. Does automatically remove
-         * its components from storage.
-         *
-         * @param handle The handle of the entity to destroy.
-         *
-         * @return `true` if the entity was destroyed, `false` if already invalid.
+         * @param handle Handle to destroy.
+         * @return `true` if the entity was destroyed.
          */
         [[nodiscard]] bool destroy(const Handle_type handle) {
 
@@ -427,11 +399,9 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Tracks this ComponentType with DirtyComponentSpec.
+         * @brief Registers and allocates the dirty set for `TComponent`.
          *
-         * @tparam TComponent The Component-type to track.
-         *
-         * @see clearAllDirtySets()
+         * @tparam TComponent Component type to track.
          */
         template<typename TComponent>
         void trackDirty() {
@@ -574,7 +544,7 @@ export namespace helios::ecs {
          * @return EntityHandle with current version from the registry.
          */
         [[nodiscard]] Handle_type handle(const EntityId entityId) const {
-            return Handle_type{entityId, registry_.version(entityId), registry_.strongId(entityId)};
+            return Handle_type{entityId, registry_.version(entityId)};
         }
 
         /**
@@ -638,9 +608,9 @@ export namespace helios::ecs {
         }
 
         /**
-         * @brief Allow for finalizing mutations of a specific component type's SparseSet.
+         * @brief Finalizes pending mutation metadata for one component type.
          *
-         * @param typeId The type ID of the component whose SparseSet should be finalized.
+         * @param typeId Component type id.
          */
         void finalizeMutations(const ComponentTypeId_type typeId) {
             assert (components_[typeId.value()] && "Component-group not existing.");
@@ -649,9 +619,10 @@ export namespace helios::ecs {
 
     private:
 
-        /** @brief Type IDs of all dirty sets registered via `trackDirty()`, used by `clearAllDirtySets()`. */
+        /**
+         * @brief Dirty-set type IDs registered via `trackDirty()`.
+         */
         std::vector<size_t> registeredDirtySets_;
-
 
         /**
          * @brief Component storage indexed by type ID.
@@ -666,9 +637,9 @@ export namespace helios::ecs {
         EntityRegistry_type registry_;
 
         /**
-         * @brief Initial capacity for the underlying sparse sets.
+         * @brief Initial reserved capacity for sparse sets.
          */
-        const size_t capacity_;
+        size_t capacity_ = 0;
     };
 
 
