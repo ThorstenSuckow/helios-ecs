@@ -10,75 +10,20 @@ module;
 
 export module helios.ecs.Entity;
 
-
-import helios.ecs.types.EntityHandle;
-
 import helios.ecs.EntityManager;
-import helios.ecs.components;
-import helios.ecs.commands;
-import helios.ecs.concepts.Traits;
-
-import helios.ecs.types.ComponentTypeId;
+import helios.ecs.common.components;
+import helios.ecs.common.commands;
+import helios.ecs.concepts;
+import helios.ecs.types;
 
 using namespace helios::ecs::types;
-using namespace helios::ecs::commands;
+using namespace helios::ecs::common::commands;
 using namespace helios::ecs::concepts::traits;
-using namespace helios::ecs::components;
+using namespace helios::ecs::common::components;
 export namespace helios::ecs {
 
     /**
      * @brief Lightweight facade for entity component manipulation.
-     *
-     * @details `Entity` provides a type-safe, convenient interface for
-     * working with entities and their components. It wraps an `EntityHandle`
-     * and a pointer to the `EntityManager`, delegating all operations.
-     *
-     * ## Size and Copy Semantics
-     *
-     * Entity is only 16 bytes (8 bytes EntityHandle + 8 bytes pointer) and
-     * should be **passed by value**, not by reference:
-     *
-     * ```cpp
-     * // Correct - pass by value
-     * void processEntity(Entity entity) { ... }
-     *
-     * // Unnecessary - reference adds indirection
-     * void processEntity(Entity& entity);       // Avoid
-     * void processEntity(const Entity& entity); // Avoid
-     * ```
-     *
-     * ## Hierarchy Integration
-     *
-     * When a Entity has a `HierarchyComponent`, activation changes trigger
-     * hierarchy propagation. Calling `setActive()` marks the hierarchy as dirty,
-     * and `HierarchyPropagationSystem` propagates the state to all descendants.
-     *
-     * ## Usage
-     *
-     * ```cpp
-     * auto player = gameWorld.addEntity();
-     *
-     * // Add components
-     * player.add<TransformComponent>(position);
-     * player.add<HealthComponent>(100.0f);
-     *
-     * // Query and access
-     * if (player.has<HealthComponent>()) {
-     *     player.get<HealthComponent>()->takeDamage(10.0f);
-     * }
-     *
-     * // Activation state (propagates to children if HierarchyComponent present)
-     * player.setActive(false);
-     * ```
-     *
-     * @tparam TEntityManager The entity manager type providing handle and component storage.
-     *                        Must expose `Handle_type` and component operations.
-     *
-     * @see EntityHandle
-     * @see EntityManager
-     * @see GameWorld
-     * @see HierarchyComponent
-     * @see HierarchyPropagationSystem
      */
     template<typename TEntityManager>
     class Entity {
@@ -114,8 +59,6 @@ export namespace helios::ecs {
         using Handle_type = TEntityManager::Handle_type;
         /** @brief Concrete `ComponentTypeId` bound to this entity's handle type. */
         using ComponentTypeId_type = ComponentTypeId<Handle_type>;
-        /** @brief `HierarchyComponent` specialisation for this entity's handle type. */
-        using HierarchyComponent_type = HierarchyComponent<Handle_type>;
         /** @brief `Active` tag component specialisation for this entity's handle type. */
         using ActiveComponent_type = Active<Handle_type>;
         /** @brief `Inactive` tag component specialisation for this entity's handle type. */
@@ -443,17 +386,11 @@ export namespace helios::ecs {
             const bool isInActive = !isActive;
 
             if (!isActive && active) {
-                if (auto* hc =  entityManager_->template get<HierarchyComponent_type>(entityHandle_)) {
-                    hc->markDirty();
-                }
                 remove<InactiveComponent_type>();
                 trackDirty<ActiveComponent_type>();
             }
 
             if (!isInActive && !active) {
-                if (auto* hc = entityManager_->template get<HierarchyComponent_type>(entityHandle_)) {
-                    hc->markDirty();
-                }
                 remove<ActiveComponent_type>();
                 trackDirty<InactiveComponent_type>();
             }

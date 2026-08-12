@@ -13,17 +13,18 @@ module;
 
 export module helios.ecs.EntityManager;
 
-import helios.ecs.SparseSet;
+import helios.ecs.storage.SparseSet;
 import helios.ecs.EntityRegistry;
 
 import helios.ecs.types;
-import helios.ecs.components;
+import helios.ecs.common.components;
 
-import helios.ecs.concepts.Traits;
+import helios.ecs.concepts;
 
 
 using namespace helios::ecs::types;
-using namespace helios::ecs::components;
+using namespace helios::ecs::common::components;
+using namespace helios::ecs::storage;
 using namespace helios::ecs::concepts;
 export namespace helios::ecs {
 

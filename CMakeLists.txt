@@ -9,6 +9,36 @@ endif()
 
 include(CTest)
 
+set(HELIOS_CORE_LOCAL_PATH "${CMAKE_CURRENT_LIST_DIR}/../helios-core" CACHE PATH "Local path to helios-core repository")
+
+# Resolve helios-core when helios-ecs is built standalone.
+if(NOT TARGET helios::core)
+    include(FetchContent)
+
+    set(_HELIOS_ECS_BUILD_TESTING "${BUILD_TESTING}")
+    set(_HELIOS_ECS_BUILD_BENCHMARKS "${BUILD_BENCHMARKS}")
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    set(BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
+
+    if(EXISTS "${HELIOS_CORE_LOCAL_PATH}/CMakeLists.txt")
+        add_subdirectory("${HELIOS_CORE_LOCAL_PATH}" "${CMAKE_BINARY_DIR}/_deps/helios-core-build")
+        message(STATUS "Using local helios-core: ${HELIOS_CORE_LOCAL_PATH}")
+    else()
+        FetchContent_Declare(helios_core
+                GIT_REPOSITORY https://github.com/thorstensuckow/helios-core.git
+                GIT_TAG main
+        )
+        FetchContent_MakeAvailable(helios_core)
+    endif()
+
+    if(DEFINED _HELIOS_ECS_BUILD_TESTING)
+        set(BUILD_TESTING "${_HELIOS_ECS_BUILD_TESTING}" CACHE BOOL "" FORCE)
+    endif()
+    if(DEFINED _HELIOS_ECS_BUILD_BENCHMARKS)
+        set(BUILD_BENCHMARKS "${_HELIOS_ECS_BUILD_BENCHMARKS}" CACHE BOOL "" FORCE)
+    endif()
+endif()
+
 if(CMAKE_IFC_OUTPUT_DIRECTORY)
     file(MAKE_DIRECTORY "${CMAKE_IFC_OUTPUT_DIRECTORY}")
 endif()
@@ -26,6 +56,7 @@ add_library(helios_ecs STATIC)
 add_library(helios::ecs ALIAS helios_ecs)
 set_property(TARGET helios_ecs PROPERTY CXX_SCAN_FOR_MODULES ON)
 target_compile_features(helios_ecs PUBLIC cxx_std_23)
+target_link_libraries(helios_ecs PUBLIC helios::core)
 
 target_sources(helios_ecs PRIVATE ${CPP_FILES})
 

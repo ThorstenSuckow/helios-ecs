@@ -13,17 +13,18 @@ module;
 
 export module helios.ecs.View;
 
-import helios.ecs.components;
-import helios.ecs.SparseSet;
+import helios.ecs.common.components;
+import helios.ecs.storage.SparseSet;
 import helios.ecs.EntityManager;
 import helios.ecs.Entity;
-import helios.ecs.concepts.Traits;
-import helios.ecs.types.EntityHandle;
+import helios.ecs.concepts;
+import helios.ecs.types;
 
 import helios.ecs.types;
 
 using namespace helios::ecs::types;
-using namespace helios::ecs::components;
+using namespace helios::ecs::common::components;
+using namespace helios::ecs::storage;
 using namespace helios::ecs::concepts::traits;
 export namespace helios::ecs {
 

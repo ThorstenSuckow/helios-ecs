@@ -11,17 +11,12 @@ module;
 
 export module helios.ecs.EntityRegistry;
 
-import helios.ecs.types.TypeDefs;
-import helios.ecs.types.TypeDefs;
-import helios.ecs.types.EntityHandle;
-import helios.ecs.strategies.LinearLookupStrategy;
-import helios.ecs.strategies.HashedLookupStrategy;
+import helios.ecs.types;
 
 import helios.ecs.concepts;
 
 using namespace helios::ecs::types;
 using namespace helios::ecs::types;
-using namespace helios::ecs::strategies;
 export namespace helios::ecs {
 
 
