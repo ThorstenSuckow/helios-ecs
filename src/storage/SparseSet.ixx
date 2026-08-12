@@ -10,14 +10,13 @@ module;
 #include <cstddef>
 #include <span>
 
-export module helios.ecs.SparseSet;
+export module helios.ecs.storage.SparseSet;
 
-import helios.ecs.types.EntityHandle;
 import helios.ecs.types;
 
 
 using namespace helios::ecs::types;
-export namespace helios::ecs {
+export namespace helios::ecs::storage {
 
     /**
      * @brief Type-erased sparse-set interface.
