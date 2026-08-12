@@ -18,6 +18,7 @@ export namespace helios::ecs::command::types {
      * @brief Unique type identifier for command buffer types.
      *
      */
+    template<typename TFlushContext, typename TInitContext>
     class CommandBufferTypeId {
 
         /**
@@ -85,9 +86,9 @@ export namespace helios::ecs::command::types {
 /**
  * @brief Hash specialization for CommandBufferTypeId.
  */
-template<>
-struct std::hash<helios::ecs::command::types::CommandBufferTypeId> {
-   std::size_t operator()(const helios::ecs::command::types::CommandBufferTypeId& id) const noexcept {
+template<typename TFlushContext, typename TInitContext>
+struct std::hash<helios::ecs::command::types::CommandBufferTypeId<TFlushContext, TInitContext>> {
+   std::size_t operator()(const helios::ecs::command::types::CommandBufferTypeId<TFlushContext, TInitContext>& id) const noexcept {
         return id.value();
     }
 
