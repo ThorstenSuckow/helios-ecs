@@ -3,7 +3,7 @@ module;
 #include <iostream>
 #include <tuple>
 
-export module helios.ecs.types.EntityAccessSet;
+export module helios.ecs.types:EntityAccessSet;
 
 
 export namespace helios::ecs::types {

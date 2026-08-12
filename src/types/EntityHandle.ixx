@@ -10,12 +10,13 @@ module;
 #include <cstddef>
 #include <cassert>
 
-export module helios.ecs.types.EntityHandle;
+export module helios.ecs.types:EntityHandle;
 
-import helios.ecs.types.TypeDefs;
-import helios.ecs.types.StrongId;
+import :TypeDefs;
+import helios.core.types;
 
 using namespace helios::ecs::types;
+using namespace helios::core::types;
 export namespace helios::ecs::types {
 
     /**
@@ -31,9 +32,6 @@ export namespace helios::ecs::types {
 
     /**
      * @brief Versioned handle used to reference entities in a registry.
-     *
-     * A handle is valid when its version is not `InvalidVersion`.
-     * Stale handles are detected via the version value.
      *
      * @tparam TDomainTag Domain tag of the handle type.
      */
@@ -133,8 +131,8 @@ export namespace helios::ecs::types {
  * Hashes a packed `(entityId, versionId)` 64-bit value.
  */
 template<typename TDomainTag>
-struct std::hash<helios::ecs::types::EntityHandle<TDomainTag>> {
-    std::size_t operator()(const helios::ecs::types::EntityHandle<TDomainTag>& handle) const noexcept {
+struct std::hash<EntityHandle<TDomainTag>> {
+    std::size_t operator()(const EntityHandle<TDomainTag>& handle) const noexcept {
 
         const uint64_t packed = (static_cast<uint64_t>(handle.entityId) << 32) |
                                 static_cast<uint64_t>(handle.versionId);
