@@ -4,14 +4,12 @@
  */
 module;
 
-export module helios.ecs.components.Uninitialized;
+export module helios.ecs.common.components.Uninitialized;
 
-export namespace helios::ecs::components {
+export namespace helios::ecs::common::components {
 
     /**
      * @brief Tag component indicating that entity initialization is still pending.
-     *
-     * Initialization systems remove this marker once setup steps are completed.
      *
      * @tparam THandle Entity handle type associated with the owning world.
      */

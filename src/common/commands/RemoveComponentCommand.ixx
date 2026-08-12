@@ -6,32 +6,29 @@ module;
 
 #include <memory>
 
-export module helios.ecs.commands:RemoveComponentCommand;
+export module helios.ecs.common.commands:RemoveComponentCommand;
 
-export namespace helios::ecs::commands {
+import helios.ecs.command.types;
+
+export namespace helios::ecs::common::commands {
 
 
     /**
      * @brief Deferred command that removes a component of type `TComponent` from an entity.
-     *
-     * Mirrors `AddComponentCommand` in structure. The stored component
-     * instance may carry contextual data needed by the consumer during removal.
      *
      * @tparam TComponent Component type to detach. Must expose `Handle_type`.
      */
     template<typename TComponent>
     struct RemoveComponentCommand {
 
-        /** @brief Handle type derived from the component. */
         using Handle_type = TComponent::Handle_type;
 
-        /** @brief The component type being removed. */
         using Component_type = TComponent;
 
-        /** @brief Handle of the target entity. */
+        using Group_type = command::types::CommandGroup<RemoveComponentCommand, Handle_type>;
+
         Handle_type handle;
 
-        /** @brief Component instance providing context for the removal. */
         TComponent component;
 
         /**

@@ -4,9 +4,9 @@
  */
 module;
 
-export module helios.ecs.components.DirtyComponentSpec;
+export module helios.ecs.common.components.DirtyComponentSpec;
 
-export namespace helios::ecs::components {
+export namespace helios::ecs::common::components {
 
     /**
      * @brief Template for dirty component specifications.

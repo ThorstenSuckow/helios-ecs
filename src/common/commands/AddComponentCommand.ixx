@@ -6,9 +6,11 @@ module;
 
 #include <memory>
 
-export module helios.ecs.commands:AddComponentCommand;
+export module helios.ecs.common.commands:AddComponentCommand;
 
-export namespace helios::ecs::commands {
+import helios.ecs.command.types;
+
+export namespace helios::ecs::common::commands {
 
 
     /**
@@ -23,16 +25,14 @@ export namespace helios::ecs::commands {
     template<typename TComponent>
     struct AddComponentCommand {
 
-        /** @brief Handle type derived from the component. */
         using Handle_type = TComponent::Handle_type;
 
-        /** @brief The component type being added. */
         using Component_type = TComponent;
 
-        /** @brief Handle of the target entity. */
+        using Group_type = command::types::CommandGroup<AddComponentCommand, Handle_type>;
+
         Handle_type handle;
 
-        /** @brief Component instance that will be attached. */
         TComponent component;
 
         /**
