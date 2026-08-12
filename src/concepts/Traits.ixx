@@ -7,13 +7,13 @@ module;
 #include <concepts>
 #include <utility>
 
-export module helios.ecs.concepts.Traits;
+export module helios.ecs.concepts:Traits;
 
-import helios.ecs.commands;
-import helios.ecs.components;
+import helios.ecs.common.commands;
+import helios.ecs.common.components;
 
-using namespace helios::ecs::commands;
-using namespace helios::ecs::components;
+using namespace helios::ecs::common::commands;
+using namespace helios::ecs::common::components;
 export namespace helios::ecs::concepts::traits {
 
     /**

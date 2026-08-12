@@ -1,6 +1,5 @@
 export module helios.ecs.concepts;
 
-export import helios.ecs.concepts.IsStrongIdCollisionResolverLike;
-export import helios.ecs.concepts.Traits;
-export import helios.ecs.concepts.IsEntityHandle;
-export import helios.ecs.concepts.IsStrongIdLike;
+export import :HasEcsTag;
+export import :HasClear;
+export import :Traits;
