@@ -1,6 +1,6 @@
 /**
  * @file ManagerTypeId.ixx
- * @brief Unique type identifier for engine resources.
+ * @brief Unique type identifier for managers.
  */
 module;
 
@@ -15,7 +15,7 @@ import helios.core.types;
 export namespace helios::ecs::manager::types {
 
     /**
-     * @brief Unique type identifier for engine resources.
+     * @brief Unique type identifier for managers.
      */
     template<typename TExecutionContext, typename TInitContext>
     class ManagerTypeId {
@@ -23,9 +23,9 @@ export namespace helios::ecs::manager::types {
         /**
          * @brief Tag type for the TypeIndexer domain.
          */
-        struct helios_engine_common_tag_ResourceTypes{};
+        struct helios_ecs_tag_ManagerTypes{};
 
-        using ResourceType = helios_engine_common_tag_ResourceTypes;
+        using ManagerType = helios_ecs_tag_ManagerTypes;
 
         /**
          * @brief The underlying ID value.
@@ -65,13 +65,13 @@ export namespace helios::ecs::manager::types {
         /**
          * @brief Returns the ManagerTypeId for a specific type.
          *
-         * @tparam T The resource type.
+         * @tparam T The manager type.
          *
          * @return The unique ManagerTypeId for type T.
          */
         template <typename T>
         [[nodiscard]] static ManagerTypeId id() {
-            static const size_t tid = helios::core::TypeIndexer<ResourceType>::template typeIndex<T>();
+            static const size_t tid = helios::core::TypeIndexer<ManagerType>::template typeIndex<T>();
             return ManagerTypeId(tid);
         }
 
