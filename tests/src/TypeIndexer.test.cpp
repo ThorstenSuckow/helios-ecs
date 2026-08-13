@@ -3,9 +3,10 @@
 
 
 import helios.ecs;
+import helios.core;
 
 using namespace helios::ecs;
-
+using namespace helios::core;
 
 namespace {
 

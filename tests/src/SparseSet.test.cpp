@@ -6,6 +6,7 @@ import helios.ecs;
 
 using namespace helios::ecs;
 using namespace helios::ecs::types;
+using namespace helios::ecs::storage;
 
 
 // Internal linkage keeps this helper distinct from identically named helpers

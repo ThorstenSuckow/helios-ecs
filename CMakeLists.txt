@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 4.0)
 project(helios-ecs LANGUAGES CXX)
 
+include(CTest)
+
 if(PROJECT_IS_TOP_LEVEL)
     set(CMAKE_CXX_STANDARD 23)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -74,13 +76,7 @@ target_include_directories(helios_ecs PUBLIC
         $<INSTALL_INTERFACE:include>
 )
 
-set(HELIOS_ECS_BUILD_TESTS_DEFAULT OFF)
-if(PROJECT_IS_TOP_LEVEL)
-    set(HELIOS_ECS_BUILD_TESTS_DEFAULT ON)
-endif()
-option(HELIOS_ECS_BUILD_TESTS "Build helios-ecs tests" ${HELIOS_ECS_BUILD_TESTS_DEFAULT})
-
-if(HELIOS_ECS_BUILD_TESTS AND BUILD_TESTING)
+if(PROJECT_IS_TOP_LEVEL AND BUILD_TESTING)
     include(FetchContent)
 
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)

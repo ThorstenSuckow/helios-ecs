@@ -6,7 +6,7 @@ import helios.ecs;
 
 using namespace helios::ecs;
 using namespace helios::ecs::types;
-using namespace helios::ecs::components;
+using namespace helios::ecs::common::components;
 
 // Wrapped in an anonymous namespace so these test-local helper types get
 // internal linkage. Without this, other test TUs that declare identically
