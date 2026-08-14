@@ -34,7 +34,7 @@ export namespace helios::ecs::command {
 
         std::vector<std::optional<ManagerTypeId>> commandToManager_;
 
-        std::vector<ManagerTypeId> commandGroupToManager_;
+        std::vector<std::optional<ManagerTypeId>> commandGroupToManager_;
 
         ManagerRegistry& registry_;
 
