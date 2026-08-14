@@ -10,240 +10,174 @@ module;
 #include <type_traits>
 #include <utility>
 #include <memory>
+#include <optional>
 
 export module helios.ecs.command.CommandHandlerRegistry;
 
 import helios.ecs.command.types;
+import helios.ecs.manager.ManagerRegistry;
+import helios.ecs.manager.Manager;
+import helios.ecs.manager.types;
 
 export namespace helios::ecs::command {
 
-    /**
-     * @brief Type-erased storage entry for a registered command handler.
-     */
-    struct CommandHandlerEntry {
-        /**
-         * @brief Pointer to the owning object (the handler instance).
-         */
-        void* owner = nullptr;
 
-        /**
-         * @brief Type-erased static trampoline function that casts owner and command to concrete types.
-         */
-        bool (*submitFn)(void*, void*) noexcept = nullptr;
-    };
 
     /**
-     * @brief Typed reference wrapper for invoking a registered handler.
-     *
-     * @tparam TCommandType The specific command type this reference handles.
-     */
-    template<typename TCommandType>
-    struct CommandHandlerRef {
-
-        /**
-         * @brief Pointer to the handler instance.
-         */
-        void* owner = nullptr;
-
-        /**
-         * @brief Type-erased trampoline for command dispatch.
-         */
-        bool (*submitFn)(void*, void*) noexcept = nullptr;
-
-        /**
-         * @brief Checks if this reference points to a valid handler.
-         *
-         * @return True if both owner and submitFn are non-null.
-         */
-        [[nodiscard]] explicit operator bool() const noexcept {
-            return owner && submitFn;
-        }
-
-        /**
-         * @brief Submits (and consumes) a command via the referenced handler.
-         *
-         * @param cmd The command instance to forward.
-         * @return True if the command was accepted/handled.
-         */
-        bool submit(TCommandType&& cmd) const noexcept {
-            return submitFn(owner, std::addressof(cmd));
-        }
-
-    };
-
-    /**
-     * @brief Registry that maps TCommandType types to handler instances via function pointers.
-     *
-     * This avoids virtual inheritance (TypedCommandHandler) and allows any class with a matching
-     * `submit` signature to act as a handler.
-     *
-     * Lookup is O(1) based on the CommandTypeId.
+     * @brief Maps command and command-group types to manager handlers.
      */
     class CommandHandlerRegistry {
 
-        /**
-         * @brief Dense vector of handler entries, indexed by CommandTypeId value.
-         */
-        std::vector<CommandHandlerEntry> entries_;
+        using ManagerTypeId = manager::types::ManagerTypeId;
+        using Manager = manager::Manager;
+        using ManagerRegistry = manager::ManagerRegistry;
 
-        /**
-         * @brief Dense vector of handler entries, indexed by CommandGroupTypeId value.
-         */
-        std::vector<CommandHandlerEntry> groupEntries_;
+        std::vector<std::optional<ManagerTypeId>> commandToManager_;
+
+        std::vector<ManagerTypeId> commandGroupToManager_;
+
+        ManagerRegistry& registry_;
 
     public:
 
         /**
-         * @brief Registers an object as the handler for a specific command type.
-         *
-         * @tparam TCommandType The command type to handle.
-         * @tparam OwningT The concrete type of the handler object.
-         *
-         * @param owner Reference to the handler instance. Must outlive the registry (usually Owned by GameWorld/ResourceRegistry).
-         *
-         * @pre No handler is currently registered for this command type.
-         *
-         * @note this method is not threadsafe and should not be called concurrently.
+         * @brief Creates a registry bound to an existing manager registry.
+         * @param managerRegistry Registry used to resolve manager instances by type id.
          */
-        template<typename TCommandType, typename OwningT>
-        void registerHandler(OwningT& owner) {
-            static_assert(requires(OwningT& x, TCommandType&& c) {
+        explicit CommandHandlerRegistry(ManagerRegistry& managerRegistry) : registry_(managerRegistry) {}
+
+
+        /**
+         * @brief Registers a handler for a concrete command type.
+         * @tparam TCommandType Command type to route.
+         * @tparam TManager Manager type that handles the command via submit(TCommandType&&).
+         * @param owner Manager instance owning the handler.
+         */
+        template<typename TCommandType, typename TManager>
+        void registerHandler(TManager& owner) {
+            static_assert(requires(TManager& x, TCommandType&& c) {
                 { x.submit(std::move(c)) } -> std::same_as<bool>;
             });
 
             const auto idx = types::CommandTypeId::id<TCommandType>().value();
 
-            if (entries_.size() <= idx) {
-                entries_.resize(idx + 1);
+            if (commandToManager_.size() <= idx) {
+                commandToManager_.resize(idx + 1);
             }
 
-            if (entries_[idx].owner != nullptr) {
+            if (commandToManager_[idx]) {
                 #if HELIOS_DEBUG
-                auto* ownerPtr = static_cast<void*>(std::addressof(owner));
-                assert(entries_[idx].owner == ownerPtr && "Handler already registered for this command type for a different owner");
+                auto id = ManagerTypeId::id<TManager>();
+                assert(*commandToManager_[idx] == id && "Handler already registered for this command type for a different owner");
                 #endif
                 return;
             }
 
-            entries_[idx] = CommandHandlerEntry{
-                &owner,
-                +[](void* owner, void* cmd) noexcept -> bool {
-                    return static_cast<OwningT*>(owner)->submit(
-                        std::move(*static_cast<TCommandType*>(cmd))
-                    );
-                }
-            };
+            commandToManager_[idx] = ManagerTypeId::id<TManager>();
         }
 
-        template<typename TCommandGroupType, typename OwningT>
-        void registerHandlerForCommandGroup(OwningT& owner) {
+        /**
+         * @brief Registers a handler for a full command group.
+         * @tparam TCommandGroupType Command group tag type.
+         * @tparam TManager Manager type handling commands in that group.
+         * @param owner Manager instance owning the group handler.
+         */
+        template<typename TCommandGroupType, typename TManager>
+        void registerHandlerForCommandGroup(TManager& owner) {
 
             const auto idx = types::CommandGroupTypeId::id<TCommandGroupType>().value();
 
-            if (groupEntries_.size() <= idx) {
-                groupEntries_.resize(idx + 1);
+
+            if (commandGroupToManager_.size() <= idx) {
+                commandGroupToManager_.resize(idx + 1);
             }
 
-            if (groupEntries_[idx].owner != nullptr) {
+            if (commandGroupToManager_[idx]) {
                 #if HELIOS_DEBUG
-                auto* ownerPtr = static_cast<void*>(std::addressof(owner));
-                assert(groupEntries_[idx].owner == ownerPtr && "Handler already registered for this command type for a different owner");
+                auto id = ManagerTypeId::id<TManager>();
+                assert(*commandGroupToManager_[idx] == id && "Handler already registered for this command type for a different owner");
                 #endif
                 return;
             }
 
-            groupEntries_[idx] = CommandHandlerEntry{
-                &owner,
-                +[](void* owner, void* cmd) noexcept -> bool {
-                    return static_cast<OwningT*>(owner)->submit(
-                        std::move(*static_cast<TCommandGroupType*>(cmd))
-                    );
-                }
-            };
+            commandGroupToManager_[idx] = ManagerTypeId::id<TManager>();
         }
 
+
         /**
-         * @brief Registers one owner as handler for multiple command types.
-         *
+         * @brief Convenience helper to register multiple command types for one manager.
          * @tparam TCommandType Command types to register.
-         * @tparam OwningT Concrete owner type implementing matching `submit(...)` overloads.
-         * @param owner Handler owner instance.
+         * @tparam TManager Manager type handling all listed command types.
+         * @param owner Manager instance owning the handlers.
          */
-        template<typename... TCommandType, typename OwningT>
-        void handleCommands(OwningT& owner) {
+        template<typename... TCommandType, typename TManager>
+        void handleCommands(TManager& owner) {
             (registerHandler<TCommandType>(owner), ...);
         }
 
+
         /**
-         * @brief Checks if a handler is registered for the specified command type.
-         *
-         * @tparam TCommandType The command type to check.
-         *
-         * @return True if a valid handler exists.
+         * @brief Returns whether a handler exists for the command or its command group.
+         * @tparam TCommandType Command type to query.
          */
         template<typename TCommandType>
         [[nodiscard]] bool has() const noexcept {
             const auto idx = types::CommandTypeId::id<TCommandType>().value();
-            if (idx < entries_.size()) {
-                const auto& entry = entries_[idx];
-                if (entry.owner && entry.submitFn) {
+            if (idx < commandToManager_.size()) {
+                const auto& entry = commandToManager_[idx];
+                if (entry) {
                     return true;
                 }
             }
-            if constexpr (TCommandType::Group_type) {
-                const auto groupIdx = types::CommandGroupTypeId::id<typename TCommandType::Group_type>().value();
-                if (idx >= groupEntries_.size()) {
+            if constexpr (TCommandType::CommandGroupType) {
+                const auto groupIdx = types::CommandGroupTypeId::id<typename TCommandType::CommandGroupType>().value();
+                if (groupIdx >= commandGroupToManager_.size()) {
                     return false;
                 }
-                const auto& groupEntry = groupEntries_[groupIdx];
-                return groupEntry.owner && groupEntry.submitFn;
+                const auto& groupEntry = commandGroupToManager_[groupIdx];
+                if (groupEntry) {
+                    return true;
+                }
             }
             return false;
         }
 
+
         /**
-         * @brief Retrieves a typed reference to the registered handler.
-         *
-         * @tparam TCommandType The command type.
-         *
-         * @return A CommandHandlerRef wrapper. Can be checked for validity via operator bool().
+         * @brief Resolves the manager that handles a command type.
+         * @tparam TCommandType Command type to resolve.
+         * @return Pointer to manager, or nullptr when no mapping exists.
          */
         template<typename TCommandType>
-        [[nodiscard]] CommandHandlerRef<TCommandType> tryHandler() const noexcept {
+        [[nodiscard]] Manager* tryHandler() const noexcept {
             const auto idx = types::CommandTypeId::id<TCommandType>().value();
 
-            if (idx < entries_.size()) {
-                const auto& entry = entries_[idx];
-                if (entry.owner && entry.submitFn) {
-                    return CommandHandlerRef<TCommandType>{ entry.owner, entry.submitFn };
+            if (idx < commandToManager_.size()) {
+                const auto& entry = commandToManager_[idx];
+                if (entry) {
+                    return registry_.item(*commandToManager_[idx]);
                 }
             }
 
-            if constexpr (TCommandType::Group_type) {
-                const auto groupIdx = types::CommandGroupTypeId::id<typename TCommandType::Group_type>().value();
-                if (groupIdx >= groupEntries_.size()) {
-                    return {};
+            if constexpr (requires {typename TCommandType::CommandGroupType;}) {
+                const auto groupIdx = types::CommandGroupTypeId::id<typename TCommandType::CommandGroupType>().value();
+                if (groupIdx < commandGroupToManager_.size()) {
+                    const auto& entry = commandGroupToManager_[groupIdx];
+                    if (entry) {
+                        return registry_.item(*commandGroupToManager_[idx]);
+                    }
                 }
-                const auto& groupEntry = groupEntries_[groupIdx];
-
-                if (!groupEntry.owner || !groupEntry.submitFn) {
-                    return {};
-                }
-
-                return CommandHandlerRef<TCommandType>{ groupEntry.owner, groupEntry.submitFn };
             }
 
-            return {};
+            return nullptr;
         }
 
+
         /**
-         * @brief Directly submits and consumes a command via its registered handler.
-         *
-         * @tparam TCommandType The command type.
-         *
-         * @param cmd The command instance to forward.
-         *
-         * @return True if a handler was found and it returned true; false otherwise.
+         * @brief Submits a command to its resolved handler.
+         * @tparam TCommandType Command value/reference type.
+         * @param cmd Command instance to forward to the handler.
+         * @return true when a handler exists and accepts the command.
          */
         template<typename TCommandType>
         bool submit(TCommandType&& cmd) const noexcept {
@@ -257,6 +191,11 @@ export namespace helios::ecs::command {
         }
 
 
+        /**
+         * @brief Placeholder for batched command submission.
+         * @tparam TCommandType Command value/reference type.
+         * @param cmd Command or batch input to submit.
+         */
         template<typename TCommandType>
         bool submitBatch(TCommandType&& cmd) const noexcept {
             assert(false && "not implemented");
