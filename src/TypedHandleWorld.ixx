@@ -108,22 +108,6 @@ export namespace helios::ecs {
 
 
         /**
-         * @brief Creates an entity in the `THandle` domain using a caller-provided id token.
-         *
-         * @tparam THandle Target handle type.
-         * @param strongId Caller-provided identifier token.
-         * @return Entity facade for the new entity.
-         */
-        template<typename THandle>
-        [[nodiscard]] auto addEntity(typename THandle::StrongId_type strongId) {
-            auto& em = entityManager<THandle>();
-
-            auto handle = em.create(strongId);
-
-            return Entity{handle, &em};
-        }
-
-        /**
          * @brief Creates an entity in the `THandle` domain.
          *
          * @tparam THandle Target handle type.

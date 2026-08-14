@@ -12,61 +12,56 @@ export module helios.ecs.EcsWorld;
 
 import helios.ecs.Entity;
 
+import helios.ecs.common.types;
+
 import helios.ecs.command.CommandHandlerRegistry;
 import helios.ecs.command.concepts;
 
-import helios.ecs.manager.ManagerCollectionRegistry;
 import helios.ecs.manager.ManagerRegistry;
 import helios.ecs.TypedHandleWorld;
 
 import helios.ecs.manager.Manager;
 import helios.ecs.manager.types;
 import helios.ecs.manager.concepts;
-import helios.ecs.manager.ManagerCollectionRegistry;
+import helios.ecs.manager.ManagerRegistry;
 
 
 import helios.ecs.View;
 
-import helios.ecs.concepts;
-import helios.ecs.types;
+import helios.ecs.common.concepts;
+import helios.ecs.common.types;
 
 export namespace helios::ecs {
 
-    template<
-        typename TTypedHandleWorld,
-        typename TManagerCollectionRegistry = manager::ManagerCollectionRegistry<
-            types::ContextPair<manager::types::NullExecutionContext, types::NullInitContext
-        >>
-    >
+    template<typename TTypedHandleWorld>
     class EcsWorld {
-
-
-
     protected:
 
-        command::CommandHandlerRegistry commandHandlerRegistry_;
+        manager::ManagerRegistry managerRegistry_{};
 
-        TManagerCollectionRegistry managerRegistry_;
+        command::CommandHandlerRegistry commandHandlerRegistry_{managerRegistry_};
 
-        TTypedHandleWorld typedHandleWorld_;
+        TTypedHandleWorld typedHandleWorld_{};
 
     public:
+
+        using TypedHandleWorld = TTypedHandleWorld;
 
         EcsWorld() = default;
 
         /**
-         * @brief Non-copyable, non-movable.
+         * @brief Non-copyable, movable.
          */
         EcsWorld(const EcsWorld&) = delete;
         EcsWorld operator=(const EcsWorld&) = delete;
-        EcsWorld(const EcsWorld&&) = delete;
-        EcsWorld operator=(const EcsWorld&&) = delete;
+        EcsWorld(EcsWorld&&) = default;
+        EcsWorld& operator=(EcsWorld&&) = default;
 
 
         template<typename TInitContext>
         EcsWorld& init(TInitContext& initContext) {
-            managerRegistry_.init(initContext);
 
+            assert(false && "TODO");
             return *this;
         }
 
@@ -129,22 +124,6 @@ export namespace helios::ecs {
 
 
         /**
-         * @brief Registers a command handler for one or more command types.
-         *
-         * @tparam CommandType The command types to register handlers for.
-         * @tparam OwningT The handler type. Must satisfy IsCommandHandlerLike.
-         *
-         * @param owner Reference to the handler instance. Must outlive the GameWorld.
-         *
-         * @see CommandHandlerRegistry
-         */
-        template<typename... CommandType, typename OwningT>
-        requires command::concepts::IsCommandHandlerLike<OwningT, CommandType...>
-        void registerCommandHandler(OwningT& owner) {
-            (commandHandlerRegistry_.template registerHandler<CommandType>(owner), ...);
-        }
-
-        /**
          * @brief Returns a reference to the CommandHandlerRegistry.
          *
          * @return Reference to the CommandHandlerRegistry.
@@ -178,7 +157,7 @@ export namespace helios::ecs {
          */
         template <typename THandle, typename... Components>
         [[nodiscard]] auto view() {
-            return typedHandleWorld_->template view<THandle, Components...>();
+            return typedHandleWorld_.template view<THandle, Components...>();
         }
 
         /**
@@ -192,7 +171,7 @@ export namespace helios::ecs {
          */
         template<typename THandle>
         [[nodiscard]] auto find(const THandle handle) noexcept {
-            return typedHandleWorld_->template find<THandle>(handle);
+            return typedHandleWorld_.template find<THandle>(handle);
         }
 
         /**
@@ -205,7 +184,7 @@ export namespace helios::ecs {
          */
         template<typename THandle>
         [[nodiscard]] auto add(const bool isActive = true) noexcept {
-            auto entity = typedHandleWorld_->template add<THandle>();
+            auto entity = typedHandleWorld_.template addEntity<THandle>();
             entity.setActive(isActive);
             return entity;
         }
@@ -221,7 +200,7 @@ export namespace helios::ecs {
          */
         template<typename THandle>
         [[nodiscard]] auto destroy(const THandle handle) noexcept {
-            return typedHandleWorld_->template destroy<THandle>(handle);
+            return typedHandleWorld_.template destroy<THandle>(handle);
         }
 
 
@@ -233,7 +212,7 @@ export namespace helios::ecs {
          */
         template<typename THandle>
         auto& entityManager() noexcept {
-            return typedHandleWorld_->template entityManager<THandle>();
+            return typedHandleWorld_.template entityManager<THandle>();
         }
 
     };

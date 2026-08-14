@@ -11,15 +11,15 @@ module;
 export module helios.ecs.Entity;
 
 import helios.ecs.EntityManager;
-import helios.ecs.common.components;
-import helios.ecs.common.commands;
-import helios.ecs.concepts;
-import helios.ecs.types;
+import helios.ecs.component;
+import helios.ecs.command;
+import helios.ecs.common.concepts;
+import helios.ecs.common.types;
 
-using namespace helios::ecs::types;
-using namespace helios::ecs::common::commands;
-using namespace helios::ecs::concepts::traits;
-using namespace helios::ecs::common::components;
+using namespace helios::ecs::common::types;
+using namespace helios::ecs::command;
+using namespace helios::ecs::common::concepts::traits;
+using namespace helios::ecs::components;
 export namespace helios::ecs {
 
     /**
@@ -141,7 +141,7 @@ export namespace helios::ecs {
         template<typename TComponent, typename TBuffer, typename ...Args>
         requires std::is_same_v<typename TEntityManager::Handle_type, typename TBuffer::Handle_type>
         void deferAdd(TBuffer& buffer, Args&& ...args) {
-            buffer.template add<AddComponentCommand<TComponent>>(entityHandle_, std::forward<Args>(args)...);
+            buffer.template add<commands::AddComponentCommand<TComponent>>(entityHandle_, std::forward<Args>(args)...);
         }
 
         /**
@@ -157,7 +157,7 @@ export namespace helios::ecs {
         template<typename TComponent, typename TBuffer>
         requires std::is_same_v<typename TEntityManager::Handle_type, typename TBuffer::Handle_type>
         void deferRemove(TBuffer& buffer) {
-            buffer.template add<RemoveComponentCommand<TComponent>>(entityHandle_);
+            buffer.template add<commands::RemoveComponentCommand<TComponent>>(entityHandle_);
         }
 
         /**
@@ -173,9 +173,9 @@ export namespace helios::ecs {
         template<typename TBuffer>
         requires std::is_same_v<typename TEntityManager::Handle_type, typename TBuffer::Handle_type>
         void deferSetActive(TBuffer& buffer) {
-            buffer.template add<AddComponentCommand<Active<typename TEntityManager::Handle_type>>>(entityHandle_);
-            buffer.template add<RemoveComponentCommand<Active<typename TEntityManager::Handle_type>>>(entityHandle_);
-            buffer.template add<AddComponentCommand<DirtyComponentSpec<Active<typename TEntityManager::Handle_type>>>>(entityHandle_);
+            buffer.template add<commands::AddComponentCommand<Active<typename TEntityManager::Handle_type>>>(entityHandle_);
+            buffer.template add<commands::RemoveComponentCommand<Active<typename TEntityManager::Handle_type>>>(entityHandle_);
+            buffer.template add<commands::AddComponentCommand<DirtyComponentSpec<Active<typename TEntityManager::Handle_type>>>>(entityHandle_);
 
             trackDirty<Active<typename TEntityManager::Handle_type>>();
         }
@@ -193,9 +193,9 @@ export namespace helios::ecs {
         template<typename TBuffer>
         requires std::is_same_v<typename TEntityManager::Handle_type, typename TBuffer::Handle_type>
         void deferSetInactive(TBuffer& buffer) {
-            buffer.template add<AddComponentCommand<Inactive<typename TEntityManager::Handle_type>>>(entityHandle_);
-            buffer.template add<RemoveComponentCommand<Active<typename TEntityManager::Handle_type>>>(entityHandle_);
-            buffer.template add<AddComponentCommand<DirtyComponentSpec<Inactive<typename TEntityManager::Handle_type>>>>(entityHandle_);
+            buffer.template add<commands::AddComponentCommand<Inactive<typename TEntityManager::Handle_type>>>(entityHandle_);
+            buffer.template add<commands::RemoveComponentCommand<Active<typename TEntityManager::Handle_type>>>(entityHandle_);
+            buffer.template add<commands::AddComponentCommand<DirtyComponentSpec<Inactive<typename TEntityManager::Handle_type>>>>(entityHandle_);
 
             trackDirty<Inactive<typename TEntityManager::Handle_type>>();
         }

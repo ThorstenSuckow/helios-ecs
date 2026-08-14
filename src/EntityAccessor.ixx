@@ -8,9 +8,9 @@ export module helios.ecs.EntityAccessor;
 import helios.ecs.EntityManager;
 import helios.ecs.Entity;
 
-import helios.ecs.types;
+import helios.ecs.common.types;
 
-using namespace helios::ecs::types;
+using namespace helios::ecs::common::types;
 export namespace helios::ecs {
 
     template<typename THandle>

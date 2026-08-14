@@ -11,12 +11,12 @@ module;
 
 export module helios.ecs.EntityRegistry;
 
-import helios.ecs.types;
+import helios.ecs.common.types;
 
-import helios.ecs.concepts;
+import helios.ecs.common.concepts;
 
-using namespace helios::ecs::types;
-using namespace helios::ecs::types;
+using namespace helios::ecs::common::types;
+using namespace helios::ecs::common::types;
 export namespace helios::ecs {
 
 

@@ -16,16 +16,16 @@ export module helios.ecs.EntityManager;
 import helios.ecs.storage.SparseSet;
 import helios.ecs.EntityRegistry;
 
-import helios.ecs.types;
-import helios.ecs.common.components;
+import helios.ecs.common.types;
+import helios.ecs.component;
 
-import helios.ecs.concepts;
+import helios.ecs.common.concepts;
 
 
-using namespace helios::ecs::types;
-using namespace helios::ecs::common::components;
+using namespace helios::ecs::common::types;
+using namespace helios::ecs::components;
 using namespace helios::ecs::storage;
-using namespace helios::ecs::concepts;
+using namespace helios::ecs::common::concepts;
 export namespace helios::ecs {
 
     /**
@@ -57,6 +57,8 @@ export namespace helios::ecs {
          * @brief Entity handle type of this manager.
          */
         using Handle_type = THandle;
+
+        using HandleType = THandle;
 
         /**
          * @brief Component type-id provider bound to `Handle_type`.
