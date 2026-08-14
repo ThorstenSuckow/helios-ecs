@@ -6,9 +6,6 @@ module;
 
 export module helios.ecs.command.NullCommandBuffer;
 
-import helios.ecs.command.CommandHandlerRegistry;
-
-import helios.ecs.types;
 import helios.ecs.command.tags;
 
 export namespace helios::ecs::command {
@@ -25,11 +22,11 @@ export namespace helios::ecs::command {
         template<class T, class... Args>
         void add(Args&&...) {/*intentionally noop*/}
 
-        void flush(ecs::types::NullFlushContext&) noexcept {/*intentionally noop*/}
+        void flush() noexcept {/*intentionally noop*/}
 
         void clear() noexcept {/*intentionally noop*/}
 
-        void init(ecs::types::NullInitContext&) noexcept {/*intentionally noop*/}
+        void init() noexcept {/*intentionally noop*/}
 
     };
 

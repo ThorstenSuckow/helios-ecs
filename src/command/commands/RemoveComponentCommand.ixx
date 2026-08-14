@@ -1,35 +1,31 @@
 /**
- * @file AddComponentCommand.ixx
- * @brief Deferred command for adding a component to an entity.
+ * @file RemoveComponentCommand.ixx
+ * @brief Deferred command for removing a component from an entity.
  */
 module;
 
 #include <memory>
 
-export module helios.ecs.common.commands:AddComponentCommand;
+export module helios.ecs.command.commands:RemoveComponentCommand;
 
 import helios.ecs.command.types;
 
-export namespace helios::ecs::common::commands {
+export namespace helios::ecs::commands {
 
 
     /**
-     * @brief Deferred command that adds a component of type `TComponent` to an entity.
+     * @brief Deferred command that removes a component of type `TComponent` from an entity.
      *
-     * Intended to be queued and processed by a command consumer (e.g. a system
-     * or entity manager) rather than applied immediately, keeping structural
-     * ECS mutations out of hot iteration loops.
-     *
-     * @tparam TComponent Component type to attach. Must expose `Handle_type`.
+     * @tparam TComponent Component type to detach. Must expose `Handle_type`.
      */
     template<typename TComponent>
-    struct AddComponentCommand {
+    struct RemoveComponentCommand {
 
         using Handle_type = TComponent::Handle_type;
 
         using Component_type = TComponent;
 
-        using Group_type = command::types::CommandGroup<AddComponentCommand, Handle_type>;
+        using CommandGroupType = command::types::CommandGroup<RemoveComponentCommand, Handle_type>;
 
         Handle_type handle;
 
@@ -40,7 +36,7 @@ export namespace helios::ecs::common::commands {
          *
          * @param handle Target entity handle.
          */
-        explicit AddComponentCommand(Handle_type handle)
+        explicit RemoveComponentCommand(Handle_type handle)
         requires std::default_initializable<TComponent>
         : handle(handle), component() {}
 
@@ -53,7 +49,7 @@ export namespace helios::ecs::common::commands {
          */
         template<typename ...TArgs>
         requires std::constructible_from<TComponent, TArgs...>
-        explicit AddComponentCommand(Handle_type handle, TArgs&& ...args)
+        explicit RemoveComponentCommand(Handle_type handle, TArgs&& ...args)
         : handle(handle), component(std::forward<TArgs>(args)...) {}
 
     };

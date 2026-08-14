@@ -6,55 +6,43 @@ module;
 
 #include <memory>
 #include <vector>
-#include <cassert>
 
 
-#include "helios-ecs-config.h"
+#include "../helios-ecs-config.h"
 
-export module helios.ecs.EntityMutationCommandBuffer;
+export module helios.ecs.command.EntityMutationCommandBuffer;
 
-import helios.ecs.manager.ManagerRegistry;
-import helios.ecs.EntityMutationManager;
-import helios.ecs.command.CommandBuffer;
-import helios.ecs.types;
+import helios.ecs.command.CommandHandlerRegistry;
 import helios.ecs.command.CommandBufferRegistry;
 import helios.ecs.command.tags;
-import helios.ecs.command.CommandHandlerRegistry;
+import helios.ecs.common.types;
+import helios.ecs.common.concepts;
 
 using namespace helios::ecs;
-using namespace helios::ecs::types;
-export namespace helios::ecs {
+using namespace helios::ecs::common::types;
+export namespace helios::ecs::command {
 
     /**
      * @brief Collects deferred entity-mutation commands and dispatches them in bulk.
      */
-    template<typename THandle, typename TFlushContext, typename TInitContext>
+    template<typename THandle, typename TInitContext, typename TFlushContext>
+    requires common::concepts::ProvidesCommandHandlerRegistry<TInitContext, command::CommandHandlerRegistry>
     class EntityMutationCommandBuffer {
 
         /** @brief Registry of lazily created per-command-type `InternalBuffer` instances. */
         command::CommandBufferRegistry<TFlushContext, TInitContext> commandBufferRegistry_{};
-
-        /** @brief Registry used to route submitted commands to their handlers. */
-        command::CommandHandlerRegistry& commandHandlerRegistry_;
 
         /**
          * @brief Per-command-type storage and dispatch unit.
          *
          * Created lazily by `EntityMutationCommandBuffer::bufferFor<TCommand>()`.
          * On `flush()` every buffered command is forwarded to the
-         * `CommandHandlerRegistry`, which routes it to the `EntityMutationManager`.
+         * `CommandHandlerRegistry`.
          *
-         * @tparam TCommandType ECS command struct to buffer (e.g. `AddComponentCommand<C>`).
+         * @tparam TCommandType ECS command struct to buffer (e.g. @c AddComponentCommand).
          */
         template<typename TCommandType>
         class InternalBuffer {
-
-            /** @brief Registry used to submit commands to their handlers on first flush. */
-            command::CommandHandlerRegistry& commandHandlerRegistry_;
-
-   
-            /** @brief `true` once the handler for `TCommandType` has been registered. */
-            bool handlerRegistered_{false};
 
 
             /** @brief Buffered commands pending submission. */
@@ -65,15 +53,12 @@ export namespace helios::ecs {
             using EcsRoleTag = command::tags::CommandBufferRole;
 
             /** @brief Reserves default capacity for the command vector. */
-            explicit InternalBuffer(command::CommandHandlerRegistry& commandHandlerRegistry)
-                : commandHandlerRegistry_(commandHandlerRegistry) {
+            explicit InternalBuffer() {
                 commands_.reserve(DEFAULT_ENTITY_MUTATION_COMMAND_BUFFER_CAPACITY);
             }
 
             /**
-             * @brief Submits all buffered commands as a batch to the `EntityMutationManager` and clears the buffer.
-             *
-             * On first call, resolves the `EntityMutationManager` from the `ManagerRegistry`.
+             * @brief Submits all buffered commands as a batch to the CommandHandlerRegistry and clears the buffer.
              *
              * @note Must not be called from concurrently running tasks.
              *
@@ -81,9 +66,10 @@ export namespace helios::ecs {
              */
             void flush(TFlushContext& flushContext) {
 
-                if (commandHandlerRegistry_.has<TCommandType>()) {
+                auto& commandHandlerRegistry = flushContext.commandHandlerRegistry();
+                if (commandHandlerRegistry.template has<TCommandType>()) {
                     for (auto& cmd : commands_) {
-                        commandHandlerRegistry_.submitBatch<TCommandType>(std::move(cmd));
+                        commandHandlerRegistry.template submitBatch<TCommandType>(std::move(cmd));
                     }
                 }
 
@@ -96,13 +82,14 @@ export namespace helios::ecs {
             }
 
             /**
-             * @brief Wires this buffer to the handler and manager registries.
+             * @brief Initialises buffer-local state from the init context.
              *
-             * @param commandHandlerRegistry Registry used to route commands to their handlers.
-             * @param managerRegistry        Registry providing the `EntityMutationManager<>`.
+             * The current implementation is intentionally a no-op.
+             *
+             * @param initContext Frame-local init context (currently unused).
              */
             void init(TInitContext& initContext) {
-                // intentionalle noop
+                // intentionally no-op
             }
 
             /**
@@ -132,7 +119,7 @@ export namespace helios::ecs {
             if (!model) {
                 auto& created   =
                     commandBufferRegistry_.template add<InternalBuffer<TCommand>>(
-                        CommandBuffer(InternalBuffer<TCommand>{commandHandlerRegistry_})
+                        CommandBuffer(InternalBuffer<TCommand>{})
                     );
                 
                 return &created;
@@ -147,8 +134,7 @@ export namespace helios::ecs {
         /** @brief Role tag marking this as a command buffer for the engine registry. */
         using EcsRoleTag = command::tags::CommandBufferRole;
 
-        explicit EntityMutationCommandBuffer(command::CommandHandlerRegistry& commandHandlerRegistry)
-            : commandHandlerRegistry_(commandHandlerRegistry) {}
+        EntityMutationCommandBuffer() = default;
 
         /**
          * @brief Enqueues a command of type `TCommand`, constructing it from `args`.
@@ -181,7 +167,7 @@ export namespace helios::ecs {
 
         /**
          * @brief Initialises this buffer and all already-registered internal buffers.
-         *
+         * @param initContext Frame-local init context passed to each internal buffer.
          */
         void init(TInitContext& initContext) {
 
@@ -193,7 +179,7 @@ export namespace helios::ecs {
         /**
          * @brief Flushes all internal buffers, dispatching every queued command.
          *
-         * @param flushContext
+         * @param flushContext Frame-local flush context passed to each internal buffer.
          */
         void flush(TFlushContext& flushContext) {
             for (auto* buffer : commandBufferRegistry_.items()) {
