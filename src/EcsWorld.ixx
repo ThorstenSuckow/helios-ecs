@@ -45,7 +45,7 @@ export namespace helios::ecs {
 
     public:
 
-        using TypedHandleWorld = TTypedHandleWorld;
+        using TypedHandleWorldType = TTypedHandleWorld;
 
         EcsWorld() = default;
 
