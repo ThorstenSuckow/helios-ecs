@@ -146,7 +146,7 @@ export namespace helios::ecs::manager {
              *
              * @param executionContext Execution context (currently unused; kept for interface uniformity).
              */
-            void executeCommands(TExecutionContext& executionContext){
+            bool executeCommands(TExecutionContext& executionContext){
 
                 using Component_type = typename TCommandType::Component_type;
 
@@ -166,6 +166,7 @@ export namespace helios::ecs::manager {
                 }
 
                 clear();
+                return true;
             }
 
 
@@ -216,6 +217,7 @@ export namespace helios::ecs::manager {
                 }
             }
 
+            void reset() {/*intentionally noop*/}
         };
 
         /**
@@ -343,8 +345,10 @@ export namespace helios::ecs::manager {
          */
         bool executeCommands(TExecutionContext& executionContext) {
 
+            auto contextRef = ContextRef<Execution>{executionContext};
+
             for (auto* manager : internalExecutionManagerRegistry_.items()) {
-                manager->executeCommands(executionContext);
+                manager->executeCommands(contextRef);
             }
 
             executionContext.template entityManager<THandle>().finalizeMutations();
@@ -372,10 +376,11 @@ export namespace helios::ecs::manager {
             auto& entityManager = executionContext.template entityManager<THandle>();
 
             jobSystem_.runAndWait(activeIndices.size(), [&](const std::size_t groupIndex) {
+                auto contextRef = ContextRef<Execution>{executionContext};
                 for (const auto executorTypeId  : componentToInternalExecutorGroups_[activeIndices[groupIndex]]) {
                     logger_.info("Processing MutationCommandBuffer {0}", executorTypeId.value());
                     auto* executor = internalExecutionManagerRegistry_.item(executorTypeId);
-                    executor->executeCommands(executionContext);
+                    executor->executeCommands(contextRef);
                 }
                 entityManager.finalizeMutations(ComponentTypeId<THandle>{activeIndices[groupIndex]});
             });
@@ -383,6 +388,7 @@ export namespace helios::ecs::manager {
             return true;
         }
 
+        void reset() {/* intentionally noop */}
 
     };
 
