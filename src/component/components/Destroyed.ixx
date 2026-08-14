@@ -4,9 +4,9 @@
  */
 module;
 
-export module helios.ecs.common.components.Destroyed;
+export module helios.ecs.component.components:Destroyed;
 
-export namespace helios::ecs::common::components {
+export namespace helios::ecs::components {
 
 /**
  * @brief Tag component indicating that the entity entered the destroyed lifecycle state.

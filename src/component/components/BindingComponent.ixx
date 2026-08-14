@@ -2,9 +2,9 @@ module;
 
 #include <concepts>
 
-export module helios.ecs.common.components.BindingComponent;
+export module helios.ecs.component.components:BindingComponent;
 
-export namespace helios::ecs::common::components {
+export namespace helios::ecs::components {
 
     /**
      * @brief Generic component that stores a handle reference to another entity.

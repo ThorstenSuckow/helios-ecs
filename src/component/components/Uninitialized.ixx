@@ -4,9 +4,9 @@
  */
 module;
 
-export module helios.ecs.common.components.Uninitialized;
+export module helios.ecs.component.components:Uninitialized;
 
-export namespace helios::ecs::common::components {
+export namespace helios::ecs::components {
 
     /**
      * @brief Tag component indicating that entity initialization is still pending.
