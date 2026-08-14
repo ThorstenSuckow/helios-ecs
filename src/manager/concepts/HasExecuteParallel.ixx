@@ -8,7 +8,7 @@ module;
 
 export module helios.ecs.manager.concepts:HasExecuteParallel;
 
-import helios.ecs.types;
+import helios.ecs.common.types;
 
 export namespace helios::ecs::manager::concepts {
     /**

@@ -6,16 +6,15 @@ module;
 
 #include <vector>
 #include <format>
-#include "helios-ecs-config.h"
+#include "../helios-ecs-config.h"
 #include <optional>
 #include <algorithm>
 #include <iterator>
 #include <cassert>
 
-export module helios.ecs.EntityMutationManager;
+export module helios.ecs.manager.EntityMutationManager;
 
-import helios.ecs.common.commands;
-import helios.ecs.types;
+import helios.ecs.common.types;
 import helios.ecs.EntityManager;
 
 import helios.core.thread.JobSystem;
@@ -24,6 +23,7 @@ import helios.ecs.command.CommandBuffer;
 import helios.ecs.command.CommandBufferRegistry;
 import helios.ecs.command.tags;
 import helios.ecs.command.types;
+import helios.ecs.command.commands;
 
 
 import helios.ecs.command.CommandHandlerRegistry;
@@ -31,24 +31,23 @@ import helios.ecs.manager.ManagerRegistry;
 import helios.ecs.manager.tags;
 import helios.ecs.manager.types;
 
-import helios.ecs.common.components;
-
+import helios.ecs.component.components;
 
 import helios.core.log;
 
-import helios.ecs.concepts;
-import helios.core.log;
+import helios.ecs.common.concepts;
 
-using namespace helios::ecs::common::components;
+
+using namespace helios::ecs::components;
 using namespace helios::core::thread;
 using namespace helios::ecs;
-using namespace helios::ecs::types;
-using namespace helios::ecs::concepts::traits;
-using namespace helios::ecs::common::commands;
+using namespace helios::ecs::common::types;
+using namespace helios::ecs::common::concepts::traits;
+using namespace helios::ecs::command;
 using namespace helios::core::log;
 
 #define HELIOS_LOG_SCOPE "helios::ecs::EntityMutationManager"
-export namespace helios::ecs {
+export namespace helios::ecs::manager {
 
 
     /**
@@ -56,26 +55,28 @@ export namespace helios::ecs {
      *
      * Acts as the write-back stage for `EntityMutationCommandBuffer`: commands
      * are submitted directly via `submit()` or `submitBatch()` and buffered per
-     * command type. On `flush()` / `flushParallel()` each buffer applies its
+     * command type. On `executeCommands()` / `executeCommandsParallel()` each buffer applies its
      * mutations to the entity manager.
      *
-     * @tparam TEntityManager Entity manager type identifying the target ECS registry.
+     * @tparam THandle Entity handle type identifying the target ECS registry.
+     * @tparam TInitContext Init-context type providing command-handler access.
+     * @tparam TExecutionContext Execution-context type providing entity-manager access.
      */
-    template<typename THandle, typename TExecutionContext, typename TInitContext>
+    template<typename THandle,typename TInitContext, typename TExecutionContext>
+    requires common::concepts::ProvidesCommandHandlerRegistry<TInitContext, command::CommandHandlerRegistry>
+        && common::concepts::ProvidesEntityManager<TExecutionContext, EntityManager<THandle>>
     class EntityMutationManager {
 
 
-        /** @brief Reference to the entity manager mutations are applied to. */
-        EntityManager<THandle>& entityManager_;
+        /**
+         * @brief Registry of lazily created per-command-type `InternalExecutionManager` instances.
+         */
+        manager::ManagerRegistry internalExecutionManagerRegistry_{};
 
-        /** @brief Registry of lazily created per-command-type `InternalExecutionManager` instances. */
-        manager::ManagerRegistry<TExecutionContext, TInitContext> internalExecutionManagerRegistry_{};
-
-        /** @brief Job system used by `flushParallel()` for concurrent buffer execution. */
+        /**
+         * @brief Job system used by `executeCommandsParallel()` for concurrent buffer execution.
+         */
         JobSystem& jobSystem_;
-
-        command::CommandHandlerRegistry& commandHandlerRegistry_;
-
 
         /**
          * @brief Maps component type IDs to the `ManagerTypeId`s of their associated buffers.
@@ -83,50 +84,58 @@ export namespace helios::ecs {
          * Indexed by component type ID; each slot holds one or more buffer IDs that can be
          * flushed independently in parallel.
          */
-        std::vector<std::vector<manager::types::ManagerTypeId<TExecutionContext, TInitContext>>> componentToInternalExecutorGroups_{};
+        std::vector<std::vector<manager::types::ManagerTypeId>> componentToInternalExecutorGroups_{};
 
-        /** @brief Ordered list of component type IDs that have at least one registered buffer. */
-        std::vector<std::size_t> executorGoupIndices_;
+        /**
+         * @brief Ordered list of component type IDs that have at least one registered buffer.
+         */
+        std::vector<std::size_t> executorGroupIndices_;
 
-        /** @brief Module-scoped logger. */
+        /**
+         * @brief Module-scoped logger.
+         */
         static inline auto& logger_ = helios::core::log::LogManager::loggerForScope(HELIOS_LOG_SCOPE);
 
         /**
          * @brief Per-command-type buffer that applies mutations on flush.
          *
-         * Two `flush()` overloads exist, selected by concept constraints:
-         * one for component add/remove, one for entity activation/deactivation.
+         * Stores add/remove component commands and replays them in `executeCommands()`.
          *
          * @tparam TCommandType ECS command type stored in this buffer.
          */
         template<typename TCommandType>
+        requires IsAddComponentCommand_v<TCommandType> || IsRemoveComponentCommand_v<TCommandType>
         class InternalExecutionManager {
 
-            /** @brief Buffered commands pending application. */
+            /**
+             * @brief Buffered commands pending application.
+             */
             std::vector<TCommandType> commands_;
 
-            /** @brief Reference to the entity manager mutations are applied to. */
-            EntityManager<THandle>& entityManager_;
 
             public:
 
             using Handle_type = THandle;
 
-            using ExecutionContext_type = TExecutionContext;
-
-            using InitContext_type = TInitContext;
-
-            /** @brief Role tag identifying this as a command buffer in the engine registry. */
+            /**
+             * @brief Role tag identifying this as a command buffer in the engine registry.
+             */
             using EcsRoleTag = command::tags::CommandBufferRole;
 
-            /** @brief The command type stored in this buffer. */
+            /**
+             * @brief The command type stored in this buffer.
+             */
             using Command_type = TCommandType;
 
-            /** @brief Component type targeted by the buffered commands. */
+            /**
+             * @brief Component type targeted by the buffered commands.
+             */
             using Component_type = typename TCommandType::Component_type;
 
-            /** @brief Reserves default capacity for the command vector. */
-            InternalExecutionManager(EntityManager<THandle>& entityManager) : entityManager_(entityManager) {
+            /**
+             * @brief Reserves default capacity for the command vector.
+             */
+            InternalExecutionManager() {
                 commands_.reserve(DEFAULT_ENTITY_MUTATION_COMMAND_BUFFER_CAPACITY);
             }
 
@@ -137,21 +146,22 @@ export namespace helios::ecs {
              *
              * @param executionContext Execution context (currently unused; kept for interface uniformity).
              */
-            void executeCommands(TExecutionContext& executionContext)
-            requires IsAddComponentCommand_v<TCommandType> || IsRemoveComponentCommand_v<TCommandType> {
+            void executeCommands(TExecutionContext& executionContext){
 
                 using Component_type = typename TCommandType::Component_type;
+
+                auto& entityManager = executionContext.template entityManager<THandle>();
 
                 logger_.info("Processing {0} commands", commands_.size());
 
                 for (auto& command : commands_) {
-                    if (!entityManager_.isValid(command.handle)) {
+                    if (!entityManager.isValid(command.handle)) {
                         continue;
                     }
                     if constexpr (IsAddComponentCommand_v<TCommandType>) {
-                        entityManager_.template emplace<Component_type>(command.handle, std::move(command.component));
+                        entityManager.template emplace<Component_type>(command.handle, std::move(command.component));
                     } else {
-                        std::ignore = entityManager_.template remove<Component_type>(command.handle);
+                        std::ignore = entityManager.template remove<Component_type>(command.handle);
                     }
                 }
 
@@ -159,13 +169,19 @@ export namespace helios::ecs {
             }
 
 
-            /** @brief Discards all buffered commands without applying them. */
+            /**
+             * @brief Discards all buffered commands without applying them.
+             */
             void clear() {
                 commands_.clear();
             }
 
-            /** @brief No-op; satisfies the buffer initialisation interface. */
-            void init(TInitContext& initContext) {/* noop*/ }
+            /**
+             * @brief No-op; satisfies the buffer initialisation interface.
+             */
+            bool init(TInitContext& initContext) {
+                return true;
+            }
 
             /**
              * @brief Stores a command for deferred execution.
@@ -180,7 +196,7 @@ export namespace helios::ecs {
              * @brief Moves all commands from `incoming` into this buffer.
              *
              * If the buffer is empty the vectors are swapped (zero-copy);
-             * otherwise `incoming` is appended via move iterators, the cleared.
+             * otherwise `incoming` is appended via move iterators, then cleared.
              *
              *
              * @param incoming Source vector; left in a valid but unspecified state after the call.
@@ -215,9 +231,7 @@ export namespace helios::ecs {
 
             if (!executor) {
                 auto& created   =
-                    internalExecutionManagerRegistry_.template add<InternalExecutionManager<TCommand>>(
-                        Manager(InternalExecutionManager<TCommand>{entityManager_})
-                    );
+                    internalExecutionManagerRegistry_.template add<InternalExecutionManager<TCommand>>();
 
                 using Component_type = typename TCommand::Component_type;
                 const auto cv = ComponentTypeId<THandle>::template id<Component_type>().value();
@@ -227,11 +241,9 @@ export namespace helios::ecs {
                 }
 
                 if (componentToInternalExecutorGroups_[cv].empty()) {
-                    executorGoupIndices_.push_back(cv);
+                    executorGroupIndices_.push_back(cv);
                 }
-                componentToInternalExecutorGroups_[cv].push_back(manager::types::ManagerTypeId<TExecutionContext, TInitContext>::template id<InternalExecutionManager<TCommand>>());
-
-                std::ignore = entityManager_.template  ensureSparseSet<Component_type>();
+                componentToInternalExecutorGroups_[cv].push_back(manager::types::ManagerTypeId::template id<InternalExecutionManager<TCommand>>());
 
                 return &created;
             }
@@ -241,21 +253,26 @@ export namespace helios::ecs {
 
     public:
 
-        /** @brief The entity handle type this manager operates on. */
+        /**
+         * @brief The entity handle type this manager operates on.
+         */
         using Handle_type = THandle;
 
-        /** @brief Role tag identifying this as a manager in the engine registry. */
+        /**
+         * @brief Role tag identifying this as a manager in the engine registry.
+         */
         using EcsRoleTag = manager::tags::ManagerRole;
 
+        using ExecutionContextType = TExecutionContext;
+
+        using InitContextType = TInitContext;
+
         /**
-         * @brief Constructs the manager bound to `entityManager` and `jobSystem`.
+         * @brief Constructs the manager bound to `jobSystem`.
          *
-         * @param entityManager Entity manager mutations are applied to.
-         * @param jobSystem      Job system used for parallel flush execution.
+         * @param jobSystem Job system used for parallel command execution.
          */
-        explicit EntityMutationManager(
-            command::CommandHandlerRegistry& commandHandlerRegistry, EntityManager<THandle>& entityManager, JobSystem& jobSystem)
-        : commandHandlerRegistry_(commandHandlerRegistry), entityManager_(entityManager), jobSystem_(jobSystem) {}
+        explicit EntityMutationManager(JobSystem& jobSystem) : jobSystem_(jobSystem) {}
 
         /**
          * @brief Accepts a command from the `CommandHandlerRegistry` and enqueues it.
@@ -302,59 +319,68 @@ export namespace helios::ecs {
         /**
          * @brief Initialises the manager. Currently a no-op.
          *
-         * @param commandHandlerRegistry Unused; kept for interface uniformity.
+         * Registers command-group handlers in the `CommandHandlerRegistry`.
+         *
+         * @param initContext Init context providing access to the command handler registry.
          */
-        void init(TInitContext& initContext) {
+        bool init(TInitContext& initContext) {
 
-            commandHandlerRegistry_.registerHandlerForCommandGroup<
-                command::types::CommandGroup<AddComponentCommand, THandle>
+            initContext.commandHandlerRegistry().template registerHandlerForCommandGroup<
+                command::types::CommandGroup<commands::AddComponentCommand, THandle>
             >(*this);
 
-            commandHandlerRegistry_.registerHandlerForCommandGroup<
-                command::types::CommandGroup<RemoveComponentCommand, THandle>
+            initContext.commandHandlerRegistry().template registerHandlerForCommandGroup<
+                command::types::CommandGroup<commands::RemoveComponentCommand, THandle>
             >(*this);
 
+            return true;
         }
 
         /**
-         * @brief Flushes all internal buffers sequentially, applying every queued mutation.
+         * @brief Executes all internal buffers sequentially, applying every queued mutation.
          *
-         * @param updateContext Frame-local ECS context forwarded to each buffer's flush.
+         * @param executionContext Frame-local ECS context forwarded to each internal executor.
          */
-        void executeCommands(TExecutionContext& executionContext) {
+        bool executeCommands(TExecutionContext& executionContext) {
+
             for (auto* manager : internalExecutionManagerRegistry_.items()) {
                 manager->executeCommands(executionContext);
             }
 
-            entityManager_.finalizeMutations();
+            executionContext.template entityManager<THandle>().finalizeMutations();
+
+            return true;
         }
 
         /**
-         * @brief Flushes independent buffer groups concurrently via the `JobSystem`.
+         * @brief Executes independent buffer groups concurrently via the `JobSystem`.
          *
          * Each component-type group is dispatched as a separate job; groups that operate
          * on different component types are assumed to be executable in parallel without contention.
          *
-         * @param executionContext Execution context forwarded to each buffer's flush.
+         * @param executionContext Execution context forwarded to each internal executor.
          */
-        void flushParallel(TExecutionContext& executionContext) {
+        bool executeCommandsParallel(TExecutionContext& executionContext) {
 
             std::vector<std::size_t> activeIndices;
-            for (const auto idx : executorGoupIndices_) {
+            for (const auto idx : executorGroupIndices_) {
                 if (!componentToInternalExecutorGroups_[idx].empty()) {
                     activeIndices.push_back(idx);
                 }
             }
+
+            auto& entityManager = executionContext.template entityManager<THandle>();
+
             jobSystem_.runAndWait(activeIndices.size(), [&](const std::size_t groupIndex) {
                 for (const auto executorTypeId  : componentToInternalExecutorGroups_[activeIndices[groupIndex]]) {
                     logger_.info("Processing MutationCommandBuffer {0}", executorTypeId.value());
                     auto* executor = internalExecutionManagerRegistry_.item(executorTypeId);
                     executor->executeCommands(executionContext);
                 }
-                entityManager_.finalizeMutations(ComponentTypeId<THandle>{activeIndices[groupIndex]});
+                entityManager.finalizeMutations(ComponentTypeId<THandle>{activeIndices[groupIndex]});
             });
 
-
+            return true;
         }
 
 
