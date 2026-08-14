@@ -12,10 +12,10 @@ module;
 
 export module helios.ecs.storage.SparseSet;
 
-import helios.ecs.types;
+import helios.ecs.common.types;
 
 
-using namespace helios::ecs::types;
+using namespace helios::ecs::common::types;
 export namespace helios::ecs::storage {
 
     /**
@@ -128,7 +128,7 @@ export namespace helios::ecs::storage {
     /**
      * @brief Sentinel value indicating an empty slot in the sparse array.
      *
-     * Aliased from `helios::ecs::types::EntityTombstone`.
+     * Aliased from `helios::ecs::common::types::EntityTombstone`.
      */
     constexpr auto Tombstone = EntityTombstone;
 
