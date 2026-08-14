@@ -4,5 +4,5 @@
  */
 export module helios.ecs.common;
 
-export import helios.ecs.common.components;
-export import helios.ecs.common.commands;
+export import helios.ecs.common.concepts;
+export import helios.ecs.common.types;

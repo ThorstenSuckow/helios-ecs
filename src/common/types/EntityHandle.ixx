@@ -10,14 +10,14 @@ module;
 #include <cstddef>
 #include <cassert>
 
-export module helios.ecs.types:EntityHandle;
+export module helios.ecs.common.types:EntityHandle;
 
 import :TypeDefs;
 import helios.core.types;
 
-using namespace helios::ecs::types;
+using namespace helios::ecs::common::types;
 using namespace helios::core::types;
-export namespace helios::ecs::types {
+export namespace helios::ecs::common::types {
 
     /**
      * @brief Sentinel version for invalid or default-initialized handles.

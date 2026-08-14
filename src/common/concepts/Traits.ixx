@@ -7,14 +7,14 @@ module;
 #include <concepts>
 #include <utility>
 
-export module helios.ecs.concepts:Traits;
+export module helios.ecs.common.concepts:Traits;
 
-import helios.ecs.common.commands;
-import helios.ecs.common.components;
+import helios.ecs.command.commands;
+import helios.ecs.component.components;
 
-using namespace helios::ecs::common::commands;
-using namespace helios::ecs::common::components;
-export namespace helios::ecs::concepts::traits {
+using namespace helios::ecs::commands;
+using namespace helios::ecs::components;
+export namespace helios::ecs::common::concepts::traits {
 
     /**
      * @brief Trait that allows components to be trackable.
@@ -67,7 +67,7 @@ export namespace helios::ecs::concepts::traits {
     struct IsAddComponentCommand : std::false_type {};
 
     template<typename TComponent>
-    struct IsAddComponentCommand<AddComponentCommand<TComponent>> : std::true_type {};
+    struct IsAddComponentCommand<commands::AddComponentCommand<TComponent>> : std::true_type {};
 
     /**
      * @brief Convenience variable template for `IsAddComponentCommand`.
@@ -82,7 +82,7 @@ export namespace helios::ecs::concepts::traits {
     struct IsRemoveComponentCommand : std::false_type {};
 
     template<typename TComponent>
-    struct IsRemoveComponentCommand<RemoveComponentCommand<TComponent>> : std::true_type {};
+    struct IsRemoveComponentCommand<commands::RemoveComponentCommand<TComponent>> : std::true_type {};
 
     /**
      * @brief Convenience variable template for `IsRemoveComponentCommand`.

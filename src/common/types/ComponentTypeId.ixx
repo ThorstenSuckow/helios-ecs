@@ -10,12 +10,12 @@ module;
 #include <functional>
 #include <cstddef>
 
-export module helios.ecs.types:ComponentTypeId;
+export module helios.ecs.common.types:ComponentTypeId;
 
 import helios.core.TypeIndexer;
 import helios.core.types;
 
-export namespace helios::ecs::types {
+export namespace helios::ecs::common::types {
 
     /**
      * @brief Unique type identifier for component types, scoped per domain.
@@ -84,8 +84,8 @@ export namespace helios::ecs::types {
  * @details Enables use of ComponentTypeId as a key in unordered containers.
  */
 template<typename THandle>
-struct std::hash<helios::ecs::types::ComponentTypeId<THandle>> {
-   std::size_t operator()(const helios::ecs::types::ComponentTypeId<THandle>& id) const noexcept {
+struct std::hash<helios::ecs::common::types::ComponentTypeId<THandle>> {
+   std::size_t operator()(const helios::ecs::common::types::ComponentTypeId<THandle>& id) const noexcept {
         return id.value();
     }
 

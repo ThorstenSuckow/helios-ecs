@@ -3,10 +3,10 @@ module;
 #include <iostream>
 #include <tuple>
 
-export module helios.ecs.types:EntityAccessSet;
+export module helios.ecs.common.types:EntityAccessSet;
 
 
-export namespace helios::ecs::types {
+export namespace helios::ecs::common::types {
     /**
      * @brief provides a list of Components.
      */
@@ -25,7 +25,7 @@ export namespace helios::ecs::types {
 
 namespace {
 
-    using namespace helios::ecs::types;
+    using namespace helios::ecs::common::types;
     /**
      * @brief Primary template to list/tuple conversion.
      * @tparam TList
@@ -128,7 +128,7 @@ namespace {
 
 
 
-export namespace helios::ecs::types {
+export namespace helios::ecs::common::types {
     /**
      * @brief Template for providing HandleList_type containing unique handles used for read access of component data.
      * @tparam TReadComponents

@@ -6,9 +6,9 @@ module;
 
 #include <concepts>
 
-export module helios.ecs.concepts:HasEcsTag;
+export module helios.ecs.common.concepts:HasEcsTag;
 
-export namespace helios::ecs::concepts {
+export namespace helios::ecs::common::concepts {
 
     /**
      * @brief Detects whether T declares a nested `EcsRoleTag` alias equal to Tag.
