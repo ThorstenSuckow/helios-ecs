@@ -5,5 +5,5 @@
 export module helios.ecs.manager.concepts;
 
 
-export import :HasExecuteParallel;
+export import :HasExecuteCommandsParallel;
 export import :IsManagerLike;
