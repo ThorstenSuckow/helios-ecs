@@ -4,7 +4,7 @@
 import helios.ecs;
 
 using namespace helios::ecs;
-using namespace helios::ecs::types;
+using namespace helios::ecs::common::types;
 
 
 namespace {
@@ -44,7 +44,7 @@ TEST(EntityAccessSet, Components) {
 
     EXPECT_TRUE((
         std::same_as<
-            helios::ecs::types::Read<
+            helios::ecs::common::types::Read<
                 PositionComponent<GameObjectHandle>,VelocityComponent<ParticleHandle>,VelocityComponent<GameObjectHandle>
             >,
             Foo::EntityAccessSet::ReadComponentSet
@@ -53,7 +53,7 @@ TEST(EntityAccessSet, Components) {
 
     EXPECT_TRUE((
         std::same_as<
-            helios::ecs::types::Write<
+            helios::ecs::common::types::Write<
                 VelocityComponent<GameObjectHandle>
             >,
             Foo::EntityAccessSet::WriteComponentSet

@@ -5,7 +5,7 @@
 import helios.ecs;
 
 using namespace helios::ecs;
-using namespace helios::ecs::types;
+using namespace helios::ecs::common::types;
 
 // Wrapped in an anonymous namespace so these test-local helper types get
 // internal linkage and their template instantiations are not shared/folded

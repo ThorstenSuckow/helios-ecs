@@ -4,7 +4,7 @@
 import helios.ecs;
 
 using namespace helios::ecs;
-using namespace helios::ecs::types;
+using namespace helios::ecs::common::types;
 
 
 namespace {

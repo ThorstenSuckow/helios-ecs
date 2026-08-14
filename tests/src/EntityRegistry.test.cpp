@@ -4,7 +4,7 @@
 import helios.ecs;
 
 using namespace helios::ecs;
-using namespace helios::ecs::types;
+using namespace helios::ecs::common::types;
 
 // Internal linkage keeps these helpers distinct from identically named helpers
 // in other test TUs (ODR safety for template instantiations).
