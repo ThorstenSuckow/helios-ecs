@@ -6,6 +6,7 @@ export module helios.ecs.manager;
 
 export import helios.ecs.manager.Manager;
 export import helios.ecs.manager.ManagerRegistry;
+export import helios.ecs.manager.EntityMutationManager;
 
 export import helios.ecs.manager.concepts;
 export import helios.ecs.manager.tags;

@@ -17,7 +17,6 @@ export namespace helios::ecs::manager::types {
     /**
      * @brief Unique type identifier for managers.
      */
-    template<typename TExecutionContext, typename TInitContext>
     class ManagerTypeId {
 
         /**
@@ -34,7 +33,6 @@ export namespace helios::ecs::manager::types {
 
 
     public:
-
 
         /**
          * @brief Constructs a ManagerTypeId with a specific value.
@@ -85,9 +83,9 @@ export namespace helios::ecs::manager::types {
 /**
  * @brief Hash specialization for ManagerTypeId.
  */
-template<typename TExecutionContext, typename TInitContext>
-struct std::hash<helios::ecs::manager::types::ManagerTypeId<TExecutionContext, TInitContext>> {
-   std::size_t operator()(const helios::ecs::manager::types::ManagerTypeId<TExecutionContext, TInitContext>& id) const noexcept {
+template<>
+struct std::hash<helios::ecs::manager::types::ManagerTypeId> {
+   std::size_t operator()(const helios::ecs::manager::types::ManagerTypeId& id) const noexcept {
         return id.value();
     }
 

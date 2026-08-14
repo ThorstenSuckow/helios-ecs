@@ -9,40 +9,22 @@ module;
 
 export module helios.ecs.manager.Manager;
 
-import helios.ecs.types;
+import helios.ecs.common.types;
 
+import helios.ecs.manager.types;
 import helios.ecs.manager.concepts;
 
 
 export namespace helios::ecs::manager {
 
-    /**
-     * @brief Concept detecting an optional `init(CommandHandlerRegistry&)` method on a manager.
-     *
-     * @tparam TConcreteManager The manager type to inspect.
-     */
-    template<typename TConcreteManager>
-    concept HasInit = requires {
-        &TConcreteManager::init;
-    };
-
-    /**
-     * @brief Concept detecting an optional `reset()` method on a manager.
-     *
-     * @tparam TConcreteManager The manager type to inspect.
-     */
-    template<typename TConcreteManager>
-    concept HasReset = requires(TConcreteManager& t) {
-            {t.reset() } -> std::same_as<void>;
-    };
-
 
     /**
      * @brief Type-erased wrapper for game world managers.
      */
-    template<typename TExecutionContext, typename TInitContext>
     class Manager {
 
+        using ExecutionContextRef = ecs::common::types::ContextRef<ecs::common::types::Execution>;
+        using InitContextRef = ecs::common::types::ContextRef<ecs::common::types::Init>;
 
 
     private:
@@ -52,10 +34,10 @@ export namespace helios::ecs::manager {
         class Concept {
         public:
             virtual ~Concept() = default;
-            virtual void executeCommands(TExecutionContext& executionContext) noexcept = 0;
-            virtual void init(TInitContext& initContext) noexcept = 0;
+            virtual bool executeCommands(ExecutionContextRef executionContext) noexcept = 0;
+            virtual bool init(InitContextRef initContext) noexcept = 0;
             virtual void reset() noexcept = 0;
-            virtual void executeCommandsParallel(TExecutionContext& executionContext) noexcept = 0;
+            virtual bool executeCommandsParallel(ExecutionContextRef executionContext) noexcept = 0;
 
             [[nodiscard]] virtual void* underlying() noexcept = 0;
             [[nodiscard]] virtual const void* underlying() const noexcept = 0;
@@ -70,12 +52,20 @@ export namespace helios::ecs::manager {
         class Model final : public Concept {
             TConcreteManager manager_;
 
+            using ExecutionContextType = typename TConcreteManager::ExecutionContextType;
+            using InitContextType = typename TConcreteManager::InitContextType;
+
             public:
 
             explicit Model(TConcreteManager sys) :  manager_(std::move(sys)) {}
 
-            void executeCommands(TExecutionContext& executionContext) noexcept override {
-                manager_.executeCommands(executionContext);
+            bool executeCommands(const ExecutionContextRef executionContextRef) noexcept override {
+                
+                if (auto* ctx = executionContextRef.tryGet<ExecutionContextType>()) {
+                    return manager_.executeCommands(*ctx);
+                }
+
+                return false;
             }
 
             /**
@@ -88,24 +78,29 @@ export namespace helios::ecs::manager {
              *
              * @pre Manager must be initialized (pimpl_ != nullptr).
              */
-            void executeCommandsParallel(TExecutionContext& executionContext) noexcept override {
-                if constexpr (concepts::HasExecuteParallel<TConcreteManager>) {
-                    manager_.executeCommandsParallel(executionContext);
-                    return;
+            bool executeCommandsParallel(const ExecutionContextRef executionContext) noexcept override {
+                
+                if (auto* ctx = executionContext.tryGet<ExecutionContextType>()) {
+                    if constexpr (concepts::HasExecuteParallel<TConcreteManager>) {
+                        return manager_.executeCommandsParallel(*ctx);
+                    } else {
+                        assert(false && "Manager does not support executeCommandsParallel");
+                        return manager_.executeCommands(*ctx);
+                    }
                 }
-                assert(false && "Manager does not support executeCommandsParallel");
-                manager_.executeCommands(executionContext);
+
+                return false;
             }
 
-            void init(TInitContext& initContext) noexcept override {
-                if constexpr (HasInit<TConcreteManager>) {
-                    manager_.init(initContext);
+            bool init(InitContextRef initContext) noexcept override {
+                if (auto* ctx = initContext.tryGet<InitContextType>()) {
+                    return manager_.init(*ctx);
                 }
+
+                return false;
             }
             void reset() noexcept override {
-                if constexpr (HasReset<TConcreteManager>) {
-                    manager_.reset();
-                }
+                manager_.reset();
             }
 
             void* underlying() noexcept override {
@@ -124,7 +119,7 @@ export namespace helios::ecs::manager {
         /**
          * @brief Default constructor creating an empty Manager.
          */
-        Manager() = default;
+        Manager() = delete;
 
         /**
          * @brief Wraps a concrete manager in a type-erased Manager.
@@ -135,7 +130,8 @@ export namespace helios::ecs::manager {
          */
         template<typename TConcreteManager>
         requires concepts::IsManagerLike<TConcreteManager>
-        explicit Manager(TConcreteManager manager) : pimpl_(std::make_unique<Model<TConcreteManager>>(std::move(manager))) {}
+        explicit Manager(TConcreteManager manager)
+            : pimpl_(std::make_unique<Model<TConcreteManager>>(std::move(manager))) {}
 
         Manager(const Manager&) = delete;
         Manager& operator=(const Manager&) = delete;
@@ -151,9 +147,9 @@ export namespace helios::ecs::manager {
          *
          * @pre Manager must be initialized (pimpl_ != nullptr).
          */
-        void executeCommands(TExecutionContext& executionContext) noexcept {
+        bool executeCommands(const ExecutionContextRef executionContext) noexcept {
             assert(pimpl_ && "Manager not initialized");
-            pimpl_->executeCommands(executionContext);
+            return pimpl_->executeCommands(executionContext);
         }
 
         /**
@@ -163,9 +159,9 @@ export namespace helios::ecs::manager {
          *
          * @pre Manager must be initialized (pimpl_ != nullptr).
          */
-        void executeCommandsParallel(TExecutionContext& executionContext) noexcept {
+        bool executeCommandsParallel(const ExecutionContextRef executionContext) noexcept {
             assert(pimpl_ && "Manager not initialized");
-            pimpl_->executeParallel(executionContext);
+            return pimpl_->executeCommandsParallel(executionContext);
         }
 
         /**
@@ -175,9 +171,9 @@ export namespace helios::ecs::manager {
          *
          * @pre Manager must be initialized (pimpl_ != nullptr).
          */
-        void init(TInitContext& initContext) noexcept {
+        bool init(InitContextRef initContext) noexcept {
             assert(pimpl_ && "Manager not initialized");
-            pimpl_->init(initContext);
+            return pimpl_->init(initContext);
         }
 
         /**

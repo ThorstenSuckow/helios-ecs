@@ -18,8 +18,6 @@ export namespace helios::ecs::manager {
      * @see ConceptModelRegistry
      * @see Manager
      */
-    template<typename TExecutionContext, typename TInitContext>
-    using ManagerRegistry = core::container::ConceptModelRegistry<Manager<TExecutionContext, TInitContext>,
-    types::ManagerTypeId<TExecutionContext, TInitContext>>;
+    using ManagerRegistry = core::container::ConceptModelRegistry<Manager, types::ManagerTypeId>;
 
 }
