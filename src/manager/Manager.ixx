@@ -81,7 +81,7 @@ export namespace helios::ecs::manager {
             bool executeCommandsParallel(const ExecutionContextRef executionContext) noexcept override {
                 
                 if (auto* ctx = executionContext.tryGet<ExecutionContextType>()) {
-                    if constexpr (concepts::HasExecuteParallel<TConcreteManager>) {
+                    if constexpr (concepts::HasExecuteCommandsParallel<TConcreteManager>) {
                         return manager_.executeCommandsParallel(*ctx);
                     } else {
                         assert(false && "Manager does not support executeCommandsParallel");
