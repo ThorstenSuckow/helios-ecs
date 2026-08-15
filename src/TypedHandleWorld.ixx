@@ -69,6 +69,7 @@ export namespace helios::ecs {
     class TypedHandleWorld {
 
 
+
     public:
 
         /**
@@ -81,6 +82,12 @@ export namespace helios::ecs {
          * @brief Constructs an empty typed-handle world.
          */
         TypedHandleWorld() = default;
+
+        TypedHandleWorld(const TypedHandleWorld&) = delete;
+        TypedHandleWorld& operator=(const TypedHandleWorld&) = delete;
+        TypedHandleWorld(TypedHandleWorld&&) noexcept = default;
+        TypedHandleWorld& operator=(TypedHandleWorld&&) noexcept = default;
+
 
         /**
          * @brief Returns the manager for `THandle`.
@@ -106,6 +113,14 @@ export namespace helios::ecs {
             return std::get<idx>(entityManagers_);
         }
 
+        /**
+         * Returns the entity managers registered with this TypedHandelWorld.
+         *
+         * @return tuple of registered entity managers
+         */
+        auto& entityManagers() const noexcept {
+            return entityManagers_;
+        }
 
         /**
          * @brief Creates an entity in the `THandle` domain.
