@@ -61,9 +61,9 @@ export namespace helios::ecs {
         using HandleType = THandle;
 
         /**
-         * @brief Component type-id provider bound to `Handle_type`.
+         * @brief Component type-id provider bound to `HandleType`.
          */
-        using ComponentTypeId_type = ComponentTypeId<Handle_type>;
+        using ComponentTypeId_type = ComponentTypeId<HandleType>;
 
         /**
          * @brief Non-copyable: copying an EntityManager is explicitly disabled.
@@ -114,7 +114,7 @@ export namespace helios::ecs {
          *
          * @return Newly created handle.
          */
-        [[nodiscard]] Handle_type create() {
+        [[nodiscard]] HandleType create() {
             return registry_.create();
         }
 
@@ -125,7 +125,7 @@ export namespace helios::ecs {
          *
          * @return `true` if the handle refers to a living entity.
          */
-        [[nodiscard]] bool isValid(const Handle_type handle) const noexcept {
+        [[nodiscard]] bool isValid(const HandleType handle) const noexcept {
             return registry_.isValid(handle);
         }
 
@@ -146,7 +146,7 @@ export namespace helios::ecs {
          * @param handle Handle to destroy.
          * @return `true` if the entity was destroyed.
          */
-        [[nodiscard]] bool destroy(const Handle_type handle) {
+        [[nodiscard]] bool destroy(const HandleType handle) {
 
             if (!registry_.isValid(handle)) {
                 return false;
@@ -177,7 +177,7 @@ export namespace helios::ecs {
          *         or does not have the requested component.
          */
         template<typename T>
-        [[nodiscard]] T* get(const Handle_type handle) const {
+        [[nodiscard]] T* get(const HandleType handle) const {
             if (!has<T>(handle)) {
                 return nullptr;
             }
@@ -232,7 +232,7 @@ export namespace helios::ecs {
          *         is invalid or the component is not attached.
          */
         template<typename T>
-        [[nodiscard]] bool has(const Handle_type handle) const {
+        [[nodiscard]] bool has(const HandleType handle) const {
             if (!registry_.isValid(handle)) {
                 return false;
             }
@@ -254,7 +254,7 @@ export namespace helios::ecs {
          *
          * @return `true` if the entity has the component, `false` otherwise.
          */
-        [[nodiscard]] bool has(const Handle_type handle, const ComponentTypeId_type typeId) const {
+        [[nodiscard]] bool has(const HandleType handle, const ComponentTypeId_type typeId) const {
             if (!registry_.isValid(handle)) {
                 return false;
             }
@@ -311,7 +311,7 @@ export namespace helios::ecs {
          *         handle is invalid.
          */
         template<typename T, typename... Args>
-        T* emplace(const Handle_type handle, Args&& ...args) {
+        T* emplace(const HandleType handle, Args&& ...args) {
 
             if (!registry_.isValid(handle)) {
                 return nullptr;
@@ -343,7 +343,7 @@ export namespace helios::ecs {
          *         or `nullptr` if the handle is invalid.
          */
         template<typename T, typename... Args>
-        T* emplaceOrGet(const Handle_type handle, Args&& ...args) {
+        T* emplaceOrGet(const HandleType handle, Args&& ...args) {
 
             if (!registry_.isValid(handle)) {
                 return nullptr;
@@ -375,7 +375,7 @@ export namespace helios::ecs {
          * @see SparseSet::remove
          */
         template<typename T>
-        [[nodiscard]] bool remove(const Handle_type& handle) {
+        [[nodiscard]] bool remove(const HandleType& handle) {
 
             if (!has<T>(handle)) {
                 return false;
@@ -483,7 +483,7 @@ export namespace helios::ecs {
          * @param func   Callback invoked for each attached component type.
          */
         template<typename TFunc>
-        void forEachComponentTypeId(const Handle_type handle, TFunc&& func) const {
+        void forEachComponentTypeId(const HandleType handle, TFunc&& func) const {
             if (!registry_.isValid(handle)) {
                 return;
             }
@@ -505,7 +505,7 @@ export namespace helios::ecs {
          * @param source The entity to copy from.
          * @param target The entity to copy to.
          */
-        void copy(const Handle_type source, const Handle_type target) {
+        void copy(const HandleType source, const HandleType target) {
 
             if (!registry_.isValid(source)) {
                 return;
@@ -531,7 +531,7 @@ export namespace helios::ecs {
          *
          * @return Raw pointer to the component, or `nullptr` if not found.
          */
-        [[nodiscard]] void* raw(const Handle_type handle, const ComponentTypeId_type typeId ) const {
+        [[nodiscard]] void* raw(const HandleType handle, const ComponentTypeId_type typeId ) const {
             if (!has(handle, typeId)) {
                 return nullptr;
             }
@@ -546,8 +546,8 @@ export namespace helios::ecs {
          *
          * @return EntityHandle with current version from the registry.
          */
-        [[nodiscard]] Handle_type handle(const EntityId entityId) const {
-            return Handle_type{entityId, registry_.version(entityId)};
+        [[nodiscard]] HandleType handle(const EntityId entityId) const {
+            return HandleType{entityId, registry_.version(entityId)};
         }
 
         /**
