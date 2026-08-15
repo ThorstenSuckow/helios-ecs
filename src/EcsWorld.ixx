@@ -25,29 +25,27 @@ import helios.ecs.manager.types;
 import helios.ecs.manager.concepts;
 import helios.ecs.manager.ManagerRegistry;
 
+import helios.ecs.EntitySpace;
 
-import helios.ecs.View;
 
 import helios.ecs.common.concepts;
 import helios.ecs.common.types;
 
 export namespace helios::ecs {
 
-    template<typename TTypedHandleWorld>
     class EcsWorld {
     protected:
 
         manager::ManagerRegistry managerRegistry_{};
 
-        command::CommandHandlerRegistry commandHandlerRegistry_{managerRegistry_};
+        command::CommandHandlerRegistry commandHandlerRegistry_{};
 
-        TTypedHandleWorld typedHandleWorld_{};
+        EntitySpace entitySpace_;
 
     public:
 
-        using TypedHandleWorldType = TTypedHandleWorld;
 
-        EcsWorld() = default;
+        explicit EcsWorld(EntitySpace&& entitySpace) : entitySpace_(std::move(entitySpace)) {}
 
         /**
          * @brief Non-copyable, movable.
@@ -157,7 +155,7 @@ export namespace helios::ecs {
          */
         template <typename THandle, typename... Components>
         [[nodiscard]] auto view() {
-            return typedHandleWorld_.template view<THandle, Components...>();
+            return entitySpace_.template view<THandle, Components...>();
         }
 
         /**
@@ -171,7 +169,7 @@ export namespace helios::ecs {
          */
         template<typename THandle>
         [[nodiscard]] auto find(const THandle handle) noexcept {
-            return typedHandleWorld_.template find<THandle>(handle);
+            return entitySpace_.template findEntity<THandle>(handle);
         }
 
         /**
@@ -184,7 +182,7 @@ export namespace helios::ecs {
          */
         template<typename THandle>
         [[nodiscard]] auto add(const bool isActive = true) noexcept {
-            auto entity = typedHandleWorld_.template addEntity<THandle>();
+            auto entity = entitySpace_.template addEntity<THandle>();
             entity.setActive(isActive);
             return entity;
         }
@@ -200,7 +198,7 @@ export namespace helios::ecs {
          */
         template<typename THandle>
         [[nodiscard]] auto destroy(const THandle handle) noexcept {
-            return typedHandleWorld_.template destroy<THandle>(handle);
+            return entitySpace_.template destroy<THandle>(handle);
         }
 
 
@@ -212,7 +210,7 @@ export namespace helios::ecs {
          */
         template<typename THandle>
         auto& entityManager() noexcept {
-            return typedHandleWorld_.template entityManager<THandle>();
+            return entitySpace_.template entityManager<THandle>();
         }
 
     };
