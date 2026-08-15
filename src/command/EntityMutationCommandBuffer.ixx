@@ -14,6 +14,7 @@ export module helios.ecs.command.EntityMutationCommandBuffer;
 
 import helios.ecs.command.CommandHandlerRegistry;
 import helios.ecs.command.CommandBufferRegistry;
+import helios.ecs.manager.ManagerRegistry;
 import helios.ecs.command.tags;
 import helios.ecs.common.types;
 import helios.ecs.common.concepts;
@@ -26,7 +27,8 @@ export namespace helios::ecs::command {
      * @brief Collects deferred entity-mutation commands and dispatches them in bulk.
      */
     template<typename THandle, typename TInitContext, typename TFlushContext>
-    requires common::concepts::ProvidesCommandHandlerRegistry<TInitContext, command::CommandHandlerRegistry>
+    requires common::concepts::ProvidesCommandHandlerRegistry<TFlushContext, command::CommandHandlerRegistry> &&
+             common::concepts::ProvidesManagerRegistry<TFlushContext, ecs::manager::ManagerRegistry>
     class EntityMutationCommandBuffer {
 
         /** @brief Registry of lazily created per-command-type `InternalBuffer` instances. */
@@ -66,6 +68,7 @@ export namespace helios::ecs::command {
              */
             void flush(TFlushContext& flushContext) {
 
+                auto& managerRegistry = flushContext.managerRegistry();
                 auto& commandHandlerRegistry = flushContext.commandHandlerRegistry();
                 if (commandHandlerRegistry.template has<TCommandType>()) {
                     for (auto& cmd : commands_) {

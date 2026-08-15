@@ -36,16 +36,15 @@ export namespace helios::ecs::command {
 
         std::vector<std::optional<ManagerTypeId>> commandGroupToManager_;
 
-        ManagerRegistry& registry_;
-
     public:
 
-        /**
-         * @brief Creates a registry bound to an existing manager registry.
-         * @param managerRegistry Registry used to resolve manager instances by type id.
-         */
-        explicit CommandHandlerRegistry(ManagerRegistry& managerRegistry) : registry_(managerRegistry) {}
+        CommandHandlerRegistry() = default;
 
+        CommandHandlerRegistry(const CommandHandlerRegistry&) = delete;
+        CommandHandlerRegistry& operator=(const CommandHandlerRegistry&) = delete;
+        CommandHandlerRegistry(CommandHandlerRegistry&&) = default;
+        CommandHandlerRegistry& operator=(CommandHandlerRegistry&&) = default;
+        
 
         /**
          * @brief Registers a handler for a concrete command type.
@@ -149,13 +148,13 @@ export namespace helios::ecs::command {
          * @return Pointer to manager, or nullptr when no mapping exists.
          */
         template<typename TCommandType>
-        [[nodiscard]] Manager* tryHandler() const noexcept {
+        [[nodiscard]] Manager* tryHandler(ManagerRegistry& managerRegistry) const noexcept {
             const auto idx = types::CommandTypeId::id<TCommandType>().value();
 
             if (idx < commandToManager_.size()) {
                 const auto& entry = commandToManager_[idx];
                 if (entry) {
-                    return registry_.item(*commandToManager_[idx]);
+                    return managerRegistry.item(*commandToManager_[idx]);
                 }
             }
 
@@ -164,7 +163,7 @@ export namespace helios::ecs::command {
                 if (groupIdx < commandGroupToManager_.size()) {
                     const auto& entry = commandGroupToManager_[groupIdx];
                     if (entry) {
-                        return registry_.item(*commandGroupToManager_[idx]);
+                        return managerRegistry.item(*commandGroupToManager_[idx]);
                     }
                 }
             }
@@ -180,10 +179,10 @@ export namespace helios::ecs::command {
          * @return true when a handler exists and accepts the command.
          */
         template<typename TCommandType>
-        bool submit(TCommandType&& cmd) const noexcept {
+        bool submit(TCommandType&& cmd, ManagerRegistry& managerRegistry) const noexcept {
             using Cmd = std::remove_cvref_t<TCommandType>;
 
-            if (auto handler = tryHandler<Cmd>()) {
+            if (auto handler = tryHandler<Cmd>(managerRegistry)) {
                 return handler.submit(std::move(cmd));
             }
 
@@ -197,7 +196,7 @@ export namespace helios::ecs::command {
          * @param cmd Command or batch input to submit.
          */
         template<typename TCommandType>
-        bool submitBatch(TCommandType&& cmd) const noexcept {
+        bool submitBatch(TCommandType&& cmd, ManagerRegistry& managerRegistry) const noexcept {
             assert(false && "not implemented");
         }
 

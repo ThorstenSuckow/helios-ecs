@@ -13,6 +13,8 @@ export module helios.ecs.command.TypedCommandBuffer;
 
 import helios.ecs.command.CommandHandlerRegistry;
 import helios.ecs.command.tags;
+import helios.ecs.common.concepts;
+import helios.ecs.manager.ManagerRegistry;
 
 
 export namespace helios::ecs::command {
@@ -24,10 +26,12 @@ export namespace helios::ecs::command {
      * @tparam TCommandTypes The command types this buffer manages.
 
      */
-    template <typename TFlushContext, typename TInitContext, typename... TCommandTypes>
+    template <typename TInitContext, typename TFlushContext, typename... TCommandTypes>
+    requires common::concepts::ProvidesCommandHandlerRegistry<TFlushContext, command::CommandHandlerRegistry> &&
+        common::concepts::ProvidesCommandHandlerRegistry<TFlushContext, command::CommandHandlerRegistry> &&
+        common::concepts::ProvidesManagerRegistry<TFlushContext, ecs::manager::ManagerRegistry>
     class TypedCommandBuffer {
 
-        CommandHandlerRegistry& commandHandlerRegistry_;
 
         /**
          * @brief Per-type command queues stored as a tuple of vectors.
@@ -58,15 +62,17 @@ export namespace helios::ecs::command {
         template<typename TCommandType>
         void flushCommandQueue(TFlushContext& flushContext) noexcept {
 
+            auto& commandHandlerRegistry = flushContext.commandHandlerRegistry();
+            auto& managerRegistry = flushContext.managerRegistry();
             auto& queue = commandQueue<TCommandType>();
 
             if (queue.empty()) {
                 return;
             }
 
-            if (commandHandlerRegistry_.has<TCommandType>()) {
+            if (commandHandlerRegistry.template has<TCommandType>()) {
                 for (auto& cmd : queue) {
-                    commandHandlerRegistry_.submit<TCommandType>(std::move(cmd));
+                    commandHandlerRegistry.template submit<TCommandType>(std::move(cmd), managerRegistry);
                 }
             }
 
@@ -77,8 +83,6 @@ export namespace helios::ecs::command {
 
         using EcsRoleTag = tags::CommandBufferRole;
 
-        explicit TypedCommandBuffer(CommandHandlerRegistry& commandHandlerRegistry) noexcept:
-            commandHandlerRegistry_(commandHandlerRegistry) {}
 
         /**
          * @brief Enqueues a command of the specified type.
