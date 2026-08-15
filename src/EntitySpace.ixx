@@ -3,6 +3,7 @@ module;
 #include <memory>
 #include <vector>
 #include <cassert>
+#include <exception>
 #include <optional>
 
 export module helios.ecs.EntitySpace;
@@ -21,6 +22,26 @@ export namespace helios::ecs {
      * @brief Type-erased facade for accessing TypedHandleWorld instances.
      */
     class EntitySpace {
+
+        class EntityManagerRef {
+            void* entityManager_{};
+            void (*clearAllDirtySets_) (void*) noexcept{};
+        public:
+            template<typename TEntityManager>
+            explicit EntityManagerRef(TEntityManager& entityManager) noexcept :
+                entityManager_(std::addressof(entityManager)),
+                clearAllDirtySets_(
+                    +[](void* entityManager) {
+                        static_cast<TEntityManager*>(entityManager)->clearAllDirtySets();
+                    }
+                )
+            {}
+
+            void clearAllDirtySets() {
+                clearAllDirtySets_(entityManager_);
+            }
+        };
+
         class Concept {
         public:
             virtual ~Concept() = default;
@@ -32,22 +53,22 @@ export namespace helios::ecs {
         public:
             explicit Model(TTypedHandleWorld typedHandleWorld) : typedHandleWorld_(std::move(typedHandleWorld)) {}
 
-            auto& entityManagers() {
-                return typedHandleWorld_.entityManagers();
-            }
         };
 
         std::unique_ptr<Concept> pimpl_;
         std::vector<void*> entityManagers_;
+        std::vector<EntityManagerRef> entityManagerRefs;
 
         template<typename TEntityManager>
         void registerEntityManager(TEntityManager& entityManager) {
             using HandleType = typename TEntityManager::HandleType;
-            auto idx = common::types::HandleTypeId::template id<HandleType>().value();
+            auto typeId = common::types::HandleTypeId::template id<HandleType>();
+            auto idx = typeId.value();
             if (entityManagers_.size() <= idx) {
                 entityManagers_.resize(idx + 1, nullptr);
             }
             entityManagers_[idx] = std::addressof(entityManager);
+            entityManagerRefs.emplace_back(entityManager);
         }
     public:
 
@@ -78,9 +99,9 @@ export namespace helios::ecs {
 
             auto idx = common::types::HandleTypeId::template id<THandle>().value();
 
-
             if (idx >= entityManagers_.size()) [[unlikely]] {
                 assert(false && "No EntityManager registered for the given handle type.");
+                std::terminate();
             }
 
             return *static_cast<EntityManager<THandle>*>(entityManagers_[idx]);
@@ -175,16 +196,22 @@ export namespace helios::ecs {
          * @tparam THandle Handle domain.
          * @tparam TComponents Optional component types to clear selectively.
          */
-        template<typename THandle, typename ...TComponents>
+        template<typename THandle = void, typename ...TComponents>
         void clearDirtySets() {
-            auto& em = entityManager<THandle>();
 
-            if constexpr (sizeof...(TComponents) == 0) {
-                em.clearAllDirtySets();
+            if constexpr (std::is_same_v<THandle, void>) {
+                for (auto& emRef : entityManagerRefs) {
+                    emRef.clearAllDirtySets();
+                }
             } else {
-                (em.template clearDirtySet<TComponents>(),...);
-            }
+                auto& em = entityManager<THandle>();
 
+                if constexpr (sizeof...(TComponents) == 0) {
+                    em.clearAllDirtySets();
+                } else {
+                    (em.template clearDirtySet<TComponents>(),...);
+                }
+            }
         }
 
         /**
