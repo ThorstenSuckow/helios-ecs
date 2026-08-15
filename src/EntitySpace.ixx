@@ -8,9 +8,11 @@ module;
 export module helios.ecs.EntitySpace;
 
 import helios.ecs.EntityManager;
-import helios.ecs.common.types;
 import helios.ecs.View;
 import helios.ecs.Entity;
+
+import helios.ecs.common;
+import helios.ecs.storage;
 
 
 export namespace helios::ecs {
@@ -19,16 +21,15 @@ export namespace helios::ecs {
      * @brief Type-erased facade for accessing TypedHandleWorld instances.
      */
     class EntitySpace {
-
         class Concept {
-            public:
+        public:
             virtual ~Concept() = default;
         };
 
         template<typename TTypedHandleWorld>
         class Model final: public Concept {
             TTypedHandleWorld typedHandleWorld_;
-            public:
+        public:
             explicit Model(TTypedHandleWorld typedHandleWorld) : typedHandleWorld_(std::move(typedHandleWorld)) {}
 
             auto& entityManagers() {
@@ -86,12 +87,12 @@ export namespace helios::ecs {
         }
 
 
-         /**
-         * @brief Creates an entity in the `THandle` domain.
-         *
-         * @tparam THandle Target handle type.
-         * @return Entity facade for the new entity.
-         */
+        /**
+        * @brief Creates an entity in the `THandle` domain.
+        *
+        * @tparam THandle Target handle type.
+        * @return Entity facade for the new entity.
+        */
         template<typename THandle>
         [[nodiscard]] auto addEntity() {
             auto& em = entityManager<THandle>();
@@ -184,6 +185,30 @@ export namespace helios::ecs {
                 (em.template clearDirtySet<TComponents>(),...);
             }
 
+        }
+
+        /**
+         * @brief Check whether the specified handle is valid.
+         *
+         * @tparam THandle Handle domain.
+         * @param handle Handle to check.
+         * @return True if the handle is valid, false otherwise.
+         */
+        template<typename THandle>
+        [[nodiscard]] bool isValid(const THandle handle) const noexcept {
+            auto& em = entityManager<THandle>();
+            return em.isValid(handle);
+        }
+
+        /**
+         * @brief Returns the underlying SparseSet managing the handle domain.
+         * @tparam THandle
+         * @return SparseSet<THandle> or nullptr if not available.
+         */
+        template<typename THandle>
+        [[nodiscard]] storage::SparseSet<THandle>* sparseSet() {
+            auto& em = entityManager<THandle>();
+            return em.sparseSet();
         }
 
     };
