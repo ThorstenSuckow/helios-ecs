@@ -58,9 +58,17 @@ export namespace helios::ecs {
 
         template<typename TInitContext>
         EcsWorld& init(TInitContext& initContext) {
-
             assert(false && "TODO");
             return *this;
+        }
+
+        /**
+         * @brief Returns the underlying EntitySpace.
+         *
+         * @return The underlying EntitySpace
+         */
+        [[nodiscard]] EntitySpace& entitySpace() noexcept {
+            return entitySpace_;
         }
 
 
@@ -128,6 +136,15 @@ export namespace helios::ecs {
          */
         [[nodiscard]] command::CommandHandlerRegistry& commandHandlerRegistry() noexcept {
             return commandHandlerRegistry_;
+        }
+
+        /**
+         * @brief Returns a reference to the CommandHandlerRegistry.
+         *
+         * @return Reference to the CommandHandlerRegistry.
+         */
+        [[nodiscard]] manager::ManagerRegistry& managerRegistry() noexcept {
+            return managerRegistry_;
         }
 
 
