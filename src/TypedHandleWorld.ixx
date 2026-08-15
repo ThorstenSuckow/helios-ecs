@@ -118,7 +118,7 @@ export namespace helios::ecs {
          *
          * @return tuple of registered entity managers
          */
-        auto& entityManagers() const noexcept {
+        auto& entityManagers() noexcept {
             return entityManagers_;
         }
 
