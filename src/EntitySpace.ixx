@@ -31,13 +31,13 @@ export namespace helios::ecs {
             explicit EntityManagerRef(TEntityManager& entityManager) noexcept :
                 entityManager_(std::addressof(entityManager)),
                 clearAllDirtySets_(
-                    +[](void* entityManager) {
+                    +[](void* entityManager) noexcept {
                         static_cast<TEntityManager*>(entityManager)->clearAllDirtySets();
                     }
                 )
             {}
 
-            void clearAllDirtySets() {
+            void clearAllDirtySets() noexcept {
                 clearAllDirtySets_(entityManager_);
             }
         };
@@ -53,6 +53,9 @@ export namespace helios::ecs {
         public:
             explicit Model(TTypedHandleWorld typedHandleWorld) : typedHandleWorld_(std::move(typedHandleWorld)) {}
 
+            auto& entityManagers() {
+                return typedHandleWorld_.entityManagers();
+            }
         };
 
         std::unique_ptr<Concept> pimpl_;
@@ -70,6 +73,8 @@ export namespace helios::ecs {
             entityManagers_[idx] = std::addressof(entityManager);
             entityManagerRefs.emplace_back(entityManager);
         }
+
+
     public:
 
 
@@ -197,7 +202,7 @@ export namespace helios::ecs {
          * @tparam TComponents Optional component types to clear selectively.
          */
         template<typename THandle = void, typename ...TComponents>
-        void clearDirtySets() {
+        void clearDirtySets() noexcept {
 
             if constexpr (std::is_same_v<THandle, void>) {
                 for (auto& emRef : entityManagerRefs) {
