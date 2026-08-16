@@ -56,12 +56,6 @@ export namespace helios::ecs {
         EcsWorld& operator=(EcsWorld&&) = default;
 
 
-        template<typename TInitContext>
-        EcsWorld& init(TInitContext& initContext) {
-            assert(false && "TODO");
-            return *this;
-        }
-
         /**
          * @brief Returns the underlying EntitySpace.
          *
