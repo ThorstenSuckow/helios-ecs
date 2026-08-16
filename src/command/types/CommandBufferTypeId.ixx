@@ -9,12 +9,12 @@ module;
 
 export module helios.ecs.command.types:CommandBufferTypeId;
 
-import helios.core.common.types;
+import helios.core;
 
 export namespace helios::ecs::command::types {
 
     struct CommandBufferTypesIdDomain{};
 
-    using CommandBufferTypeId = helios::core::common::types::TypeId<CommandBufferTypesIdDomain>;
+    using CommandBufferTypeId = helios::core::common::TypeId<CommandBufferTypesIdDomain>;
 
 };
