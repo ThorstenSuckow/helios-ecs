@@ -8,7 +8,7 @@ export module helios.ecs.command.CommandBufferRegistry;
 
 import helios.ecs.command.types;
 
-import helios.core.container.ConceptModelRegistry;
+import helios.core.container;
 import helios.ecs.command.CommandBuffer;
 
 export namespace helios::ecs::command {

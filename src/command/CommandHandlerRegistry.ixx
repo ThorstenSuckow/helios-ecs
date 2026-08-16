@@ -128,7 +128,7 @@ export namespace helios::ecs::command {
                     return true;
                 }
             }
-            if constexpr (TCommandType::CommandGroupType) {
+            if constexpr (requires{TCommandType::CommandGroupType;}) {
                 const auto groupIdx = types::CommandGroupTypeId::id<typename TCommandType::CommandGroupType>().value();
                 if (groupIdx >= commandGroupToManager_.size()) {
                     return false;
@@ -183,7 +183,8 @@ export namespace helios::ecs::command {
             using Cmd = std::remove_cvref_t<TCommandType>;
 
             if (auto handler = tryHandler<Cmd>(managerRegistry)) {
-                return handler.submit(std::move(cmd));
+                assert(false && "missing submit");
+                //return handler->submit(std::move(cmd));
             }
 
             return false;
