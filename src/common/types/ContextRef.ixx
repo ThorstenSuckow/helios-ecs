@@ -8,7 +8,7 @@ module;
 
 export module helios.ecs.common.types:ContextRef;
 
-import helios.core.types;
+import helios.core.common.types;
 import :ContextTypeId;
 
 
@@ -26,7 +26,7 @@ export namespace helios::ecs::common::types {
      */
     class ContextRef {
 
-        ContextTypeId id_{helios::core::types::no_init};
+        ContextTypeId id_{helios::core::common::types::no_init};
 
         void* ptr_{};
 

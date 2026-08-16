@@ -13,10 +13,10 @@ module;
 export module helios.ecs.common.types:EntityHandle;
 
 import :TypeDefs;
-import helios.core.types;
+import helios.core.common.types;
 
 using namespace helios::ecs::common::types;
-using namespace helios::core::types;
+using namespace helios::core::common::types;
 export namespace helios::ecs::common::types {
 
     /**
