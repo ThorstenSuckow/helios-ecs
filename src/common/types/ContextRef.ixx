@@ -8,22 +8,11 @@ module;
 
 export module helios.ecs.common.types:ContextRef;
 
+import helios.core.types;
 import :ContextTypeId;
 
 
 export namespace helios::ecs::common::types {
-
-    struct Execution{};
-    struct Init{};
-    struct Flush{};
-    struct Update{};
-
-    template<typename TPhase>
-    concept IsRuntimeContext =
-        std::same_as<TPhase, Execution>
-    || std::same_as<TPhase, Init>
-    || std::same_as<TPhase, Flush>
-    || std::same_as<TPhase, Update>;
 
 
     /**
@@ -35,27 +24,30 @@ export namespace helios::ecs::common::types {
      *
      * @see manager::Manager
      */
-    template<typename TPhase>
-    requires IsRuntimeContext<TPhase>
     class ContextRef {
 
-        ContextTypeId<TPhase> id_;
+        ContextTypeId id_{helios::core::types::no_init};
 
         void* ptr_{};
 
     public:
 
+        ContextRef() = default;
+
         template<typename TConcreteContext>
         explicit ContextRef(TConcreteContext& ctx) :
-            id_(ContextTypeId<TPhase>::template id<TConcreteContext>()),
+            id_(ContextTypeId::template id<TConcreteContext>()),
             ptr_(&ctx)
         {}
 
+        [[nodiscard]] bool isValid() const noexcept {
+            return ptr_ != nullptr;
+        }
 
         template<typename TRequiredContext>
         [[nodiscard]] TRequiredContext* tryGet() const noexcept {
 
-            auto requiredId = ContextTypeId<TPhase>::template id<TRequiredContext>();
+            auto requiredId = ContextTypeId::template id<TRequiredContext>();
 
             if (id_ != requiredId) [[unlikely]] {
                 return nullptr;
