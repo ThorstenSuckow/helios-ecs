@@ -23,9 +23,8 @@ export namespace helios::ecs::manager {
      */
     class Manager {
 
-        using ExecutionContextRef = ecs::common::types::ContextRef<ecs::common::types::Execution>;
-        using InitContextRef = ecs::common::types::ContextRef<ecs::common::types::Init>;
-
+        using ContextRef = ecs::common::types::ContextRef;
+        using ContextTypeId = ecs::common::types::ContextTypeId;
 
     private:
         /**
@@ -34,10 +33,13 @@ export namespace helios::ecs::manager {
         class Concept {
         public:
             virtual ~Concept() = default;
-            virtual bool executeCommands(ExecutionContextRef executionContext) noexcept = 0;
-            virtual bool init(InitContextRef initContext) noexcept = 0;
+            virtual bool executeCommands(ContextRef executionContext) noexcept = 0;
+            virtual bool init(ContextRef initContext) noexcept = 0;
             virtual void reset() noexcept = 0;
-            virtual bool executeCommandsParallel(ExecutionContextRef executionContext) noexcept = 0;
+            virtual bool executeCommandsParallel(ContextRef executionContext) noexcept = 0;
+
+            [[nodiscard]] virtual ContextTypeId expectedInitContextTypeId() const noexcept = 0;
+            [[nodiscard]] virtual ContextTypeId expectedExecutionContextTypeId() const noexcept = 0;
 
             [[nodiscard]] virtual void* underlying() noexcept = 0;
             [[nodiscard]] virtual const void* underlying() const noexcept = 0;
@@ -59,7 +61,15 @@ export namespace helios::ecs::manager {
 
             explicit Model(TConcreteManager sys) :  manager_(std::move(sys)) {}
 
-            bool executeCommands(const ExecutionContextRef executionContextRef) noexcept override {
+            [[nodiscard]] ContextTypeId expectedInitContextTypeId() const noexcept override {
+                return ContextTypeId::template id<InitContextType>();
+            }
+
+            [[nodiscard]] ContextTypeId expectedExecutionContextTypeId() const noexcept override {
+                return ContextTypeId::template id<ExecutionContextType>();
+            }
+
+            bool executeCommands(const ContextRef executionContextRef) noexcept override {
                 
                 if (auto* ctx = executionContextRef.tryGet<ExecutionContextType>()) {
                     return manager_.executeCommands(*ctx);
@@ -68,17 +78,7 @@ export namespace helios::ecs::manager {
                 return false;
             }
 
-            /**
-             * @brief Delegates to the wrapped manager's `executeCommandsParallel()` method.
-             *
-             * Will fall back to executeCommands() if executeCommandsParallel() is not implemented by the underlying
-             * manager.
-             *
-             * @param executionContext The current frame's update context.
-             *
-             * @pre Manager must be initialized (pimpl_ != nullptr).
-             */
-            bool executeCommandsParallel(const ExecutionContextRef executionContext) noexcept override {
+            bool executeCommandsParallel(const ContextRef executionContext) noexcept override {
                 
                 if (auto* ctx = executionContext.tryGet<ExecutionContextType>()) {
                     if constexpr (concepts::HasExecuteCommandsParallel<TConcreteManager>) {
@@ -92,7 +92,7 @@ export namespace helios::ecs::manager {
                 return false;
             }
 
-            bool init(InitContextRef initContext) noexcept override {
+            bool init(ContextRef initContext) noexcept override {
                 if (auto* ctx = initContext.tryGet<InitContextType>()) {
                     return manager_.init(*ctx);
                 }
@@ -147,7 +147,7 @@ export namespace helios::ecs::manager {
          *
          * @pre Manager must be initialized (pimpl_ != nullptr).
          */
-        bool executeCommands(const ExecutionContextRef executionContext) noexcept {
+        bool executeCommands(const ContextRef executionContext) noexcept {
             assert(pimpl_ && "Manager not initialized");
             return pimpl_->executeCommands(executionContext);
         }
@@ -159,7 +159,7 @@ export namespace helios::ecs::manager {
          *
          * @pre Manager must be initialized (pimpl_ != nullptr).
          */
-        bool executeCommandsParallel(const ExecutionContextRef executionContext) noexcept {
+        bool executeCommandsParallel(const ContextRef executionContext) noexcept {
             assert(pimpl_ && "Manager not initialized");
             return pimpl_->executeCommandsParallel(executionContext);
         }
@@ -171,7 +171,7 @@ export namespace helios::ecs::manager {
          *
          * @pre Manager must be initialized (pimpl_ != nullptr).
          */
-        bool init(InitContextRef initContext) noexcept {
+        bool init(ContextRef initContext) noexcept {
             assert(pimpl_ && "Manager not initialized");
             return pimpl_->init(initContext);
         }
@@ -204,6 +204,16 @@ export namespace helios::ecs::manager {
         [[nodiscard]] const void* underlying() const noexcept {
             assert(pimpl_ && "Manager not initialized");
             return pimpl_->underlying();
+        }
+
+        [[nodiscard]] ContextTypeId expectedInitContextTypeId() const noexcept {
+            assert(pimpl_ && "Manager not initialized");
+            return pimpl_->expectedInitContextTypeId();
+        }
+
+        [[nodiscard]] ContextTypeId expectedExecutionContextTypeId() const noexcept {
+            assert(pimpl_ && "Manager not initialized");
+            return pimpl_->expectedInitContextTypeId();
         }
 
     };

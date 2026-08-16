@@ -345,7 +345,7 @@ export namespace helios::ecs::manager {
          */
         bool executeCommands(TExecutionContext& executionContext) {
 
-            auto contextRef = ContextRef<Execution>{executionContext};
+            auto contextRef = ContextRef{executionContext};
 
             for (auto* manager : internalExecutionManagerRegistry_.items()) {
                 manager->executeCommands(contextRef);
@@ -376,7 +376,7 @@ export namespace helios::ecs::manager {
             auto& entityManager = executionContext.template entityManager<THandle>();
 
             jobSystem_.runAndWait(activeIndices.size(), [&](const std::size_t groupIndex) {
-                auto contextRef = ContextRef<Execution>{executionContext};
+                auto contextRef = ContextRef{executionContext};
                 for (const auto executorTypeId  : componentToInternalExecutorGroups_[activeIndices[groupIndex]]) {
                     logger_.info("Processing MutationCommandBuffer {0}", executorTypeId.value());
                     auto* executor = internalExecutionManagerRegistry_.item(executorTypeId);
