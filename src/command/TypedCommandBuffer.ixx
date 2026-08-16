@@ -10,7 +10,7 @@ module;
 
 export module helios.ecs.command.TypedCommandBuffer;
 
-
+import helios.ecs.common.types;
 import helios.ecs.command.CommandHandlerRegistry;
 import helios.ecs.command.tags;
 import helios.ecs.common.concepts;
@@ -83,6 +83,8 @@ export namespace helios::ecs::command {
 
         using EcsRoleTag = tags::CommandBufferRole;
 
+        using InitContextType = TInitContext;
+        using FlushContextType = TFlushContext;
 
         /**
          * @brief Enqueues a command of the specified type.
@@ -104,24 +106,27 @@ export namespace helios::ecs::command {
         /**
          * @brief Binds external services required for command dispatch.
          *
-         * @param commandHandlerRegistry Registry used for handler-based command routing.
+         * @param TInitContext
          */
-        void init(TInitContext& initContext) noexcept {
-          // intentionally left empoty
+        bool init(TInitContext&) noexcept {
+            // intentionally left empty
+            return true;
         }
 
         /**
          * @brief Discards all queued commands without executing them.
          */
-        void clear() noexcept {
+        bool clear() noexcept {
             std::apply([](auto&... queue) { (queue.clear(), ...); }, commandQueues_);
+            return true;
         }
 
         /**
          * @brief Flushes all command queues in template parameter order.
          */
-        void flush(TFlushContext& flushContext) noexcept {
+        bool flush(TFlushContext& flushContext) noexcept {
             (flushCommandQueue<TCommandTypes>(flushContext), ...);
+            return true;
         }
 
 

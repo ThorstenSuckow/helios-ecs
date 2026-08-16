@@ -17,6 +17,6 @@ export namespace helios::ecs::command {
      * @brief Type alias for a ConceptModelRegistry specialized for CommandBuffers.
      */
     template<typename TFlushContext, typename TInitContext>
-    using CommandBufferRegistry = helios::core::container::ConceptModelRegistry<CommandBuffer<TFlushContext, TInitContext>, types::CommandBufferTypeId<TFlushContext, TInitContext>>;
+    using CommandBufferRegistry = helios::core::container::ConceptModelRegistry<CommandBuffer, types::CommandBufferTypeId>;
 
 }

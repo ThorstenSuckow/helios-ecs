@@ -10,6 +10,7 @@ module;
 export module helios.ecs.command.CommandBuffer;
 
 import helios.ecs.command.concepts;
+import helios.ecs.common.types;
 
 export namespace helios::ecs::command {
 
@@ -17,8 +18,10 @@ export namespace helios::ecs::command {
      * @brief Type-erased wrapper for command buffers using the Concept/Model pattern.
      *
      */
-    template<typename TFlushContext, typename TInitContext>
     class CommandBuffer {
+
+        using ContextRef = ecs::common::types::ContextRef;
+        using ContextTypeId = ecs::common::types::ContextTypeId;
 
     private:
 
@@ -28,9 +31,12 @@ export namespace helios::ecs::command {
         class Concept {
         public:
             virtual ~Concept() = default;
-            virtual void flush(TFlushContext& flushContext) noexcept = 0;
-            virtual void clear() noexcept = 0;
-            virtual void init(TInitContext& initContext) noexcept = 0;
+            virtual bool flush(ContextRef& flushContext) noexcept = 0;
+            virtual bool clear() noexcept = 0;
+            virtual bool init(ContextRef& initContext) noexcept = 0;
+
+            [[nodiscard]] virtual ContextTypeId expectedFlushContextTypeId() const noexcept = 0;
+            [[nodiscard]] virtual ContextTypeId expectedInitContextTypeId() const noexcept = 0;
 
             [[nodiscard]] virtual void* underlying() noexcept = 0;
             [[nodiscard]] virtual const void* underlying() const noexcept = 0;
@@ -44,25 +50,48 @@ export namespace helios::ecs::command {
         template<typename TConcreteCommandBuffer>
         class Model final : public Concept {
 
+            using FlushContextType = typename TConcreteCommandBuffer::FlushContextType;
+            using InitContextType = typename TConcreteCommandBuffer::InitContextType;
+
             /**
              * @brief The owned command buffer instance.
              */
             TConcreteCommandBuffer cmdBuffer_;
 
+
+
             public:
 
             explicit Model(TConcreteCommandBuffer cmdBuffer) :  cmdBuffer_(std::move(cmdBuffer)) {}
 
-            void flush(TFlushContext& flushContext) noexcept override {
-                cmdBuffer_.flush(flushContext);
+            bool flush(ContextRef& flushContext) noexcept override {
+
+                if (auto*ctx = flushContext.tryGet<FlushContextType>()) {
+                    return cmdBuffer_.flush(*ctx);
+                }
+
+                return false;
             }
 
-            void init(TInitContext& initContext) noexcept override {
-                cmdBuffer_.init(initContext);
+            bool init(ContextRef& initContext) noexcept override {
+
+                if (auto*ctx = initContext.tryGet<InitContextType>()) {
+                    return cmdBuffer_.init(*ctx);
+                }
+
+                return false;
             }
 
-            void clear() noexcept override {
-                cmdBuffer_.clear();
+            bool clear() noexcept override {
+                return cmdBuffer_.clear();
+            }
+
+            [[nodiscard]] ContextTypeId expectedFlushContextTypeId() const noexcept override {
+                return ContextTypeId::template id<FlushContextType>();
+            }
+
+            [[nodiscard]] ContextTypeId expectedInitContextTypeId() const noexcept override {
+                return ContextTypeId::template id<InitContextType>();
             }
 
             [[nodiscard]] void* underlying() noexcept override {
@@ -85,9 +114,6 @@ export namespace helios::ecs::command {
 
         /**
          * @brief Constructs a CommandBuffer wrapping the given concrete buffer.
-         *
-         * @details Ownership of the buffer is transferred into a heap-allocated
-         * Model<TConcreteCommandBuffer>. The concrete type is erased after construction.
          *
          * @tparam TConcreteCommandBuffer The concrete buffer type. Must satisfy IsCommandBufferLike.
          *
@@ -112,9 +138,9 @@ export namespace helios::ecs::command {
          *
          * @pre The CommandBuffer must be initialized (not default-constructed).
          */
-        void flush(TFlushContext& flushContext) noexcept {
+        bool flush(ContextRef& flushContext) noexcept {
             assert(pimpl_ && "CommandBuffer not initialized");
-            pimpl_->flush(flushContext);
+            return pimpl_->flush(flushContext);
         }
 
         /**
@@ -122,9 +148,9 @@ export namespace helios::ecs::command {
          *
          * @pre The CommandBuffer must be initialized.
          */
-        void clear() noexcept {
+        bool clear() noexcept {
             assert(pimpl_ && "CommandBuffer not initialized");
-            pimpl_->clear();
+            return pimpl_->clear();
         }
 
         /**
@@ -132,9 +158,19 @@ export namespace helios::ecs::command {
          *
          * @param initContext The initialization context.
          */
-        void init(TInitContext& initContext) noexcept {
+        bool init(ContextRef& initContext) noexcept {
             assert(pimpl_ && "CommandBuffer not initialized");
-            pimpl_->init(initContext);
+            return pimpl_->init(initContext);
+        }
+
+        [[nodiscard]] ContextTypeId expectedFlushContextTypeId() const noexcept {
+            assert(pimpl_ && "CommandBuffer not initialized");
+            return pimpl_->expectedFlushContextTypeId();
+        }
+
+        [[nodiscard]] ContextTypeId expectedInitContextTypeId() const noexcept {
+            assert(pimpl_ && "CommandBuffer not initialized");
+            return pimpl_->expectedInitContextTypeId();
         }
 
         /**
