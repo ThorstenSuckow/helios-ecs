@@ -4,7 +4,9 @@ module;
 #include <vector>
 #include <cassert>
 #include <exception>
+#include <iostream>
 #include <optional>
+#include <ostream>
 
 export module helios.ecs.EntitySpace;
 
@@ -105,6 +107,7 @@ export namespace helios::ecs {
             auto idx = common::types::HandleTypeId::template id<THandle>().value();
 
             if (idx >= entityManagers_.size()) [[unlikely]] {
+                std::cerr << "No EntityManager registered for the given handle type:"<< typeid(THandle).name() << std::endl;
                 assert(false && "No EntityManager registered for the given handle type.");
                 std::terminate();
             }
