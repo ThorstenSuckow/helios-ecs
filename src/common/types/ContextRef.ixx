@@ -4,7 +4,7 @@
  */
 module;
 
-#include <concepts>
+#include <cassert>
 
 export module helios.ecs.common.types:ContextRef;
 
@@ -47,7 +47,9 @@ export namespace helios::ecs::common::types {
         template<typename TRequiredContext>
         [[nodiscard]] TRequiredContext* tryGet() const noexcept {
 
-            auto requiredId = ContextTypeId::template id<TRequiredContext>();
+            assert(isValid() && "ContextRef is not valid. Ensure it was constructed with a valid context.");
+
+            auto requiredId = ContextTypeId::id<TRequiredContext>();
 
             if (id_ != requiredId) [[unlikely]] {
                 return nullptr;
