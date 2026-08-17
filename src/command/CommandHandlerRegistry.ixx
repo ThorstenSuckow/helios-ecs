@@ -7,10 +7,9 @@ module;
 #include <concepts>
 #include <vector>
 #include <cassert>
+#include <functional>
 #include <type_traits>
 #include <utility>
-#include <memory>
-#include <optional>
 
 export module helios.ecs.command.CommandHandlerRegistry;
 
@@ -28,13 +27,25 @@ export namespace helios::ecs::command {
      */
     class CommandHandlerRegistry {
 
+
+        struct CommandHandlerRef {
+            void* manager{};
+            bool (*submit) (
+                void* manager,
+                void* cmd
+            ){};
+            [[nodiscard]] explicit operator bool() const noexcept {
+                return manager != nullptr && submit != nullptr;
+            }
+        };
+
         using ManagerTypeId = manager::types::ManagerTypeId;
         using Manager = manager::Manager;
         using ManagerRegistry = manager::ManagerRegistry;
 
-        std::vector<std::optional<ManagerTypeId>> commandToManager_;
-
-        std::vector<std::optional<ManagerTypeId>> commandGroupToManager_;
+        
+        std::vector<CommandHandlerRef> commandToHandlerRef_;
+        std::vector<CommandHandlerRef> commandGroupToHandlerRef_;
 
     public:
 
@@ -53,53 +64,70 @@ export namespace helios::ecs::command {
          * @param owner Manager instance owning the handler.
          */
         template<typename TCommandType, typename TManager>
-        void registerHandler(TManager& owner) {
+        void registerHandler(TManager& manager) {
             static_assert(requires(TManager& x, TCommandType&& c) {
                 { x.submit(std::move(c)) } -> std::same_as<bool>;
             });
 
             const auto idx = types::CommandTypeId::id<TCommandType>().value();
 
-            if (commandToManager_.size() <= idx) {
-                commandToManager_.resize(idx + 1);
+            if (commandToHandlerRef_.size() <= idx) {
+                commandToHandlerRef_.resize(idx + 1);
             }
-
-            if (commandToManager_[idx]) {
+            
+            if (commandToHandlerRef_[idx]) {
                 #if HELIOS_DEBUG
                 auto id = ManagerTypeId::id<TManager>();
-                assert(*commandToManager_[idx] == id && "Handler already registered for this command type for a different owner");
+                assert(commandToHandlerRef_[idx].manager == std::addressof(manager) && "Handler already registered for this command type for a different owner");
                 #endif
                 return;
             }
 
-            commandToManager_[idx] = ManagerTypeId::id<TManager>();
+            commandToHandlerRef_[idx] = CommandHandlerRef{
+                std::addressof(manager),
+                +[](void* managerPtr, void* cmdPtr) {
+                    auto& concreteManager = *static_cast<TManager*>(managerPtr);
+                    auto& concreteCmd = *static_cast<TCommandType*>(cmdPtr);
+                    return concreteManager.submit(std::move(concreteCmd));
+                }
+            };
         }
 
         /**
          * @brief Registers a handler for a full command group.
          * @tparam TCommandGroupType Command group tag type.
          * @tparam TManager Manager type handling commands in that group.
-         * @param owner Manager instance owning the group handler.
+         * @param manager Manager instance owning the group handler.
          */
         template<typename TCommandGroupType, typename TManager>
-        void registerHandlerForCommandGroup(TManager& owner) {
+        void registerHandlerForCommandGroup(TManager& manager) {
+
+            /*static_assert(requires(TManager& x, TCommandGroupType&& c) {
+                { x.submit(std::move(c)) } -> std::same_as<bool>;
+            });*/
 
             const auto idx = types::CommandGroupTypeId::id<TCommandGroupType>().value();
 
-
-            if (commandGroupToManager_.size() <= idx) {
-                commandGroupToManager_.resize(idx + 1);
+            if (commandGroupToHandlerRef_.size() <= idx) {
+                commandGroupToHandlerRef_.resize(idx + 1);
             }
 
-            if (commandGroupToManager_[idx]) {
+            if (commandGroupToHandlerRef_[idx]) {
                 #if HELIOS_DEBUG
                 auto id = ManagerTypeId::id<TManager>();
-                assert(*commandGroupToManager_[idx] == id && "Handler already registered for this command type for a different owner");
+                assert(commandGroupToHandlerRef_[idx].manager == std::addressof(manager) && "Handler already registered for this command group for a different owner");
                 #endif
                 return;
             }
 
-            commandGroupToManager_[idx] = ManagerTypeId::id<TManager>();
+            /*commandGroupToHandlerRef_[idx] = CommandHandlerRef{
+                std::addressof(manager),
+                +[](void* managerPtr, void* cmdPtr) {
+                    auto& concreteManager = *static_cast<TManager*>(managerPtr);
+                    auto& concreteCmd = *static_cast<TCommandGroupType*>(cmdPtr);
+                    return concreteManager.submit(std::move(concreteCmd));
+                }
+            };*/
         }
 
 
@@ -107,11 +135,11 @@ export namespace helios::ecs::command {
          * @brief Convenience helper to register multiple command types for one manager.
          * @tparam TCommandType Command types to register.
          * @tparam TManager Manager type handling all listed command types.
-         * @param owner Manager instance owning the handlers.
+         * @param manager Manager instance owning the handlers.
          */
         template<typename... TCommandType, typename TManager>
-        void handleCommands(TManager& owner) {
-            (registerHandler<TCommandType>(owner), ...);
+        void handleCommands(TManager& manager) {
+            (registerHandler<TCommandType>(manager), ...);
         }
 
 
@@ -122,22 +150,17 @@ export namespace helios::ecs::command {
         template<typename TCommandType>
         [[nodiscard]] bool has() const noexcept {
             const auto idx = types::CommandTypeId::id<TCommandType>().value();
-            if (idx < commandToManager_.size()) {
-                const auto& entry = commandToManager_[idx];
-                if (entry) {
+            if (idx < commandToHandlerRef_.size() && commandToHandlerRef_[idx]) {
                     return true;
-                }
             }
+
             if constexpr (requires{TCommandType::CommandGroupType;}) {
                 const auto groupIdx = types::CommandGroupTypeId::id<typename TCommandType::CommandGroupType>().value();
-                if (groupIdx >= commandGroupToManager_.size()) {
-                    return false;
-                }
-                const auto& groupEntry = commandGroupToManager_[groupIdx];
-                if (groupEntry) {
+                if (groupIdx < commandGroupToHandlerRef_.size() &&  commandGroupToHandlerRef_[groupIdx]){
                     return true;
                 }
             }
+
             return false;
         }
 
@@ -148,22 +171,22 @@ export namespace helios::ecs::command {
          * @return Pointer to manager, or nullptr when no mapping exists.
          */
         template<typename TCommandType>
-        [[nodiscard]] Manager* tryHandler(ManagerRegistry& managerRegistry) const noexcept {
+        [[nodiscard]] const CommandHandlerRef* tryHandler() const noexcept {
             const auto idx = types::CommandTypeId::id<TCommandType>().value();
 
-            if (idx < commandToManager_.size()) {
-                const auto& entry = commandToManager_[idx];
+            if (idx < commandToHandlerRef_.size()) {
+                const auto& entry = commandToHandlerRef_[idx];
                 if (entry) {
-                    return managerRegistry.item(*commandToManager_[idx]);
+                    return std::addressof(entry);
                 }
             }
 
             if constexpr (requires {typename TCommandType::CommandGroupType;}) {
                 const auto groupIdx = types::CommandGroupTypeId::id<typename TCommandType::CommandGroupType>().value();
-                if (groupIdx < commandGroupToManager_.size()) {
-                    const auto& entry = commandGroupToManager_[groupIdx];
+                if (groupIdx < commandToHandlerRef_.size()) {
+                    const auto& entry = commandGroupToHandlerRef_[groupIdx];
                     if (entry) {
-                        return managerRegistry.item(*commandGroupToManager_[idx]);
+                        return std::addressof(entry);
                     }
                 }
             }
@@ -182,9 +205,8 @@ export namespace helios::ecs::command {
         bool submit(TCommandType&& cmd, ManagerRegistry& managerRegistry) const noexcept {
             using Cmd = std::remove_cvref_t<TCommandType>;
 
-            if (auto handler = tryHandler<Cmd>(managerRegistry)) {
-                assert(false && "missing submit");
-                //return handler->submit(std::move(cmd));
+            if (auto* handler = tryHandler<Cmd>()) {
+                return handler->submit(handler->manager, std::addressof(cmd));
             }
 
             return false;
