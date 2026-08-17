@@ -6,6 +6,7 @@ module;
 
 #include <cassert>
 #include <memory>
+#include <span>
 
 export module helios.ecs.manager.Manager;
 
@@ -14,6 +15,7 @@ import helios.ecs.common.types;
 import helios.ecs.manager.types;
 import helios.ecs.manager.concepts;
 
+import helios.ecs.command.CommandBuffer;
 
 export namespace helios::ecs::manager {
 
@@ -38,6 +40,8 @@ export namespace helios::ecs::manager {
             virtual void reset() noexcept = 0;
             virtual bool executeCommandsParallel(ContextRef executionContext) noexcept = 0;
 
+            virtual std::span<command::CommandBuffer*> commandBuffers() noexcept = 0;
+
             [[nodiscard]] virtual ContextTypeId expectedInitContextTypeId() const noexcept = 0;
             [[nodiscard]] virtual ContextTypeId expectedExecutionContextTypeId() const noexcept = 0;
 
@@ -61,6 +65,14 @@ export namespace helios::ecs::manager {
 
             explicit Model(TConcreteManager sys) :  manager_(std::move(sys)) {}
 
+            [[nodiscard]] std::span<command::CommandBuffer*> commandBuffers() noexcept override {
+                if constexpr(requires(TConcreteManager& t){{t.commandBuffers()}->std::same_as<std::span<command::CommandBuffer*>>;}) {
+                    return manager_.commandBuffers();
+                }
+
+                return {};
+            }
+
             [[nodiscard]] ContextTypeId expectedInitContextTypeId() const noexcept override {
                 return ContextTypeId::template id<InitContextType>();
             }
@@ -70,7 +82,6 @@ export namespace helios::ecs::manager {
             }
 
             bool executeCommands(const ContextRef executionContextRef) noexcept override {
-                
                 if (auto* ctx = executionContextRef.tryGet<ExecutionContextType>()) {
                     return manager_.executeCommands(*ctx);
                 }
@@ -199,6 +210,20 @@ export namespace helios::ecs::manager {
         }
 
         /**
+         * @brief Provide CommandBuffer access in case managers write commands into owned command buffers.
+         *
+         * @details This is useful if systems executed the Manager and must make sure that generated commands are
+         * being flushed..
+         *
+         * @return A span of pointers to the owned command buffers, or an empty span if the manager does not
+         * own any command buffers.
+         */
+        std::span<command::CommandBuffer*> commandBuffers() noexcept {
+            assert(pimpl_ && "Manager not initialized");
+            return pimpl_->commandBuffers();
+        }
+
+        /**
          * @copydoc underlying()
          */
         [[nodiscard]] const void* underlying() const noexcept {
@@ -206,14 +231,22 @@ export namespace helios::ecs::manager {
             return pimpl_->underlying();
         }
 
+        /**
+         * @brief Returns the expected TypeId of the InitContextType.
+         * @return The expected InitContextType's TypeId.
+         */
         [[nodiscard]] ContextTypeId expectedInitContextTypeId() const noexcept {
             assert(pimpl_ && "Manager not initialized");
             return pimpl_->expectedInitContextTypeId();
         }
 
+        /**
+         * @brief Returns the expected TypeId of the ExecutionContextType.
+         * @return The expected ExecutionContextType's TypeId.
+         */
         [[nodiscard]] ContextTypeId expectedExecutionContextTypeId() const noexcept {
             assert(pimpl_ && "Manager not initialized");
-            return pimpl_->expectedInitContextTypeId();
+            return pimpl_->expectedExecutionContextTypeId();
         }
 
     };
