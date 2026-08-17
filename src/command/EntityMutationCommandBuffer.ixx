@@ -32,7 +32,7 @@ export namespace helios::ecs::command {
     class EntityMutationCommandBuffer {
 
         /** @brief Registry of lazily created per-command-type `InternalBuffer` instances. */
-        command::CommandBufferRegistry<TFlushContext, TInitContext> commandBufferRegistry_{};
+        command::CommandBufferRegistry commandBufferRegistry_{};
 
         /**
          * @brief Per-command-type storage and dispatch unit.
