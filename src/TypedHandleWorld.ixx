@@ -13,7 +13,7 @@ module;
 #include <optional>
 #include <cstddef>
 
-export module helios.ecs.TypedHandleWorld;
+export module helios.ecs.EcsWorld:TypedHandleWorld;
 
 import helios.ecs.View;
 import helios.ecs.Entity;
@@ -129,7 +129,7 @@ export namespace helios::ecs {
          * @return Entity facade for the new entity.
          */
         template<typename THandle>
-        [[nodiscard]] auto addEntity() {
+        [[nodiscard]] auto add() {
             auto& em = entityManager<THandle>();
 
             auto handle = em.create();
@@ -159,7 +159,7 @@ export namespace helios::ecs {
          * @return Optional entity facade.
          */
         template<typename THandle>
-        [[nodiscard]] auto findEntity(THandle handle) {
+        [[nodiscard]] auto find(THandle handle) {
             auto& em = entityManager<THandle>();
 
             using EM = std::remove_reference_t<decltype(em)>;
@@ -180,10 +180,10 @@ export namespace helios::ecs {
          * @return Entity facade for the cloned entity.
          */
         template<typename THandle>
-        [[nodiscard]] auto copyEntity(THandle source) noexcept {
+        [[nodiscard]] auto copy(THandle source) noexcept {
             auto& em = entityManager<THandle>();
 
-            auto entity = addEntity<THandle>();
+            auto entity = add<THandle>();
 
             em.copy(source, entity.handle());
 

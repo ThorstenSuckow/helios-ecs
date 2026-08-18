@@ -1,230 +1,260 @@
-/**
- * @file GameWorld.ixx
- * @brief Central game state container for entities, resources, and the active level.
- */
 module;
 
+#include <memory>
+#include <vector>
 #include <cassert>
-#include <helios-ecs-config.h>
-#include <span>
+#include <exception>
+#include <iostream>
+#include <optional>
+#include <ostream>
 
 export module helios.ecs.EcsWorld;
 
+import helios.ecs.EntityManager;
+import helios.ecs.View;
 import helios.ecs.Entity;
 
-import helios.ecs.common.types;
+import helios.ecs.common;
+import helios.ecs.storage;
+import :TypedHandleWorld;
 
-import helios.ecs.command.CommandHandlerRegistry;
-import helios.ecs.command.concepts;
-
-import helios.ecs.manager.ManagerRegistry;
-import helios.ecs.TypedHandleWorld;
-
-import helios.ecs.manager.Manager;
-import helios.ecs.manager.types;
-import helios.ecs.manager.concepts;
-import helios.ecs.manager.ManagerRegistry;
-
-import helios.ecs.EntitySpace;
-
-
-import helios.ecs.common.concepts;
-import helios.ecs.common.types;
 
 export namespace helios::ecs {
 
+    /**
+     * @brief Type-erased facade for accessing TypedHandleWorld instances.
+     */
     class EcsWorld {
-    protected:
 
-        manager::ManagerRegistry managerRegistry_{};
+        class EntityManagerRef {
+            void* entityManager_{};
+            void (*clearAllDirtySets_) (void*) noexcept{};
+        public:
+            template<typename TEntityManager>
+            explicit EntityManagerRef(TEntityManager& entityManager) noexcept :
+                entityManager_(std::addressof(entityManager)),
+                clearAllDirtySets_(
+                    +[](void* entityManager) noexcept {
+                        static_cast<TEntityManager*>(entityManager)->clearAllDirtySets();
+                    }
+                )
+            {}
 
-        command::CommandHandlerRegistry commandHandlerRegistry_{};
+            void clearAllDirtySets() noexcept {
+                clearAllDirtySets_(entityManager_);
+            }
+        };
 
-        EntitySpace entitySpace_;
+        class Concept {
+        public:
+            virtual ~Concept() = default;
+        };
+
+        template<typename TTypedHandleWorld>
+        class Model final: public Concept {
+            TTypedHandleWorld typedHandleWorld_;
+        public:
+            explicit Model(TTypedHandleWorld typedHandleWorld) : typedHandleWorld_(std::move(typedHandleWorld)) {}
+
+            auto& entityManagers() {
+                return typedHandleWorld_.entityManagers();
+            }
+        };
+
+        std::unique_ptr<Concept> pimpl_;
+        std::vector<void*> entityManagers_;
+        std::vector<EntityManagerRef> entityManagerRefs;
+
+        template<typename TEntityManager>
+        void registerEntityManager(TEntityManager& entityManager) {
+            using HandleType = typename TEntityManager::HandleType;
+            auto typeId = common::types::HandleTypeId::template id<HandleType>();
+            auto idx = typeId.value();
+            if (entityManagers_.size() <= idx) {
+                entityManagers_.resize(idx + 1, nullptr);
+            }
+            entityManagers_[idx] = std::addressof(entityManager);
+            entityManagerRefs.emplace_back(entityManager);
+        }
+
 
     public:
 
 
-        explicit EcsWorld(EntitySpace&& entitySpace) : entitySpace_(std::move(entitySpace)) {}
-
-        /**
-         * @brief Non-copyable, movable.
-         */
+        EcsWorld() = delete;
         EcsWorld(const EcsWorld&) = delete;
-        EcsWorld operator=(const EcsWorld&) = delete;
-        EcsWorld(EcsWorld&&) = default;
-        EcsWorld& operator=(EcsWorld&&) = default;
+        EcsWorld& operator=(const EcsWorld&) = delete;
 
+        EcsWorld(EcsWorld&&) noexcept = default;
+        EcsWorld& operator=(EcsWorld&&) noexcept = default;
 
-        /**
-         * @brief Returns the underlying EntitySpace.
-         *
-         * @return The underlying EntitySpace
-         */
-        [[nodiscard]] EntitySpace& entitySpace() noexcept {
-            return entitySpace_;
+        template<typename ... THandles>
+        static EcsWorld make() noexcept {
+            return EcsWorld{TypedHandleWorld<THandles...>{}};
         }
 
+        template<typename TTypedHandleWorld>
+        requires (!std::is_lvalue_reference_v<TTypedHandleWorld>)
+        explicit EcsWorld(TTypedHandleWorld&& typedHandleWorld) {
 
-        /**
-         * @brief Checks whether a Manager of type T is registered.
-         *
-         * @tparam T The Manager type. Must satisfy IsManagerLike.
-         *
-         * @return True if the Manager is registered.
-         */
-        template<typename T>
-        requires manager::concepts::IsManagerLike<T>
-        [[nodiscard]] bool hasManager() const {
-            return managerRegistry_.template has<T>();
-        }
+            using TypedHandleWorld = std::remove_cvref_t<TTypedHandleWorld>;
+            auto model = std::make_unique<Model<TypedHandleWorld>>(std::move(typedHandleWorld));
 
+            std::apply([&]<typename... TEntityManager>(TEntityManager&... entityManager) {
+                (registerEntityManager<TEntityManager>(entityManager), ...);
+            }, model->entityManagers());
 
-        /**
-         * @brief Registers and constructs a Manager of type T.
-         *
-         * @tparam T The Manager type. Must satisfy IsManagerLike.
-         * @tparam Args Constructor argument types.
-         *
-         * @param args Arguments forwarded to the T constructor.
-         *
-         * @return Reference to the newly registered Manager.
-         */
-        template<typename T, typename... Args>
-        requires manager::concepts::IsManagerLike<T>
-        T& registerManager(Args&&... args) {
-            return managerRegistry_.template add<T>(std::forward<Args>(args)...);
-        }
+            pimpl_ = std::move(model);
+        };
 
-        /**
-         * @brief Retrieves a registered Manager by type, or nullptr if not found.
-         *
-         * @tparam T The Manager type. Must satisfy IsManagerLike.
-         *
-         * @return Pointer to the Manager, or nullptr if not registered.
-         */
-        template<typename T>
-        requires manager::concepts::IsManagerLike<T>
-        T* tryManager() noexcept {
-            return managerRegistry_.template item<T>();
-        }
+        template<typename THandle>
+        EntityManager<THandle>& entityManager() {
 
-        /**
-         * @brief Retrieves a registered Manager by type, or nullptr if not found.
-         *
-         * @tparam T The Manager type. Must satisfy IsManagerLike.
-         *
-         * @return Const Pointer to the Manager, or nullptr if not registered.
-         */
-        template<typename T>
-        requires manager::concepts::IsManagerLike<T>
-        const T* tryManager() const noexcept {
-            return managerRegistry_.template item<T>();
-        }
+            auto idx = common::types::HandleTypeId::template id<THandle>().value();
 
-
-        /**
-         * @brief Returns a reference to the CommandHandlerRegistry.
-         *
-         * @return Reference to the CommandHandlerRegistry.
-         */
-        [[nodiscard]] command::CommandHandlerRegistry& commandHandlerRegistry() noexcept {
-            return commandHandlerRegistry_;
-        }
-
-        /**
-         * @brief Returns a reference to the CommandHandlerRegistry.
-         *
-         * @return Reference to the CommandHandlerRegistry.
-         */
-        [[nodiscard]] manager::ManagerRegistry& managerRegistry() noexcept {
-            return managerRegistry_;
-        }
-
-
-        /**
-         * @brief Resets all managers and the session to their initial state.
-         *
-         * @details Called during level transitions or game restarts to clear
-         * accumulated state. Invokes reset() on all managers and the session.
-         */
-        void reset() {
-            for (auto& mgr : managerRegistry_.items()) {
-                mgr->reset();
+            if (idx >= entityManagers_.size()) [[unlikely]] {
+                std::cerr << "No EntityManager registered for the given handle type:"<< typeid(THandle).name() << std::endl;
+                assert(false && "No EntityManager registered for the given handle type.");
+                std::terminate();
             }
+
+            return *static_cast<EntityManager<THandle>*>(entityManagers_[idx]);
         }
 
 
-
         /**
-         * @brief Builds a typed ECS view for a handle domain and component set.
-         *
-         * @tparam THandle Handle domain type.
-         * @tparam Components Component types to include.
-         *
-         * @return Domain-specific view.
-         */
-        template <typename THandle, typename... Components>
-        [[nodiscard]] auto view() {
-            return entitySpace_.template view<THandle, Components...>();
+        * @brief Creates an entity in the `THandle` domain.
+        *
+        * @tparam THandle Target handle type.
+        * @return Entity facade for the new entity.
+        */
+        template<typename THandle>
+        [[nodiscard]] auto add() {
+            auto& em = entityManager<THandle>();
+
+            auto handle = em.create();
+
+            return Entity{handle, &em};
         }
 
         /**
-         * @brief Finds an entity facade by handle.
+         * @brief Destroys an entity by handle.
          *
-         * @tparam THandle Handle type.
-         *
-         * @param handle Entity handle to resolve.
-         *
-         * @return Domain-specific entity facade (or empty facade if not found).
+         * @tparam THandle Target handle type.
+         * @param handle Handle to destroy.
+         * @return `true` if destruction succeeded.
          */
         template<typename THandle>
-        [[nodiscard]] auto find(const THandle handle) noexcept {
-            return entitySpace_.template findEntity<THandle>(handle);
+        bool destroy(THandle handle) {
+            auto& em = entityManager<THandle>();
+
+            return em.destroy(handle);
         }
 
         /**
-         * @brief Adds a new entity in the domain inferred from `THandle`.
+         * @brief Finds an entity by handle.
          *
-         * @tparam THandle Handle type.
-
-         *
-         * @return Domain-specific entity facade for the created entity.
+         * @tparam THandle Target handle type.
+         * @param handle Handle to resolve.
+         * @return Optional entity facade.
          */
         template<typename THandle>
-        [[nodiscard]] auto add(const bool isActive = true) noexcept {
-            auto entity = entitySpace_.template addEntity<THandle>();
-            entity.setActive(isActive);
+        [[nodiscard]] auto find(THandle handle) {
+            auto& em = entityManager<THandle>();
+
+            using EM = std::remove_reference_t<decltype(em)>;
+            using Entity_type = Entity<EM>;
+
+            if (!em.isValid(handle)) {
+                return std::optional<Entity_type>{std::nullopt};
+            }
+
+            return std::optional<Entity_type>{std::in_place, handle, &em};
+        }
+
+        /**
+         * @brief Creates a new entity and copies all components from `source`.
+         *
+         * @tparam THandle Target handle type.
+         * @param source Source entity handle.
+         * @return Entity facade for the cloned entity.
+         */
+        template<typename THandle>
+        [[nodiscard]] auto copy(THandle source) noexcept {
+            auto& em = entityManager<THandle>();
+
+            auto entity = add<THandle>();
+
+            em.copy(source, entity.handle());
+
             return entity;
         }
 
         /**
-         * @brief Destroys an entity in the domain inferred from `THandle`.
+         * @brief Creates a typed view for one handle domain.
          *
-         * @tparam THandle Handle type.
-         *
-         * @param handle Entity handle to destroy.
-         *
-         * @return Domain-specific destroy result.
+         * @tparam THandle Handle domain.
+         * @tparam TComponents Component filter pack.
+         * @return View object for iterating matching entities.
          */
-        template<typename THandle>
-        [[nodiscard]] auto destroy(const THandle handle) noexcept {
-            return entitySpace_.template destroy<THandle>(handle);
+        template<typename THandle, typename ...TComponents>
+        [[nodiscard]] auto view() {
+            auto& em = entityManager<THandle>();
+            using EM = std::remove_reference_t<decltype(em)>;
+            return View<EM, TComponents...>(&em);
         }
 
+        /**
+         * @brief Clears dirty sets for one handle domain.
+         *
+         * @tparam THandle Handle domain.
+         * @tparam TComponents Optional component types to clear selectively.
+         */
+        template<typename THandle = void, typename ...TComponents>
+        void clearDirtySets() noexcept {
+
+            if constexpr (std::is_same_v<THandle, void>) {
+                for (auto& emRef : entityManagerRefs) {
+                    emRef.clearAllDirtySets();
+                }
+            } else {
+                auto& em = entityManager<THandle>();
+
+                if constexpr (sizeof...(TComponents) == 0) {
+                    em.clearAllDirtySets();
+                } else {
+                    (em.template clearDirtySet<TComponents>(),...);
+                }
+            }
+        }
 
         /**
-         * @brief Returns direct access to the entity manager for a specific handle type.
+         * @brief Check whether the specified handle is valid.
          *
-         * @tparam THandle Handle type.
-         * @return Reference to the internal EntityManager for the specified handle type.
+         * @tparam THandle Handle domain.
+         * @param handle Handle to check.
+         * @return True if the handle is valid, false otherwise.
          */
         template<typename THandle>
-        auto& entityManager() noexcept {
-            return entitySpace_.template entityManager<THandle>();
+        [[nodiscard]] bool isValid(const THandle handle) const noexcept {
+            auto& em = entityManager<THandle>();
+            return em.isValid(handle);
+        }
+
+        /**
+         * @brief Returns the underlying SparseSet managing the handle domain.
+         * @tparam THandle
+         * @return SparseSet<THandle> or nullptr if not available.
+         */
+        template<typename THandle>
+        [[nodiscard]] storage::SparseSet<THandle>* sparseSet() {
+            auto& em = entityManager<THandle>();
+            return em.sparseSet();
         }
 
     };
 
-}
 
+
+
+};

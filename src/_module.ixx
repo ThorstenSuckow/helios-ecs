@@ -16,9 +16,7 @@ export import helios.ecs.system;
 
 export import helios.ecs.EcsWorld;
 export import helios.ecs.Entity;
-export import helios.ecs.EntitySpace;
 export import helios.ecs.EntityManager;
 export import helios.ecs.EntityRegistry;
 export import helios.ecs.EntityAccessor;
-export import helios.ecs.TypedHandleWorld;
 export import helios.ecs.View;
