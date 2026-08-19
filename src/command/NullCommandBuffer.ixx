@@ -7,6 +7,7 @@ module;
 export module helios.ecs.command.NullCommandBuffer;
 
 import helios.ecs.command.tags;
+import helios.ecs.common.types;
 
 export namespace helios::ecs::command {
 
@@ -18,15 +19,17 @@ export namespace helios::ecs::command {
     public:
 
         using EcsRoleTag = tags::CommandBufferRole;
+        using InitContextType = ecs::common::types::NullInitContext;
+        using FlushContextType = ecs::common::types::NullFlushContext;
 
         template<class T, class... Args>
         void add(Args&&...) {/*intentionally noop*/}
 
-        void flush() noexcept {/*intentionally noop*/}
+        bool flush(FlushContextType&) noexcept {return true;}
 
-        void clear() noexcept {/*intentionally noop*/}
+        bool clear() noexcept {return true;}
 
-        void init() noexcept {/*intentionally noop*/}
+        bool init(InitContextType&) noexcept {return true;}
 
     };
 
