@@ -42,6 +42,63 @@ export namespace helios::ecs::command {
             [[nodiscard]] virtual const void* underlying() const noexcept = 0;
         };
 
+        template<typename TConcreteCommandBuffer>
+        class ModelWithBorrowedBuffer final : public Concept {
+
+            using FlushContextType = typename TConcreteCommandBuffer::FlushContextType;
+            using InitContextType = typename TConcreteCommandBuffer::InitContextType;
+
+            /**
+             * @brief The owned command buffer instance.
+             */
+            TConcreteCommandBuffer* cmdBuffer_;
+
+
+
+        public:
+
+            explicit ModelWithBorrowedBuffer(TConcreteCommandBuffer* cmdBuffer) :  cmdBuffer_(cmdBuffer) {}
+
+            bool flush(ContextRef& flushContext) noexcept override {
+
+                if (auto*ctx = flushContext.tryGet<FlushContextType>()) {
+                    return cmdBuffer_->flush(*ctx);
+                }
+
+                return false;
+            }
+
+            bool init(ContextRef& initContext) noexcept override {
+
+                if (auto*ctx = initContext.tryGet<InitContextType>()) {
+                    return cmdBuffer_->init(*ctx);
+                }
+
+                return false;
+            }
+
+            bool clear() noexcept override {
+                return cmdBuffer_->clear();
+            }
+
+            [[nodiscard]] ContextTypeId expectedFlushContextTypeId() const noexcept override {
+                return ContextTypeId::template id<FlushContextType>();
+            }
+
+            [[nodiscard]] ContextTypeId expectedInitContextTypeId() const noexcept override {
+                return ContextTypeId::template id<InitContextType>();
+            }
+
+            [[nodiscard]] void* underlying() noexcept override {
+                return cmdBuffer_;
+            }
+
+            [[nodiscard]] const void* underlying() const noexcept override {
+                return cmdBuffer_;
+            }
+        };
+
+
         /**
          * @brief Typed model that adapts a concrete buffer to the Concept interface.
          *
@@ -124,6 +181,14 @@ export namespace helios::ecs::command {
         explicit CommandBuffer(TConcreteCommandBuffer cmdBuffer) : pimpl_(
             std::make_unique<Model<TConcreteCommandBuffer>>(std::move(cmdBuffer))
         ) {}
+
+        template<typename TConcreteCommandBuffer>
+        requires concepts::IsCommandBufferLike<TConcreteCommandBuffer>
+        explicit CommandBuffer(TConcreteCommandBuffer* cmdBuffer) : pimpl_(
+            std::make_unique<ModelWithBorrowedBuffer<TConcreteCommandBuffer>>(cmdBuffer)
+        ) {
+            assert(cmdBuffer && "CommandBuffer pointer must not be null");
+        }
 
         CommandBuffer(const CommandBuffer&) = delete;
         CommandBuffer& operator=(const CommandBuffer&) = delete;
