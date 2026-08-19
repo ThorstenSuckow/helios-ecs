@@ -6,10 +6,12 @@ module;
 
 #include <cassert>
 #include <memory>
+#include <exception>
 
 export module helios.ecs.command.CommandBuffer;
 
 import helios.ecs.command.concepts;
+import helios.ecs.command.types;
 import helios.ecs.common.types;
 
 export namespace helios::ecs::command {
@@ -22,6 +24,7 @@ export namespace helios::ecs::command {
 
         using ContextRef = ecs::common::types::ContextRef;
         using ContextTypeId = ecs::common::types::ContextTypeId;
+        using CommandBufferTypeId = ecs::command::types::CommandBufferTypeId;
 
     private:
 
@@ -37,6 +40,8 @@ export namespace helios::ecs::command {
 
             [[nodiscard]] virtual ContextTypeId expectedFlushContextTypeId() const noexcept = 0;
             [[nodiscard]] virtual ContextTypeId expectedInitContextTypeId() const noexcept = 0;
+            
+            [[nodiscard]] virtual CommandBufferTypeId typeId() const noexcept = 0;
 
             [[nodiscard]] virtual void* underlying() noexcept = 0;
             [[nodiscard]] virtual const void* underlying() const noexcept = 0;
@@ -53,7 +58,7 @@ export namespace helios::ecs::command {
              */
             TConcreteCommandBuffer* cmdBuffer_;
 
-
+            CommandBufferTypeId typeId_ = ecs::command::types::CommandBufferTypeId::template id<TConcreteCommandBuffer>();
 
         public:
 
@@ -89,6 +94,10 @@ export namespace helios::ecs::command {
                 return ContextTypeId::template id<InitContextType>();
             }
 
+            [[nodiscard]] CommandBufferTypeId typeId() const noexcept override {
+                return typeId_;
+            }
+
             [[nodiscard]] void* underlying() noexcept override {
                 return cmdBuffer_;
             }
@@ -115,6 +124,7 @@ export namespace helios::ecs::command {
              */
             TConcreteCommandBuffer cmdBuffer_;
 
+            ecs::command::types::CommandBufferTypeId typeId_ = ecs::command::types::CommandBufferTypeId::template id<TConcreteCommandBuffer>();
 
 
             public:
@@ -157,6 +167,10 @@ export namespace helios::ecs::command {
 
             [[nodiscard]] const void* underlying() const noexcept override {
                 return &cmdBuffer_;
+            }
+
+            [[nodiscard]] CommandBufferTypeId typeId() const noexcept override {
+                return typeId_;
             }
         };
 
@@ -256,6 +270,18 @@ export namespace helios::ecs::command {
         [[nodiscard]] const void* underlying() const noexcept {
             assert(pimpl_ && "CommandBuffer not initialized");
             return pimpl_->underlying();
+        }
+        
+        template<typename TConcreteBuffer>
+        [[nodiscard]] TConcreteBuffer* tryGet() noexcept {
+            assert(pimpl_ && "CommandBuffer not initialized");
+            if (CommandBufferTypeId::template id<TConcreteBuffer>() != pimpl_->typeId()) {
+                assert(false && "CommandBuffer does not contain the requested concrete buffer type");
+                std::terminate();
+            }
+            
+            return static_cast<TConcreteBuffer*>(pimpl_->underlying());
+            
         }
 
     };
