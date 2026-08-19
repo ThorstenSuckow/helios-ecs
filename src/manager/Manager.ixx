@@ -6,7 +6,6 @@ module;
 
 #include <cassert>
 #include <memory>
-#include <span>
 
 export module helios.ecs.manager.Manager;
 
@@ -40,7 +39,7 @@ export namespace helios::ecs::manager {
             virtual void reset() noexcept = 0;
             virtual bool executeCommandsParallel(ContextRef executionContext) noexcept = 0;
 
-            virtual std::span<command::CommandBuffer*> commandBuffers() noexcept = 0;
+            virtual command::CommandBuffer* commandBuffer() noexcept = 0;
 
             [[nodiscard]] virtual ContextTypeId expectedInitContextTypeId() const noexcept = 0;
             [[nodiscard]] virtual ContextTypeId expectedExecutionContextTypeId() const noexcept = 0;
@@ -65,12 +64,12 @@ export namespace helios::ecs::manager {
 
             explicit Model(TConcreteManager sys) :  manager_(std::move(sys)) {}
 
-            [[nodiscard]] std::span<command::CommandBuffer*> commandBuffers() noexcept override {
-                if constexpr(requires(TConcreteManager& t){{t.commandBuffers()}->std::same_as<std::span<command::CommandBuffer*>>;}) {
-                    return manager_.commandBuffers();
+            [[nodiscard]] command::CommandBuffer* commandBuffer() noexcept override {
+                if constexpr(requires(TConcreteManager& t){{t.commandBuffer()}->std::same_as<command::CommandBuffer*>;}) {
+                    return manager_.commandBuffer();
                 }
 
-                return {};
+                return nullptr;
             }
 
             [[nodiscard]] ContextTypeId expectedInitContextTypeId() const noexcept override {
@@ -218,9 +217,9 @@ export namespace helios::ecs::manager {
          * @return A span of pointers to the owned command buffers, or an empty span if the manager does not
          * own any command buffers.
          */
-        std::span<command::CommandBuffer*> commandBuffers() noexcept {
+        command::CommandBuffer* commandBuffer() noexcept {
             assert(pimpl_ && "Manager not initialized");
-            return pimpl_->commandBuffers();
+            return pimpl_->commandBuffer();
         }
 
         /**
