@@ -17,6 +17,6 @@ export namespace helios::ecs::common::concepts {
      * @tparam Tag The expected tag type (e.g. ManagerRole, SystemRole).
      */
     template<class T, class Tag>
-    concept HasEcsTag = requires { std::same_as<typename T::EcsRoleTag, Tag>; };
+    concept HasEcsTag = std::same_as<typename T::EcsRoleTag, Tag>; ;
 
 }
