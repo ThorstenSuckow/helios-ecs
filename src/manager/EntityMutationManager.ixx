@@ -59,12 +59,8 @@ export namespace helios::ecs::manager {
      * mutations to the entity manager.
      *
      * @tparam THandle Entity handle type identifying the target ECS registry.
-     * @tparam TInitContext Init-context type providing command-handler access.
-     * @tparam TExecutionContext Execution-context type providing entity-manager access.
      */
-    template<typename THandle,typename TInitContext, typename TExecutionContext>
-    requires common::concepts::ProvidesCommandHandlerRegistry<TInitContext, command::CommandHandlerRegistry>
-        && common::concepts::ProvidesEntityManager<TExecutionContext, EntityManager<THandle>>
+    template<typename THandle>
     class EntityMutationManager {
 
 
@@ -146,6 +142,8 @@ export namespace helios::ecs::manager {
              *
              * @param executionContext Execution context (currently unused; kept for interface uniformity).
              */
+            template<typename TExecutionContext>
+            requires common::concepts::ProvidesEntityManager<TExecutionContext, EntityManager<THandle>>
             bool executeCommands(TExecutionContext& executionContext){
 
                 using Component_type = typename TCommandType::Component_type;
@@ -180,6 +178,7 @@ export namespace helios::ecs::manager {
             /**
              * @brief No-op; satisfies the buffer initialisation interface.
              */
+            template<typename TInitContext>
             bool init(TInitContext& initContext) {
                 return true;
             }
@@ -265,10 +264,6 @@ export namespace helios::ecs::manager {
          */
         using EcsRoleTag = manager::tags::ManagerRole;
 
-        using ExecutionContextType = TExecutionContext;
-
-        using InitContextType = TInitContext;
-
         /**
          * @brief Constructs the manager bound to `jobSystem`.
          *
@@ -325,6 +320,8 @@ export namespace helios::ecs::manager {
          *
          * @param initContext Init context providing access to the command handler registry.
          */
+        template<typename TInitContext>
+        requires common::concepts::ProvidesCommandHandlerRegistry<TInitContext, command::CommandHandlerRegistry>
         bool init(TInitContext& initContext) {
 
             initContext.commandHandlerRegistry().template registerHandlerForCommandGroup<
@@ -343,6 +340,8 @@ export namespace helios::ecs::manager {
          *
          * @param executionContext Frame-local ECS context forwarded to each internal executor.
          */
+        template<typename TExecutionContext>
+        requires common::concepts::ProvidesEntityManager<TExecutionContext, EntityManager<THandle>>
         bool executeCommands(TExecutionContext& executionContext) {
 
             auto contextRef = ContextRef{executionContext};
@@ -364,6 +363,8 @@ export namespace helios::ecs::manager {
          *
          * @param executionContext Execution context forwarded to each internal executor.
          */
+        template<typename TExecutionContext>
+        requires common::concepts::ProvidesEntityManager<TExecutionContext, EntityManager<THandle>>
         bool executeCommandsParallel(TExecutionContext& executionContext) {
 
             std::vector<std::size_t> activeIndices;

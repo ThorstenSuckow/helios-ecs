@@ -4,11 +4,12 @@
  */
 module;
 
-#include <concepts>
 
 export module helios.ecs.manager.concepts:IsManagerLike;
 
 import helios.ecs.manager.tags;
+import helios.ecs.command.concepts;
+import helios.ecs.common.concepts;
 
 export namespace helios::ecs::manager::concepts {
 
@@ -20,13 +21,10 @@ export namespace helios::ecs::manager::concepts {
      */
     template<class TManager>
     concept IsManagerLike = requires (
-        TManager& manager,
-        typename TManager::InitContextType& initCtx,
-        typename TManager::ExecutionContextType& execCtx)
+        TManager& manager
+    )
     {
-        std::same_as<typename TManager::EcsRoleTag, tags::ManagerRole>;
-        {manager.init(initCtx)} -> std::same_as<bool>;
-        {manager.executeCommands(execCtx)} -> std::same_as<bool>;
-        {manager.reset()} -> std::same_as<void>;
+        requires ecs::command::concepts::IsCommandTypeList<typename TManager::CommandTypes>::value;
+        requires ecs::common::concepts::HasEcsTag<TManager, tags::ManagerRole>;
     };
 }
