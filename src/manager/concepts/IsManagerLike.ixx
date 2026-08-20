@@ -20,11 +20,6 @@ export namespace helios::ecs::manager::concepts {
      * @tparam TManager The manager type to constrain.
      */
     template<class TManager>
-    concept IsManagerLike = requires (
-        TManager& manager
-    )
-    {
-        requires ecs::command::concepts::IsCommandTypeList<typename TManager::CommandTypes>::value;
-        requires ecs::common::concepts::HasEcsTag<TManager, tags::ManagerRole>;
-    };
+    concept IsManagerLike = ecs::common::concepts::HasEcsTag<TManager, tags::ManagerRole>;
+    ;
 }
