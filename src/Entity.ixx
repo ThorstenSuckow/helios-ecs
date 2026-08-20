@@ -295,25 +295,27 @@ export namespace helios::ecs {
             return entityManager_->raw(entityHandle_, typeId);
         }
 
-        /**
-         * @brief Returns pointer to a component.
-         *
-         * @tparam T The component type.
-         *
-         * @return Pointer to the component, or nullptr if not attached.
-         */
+
+        template<
+            template<typename> typename TComponent
+        >
+        TComponent<Handle_type>* get() {
+            return entityManager_->template  get<TComponent<Handle_type>>(entityHandle_);
+        }
+
+        template<
+            template<typename> typename TComponent
+        >
+        const TComponent<Handle_type>* get() const {
+            return entityManager_->template  get<TComponent<Handle_type>>(entityHandle_);
+        }
+
+
         template<typename T>
         T* get() {
             return entityManager_->template  get<T>(entityHandle_);
         }
 
-        /**
-         * @brief Returns const pointer to a component.
-         *
-         * @tparam T The component type.
-         *
-         * @return Const pointer to the component, or nullptr if not attached.
-         */
         template<typename T>
         const T* get() const {
             return entityManager_->template  get<T>(entityHandle_);
