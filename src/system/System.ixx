@@ -39,8 +39,6 @@ export namespace helios::ecs::system {
 
             virtual ~Concept() = default;
             virtual bool update(ContextRef& contextRef) noexcept = 0;
-            virtual bool flush(ContextRef& contextRef) noexcept = 0;
-            virtual bool init(ContextRef& contextRef) noexcept = 0;
 
             [[nodiscard]] virtual CommandBuffer* commandBuffer() noexcept = 0;
 
@@ -51,7 +49,7 @@ export namespace helios::ecs::system {
         };
 
 
-        template<typename TConcreteSystem, typename TCommandBuffer, typename TUpdateContext>
+        template<typename TConcreteSystem, typename TUpdateContext, typename TCommandBuffer>
         class Model final : public Concept {
 
             using UpdateContextType = TUpdateContext;
@@ -65,13 +63,9 @@ export namespace helios::ecs::system {
 
         public:
 
-            explicit Model(TConcreteSystem sys) :
+            explicit Model(TConcreteSystem&& sys, CommandBuffer&& cmdBuffer) :
             system_(std::move(sys)),
-            commandBuffer_(CommandBuffer(TCommandBuffer{})) {}
-
-            explicit Model(TConcreteSystem sys, TCommandBuffer& cmdBuffer) :
-            system_(std::move(sys)),
-            commandBuffer_(CommandBuffer(&cmdBuffer)) {}
+            commandBuffer_(std::move(cmdBuffer)) {}
 
             bool update(ContextRef& contextRef) noexcept override {
 
@@ -104,13 +98,6 @@ export namespace helios::ecs::system {
                 }
             }
 
-            bool init(ContextRef& contextRef) noexcept override {
-                return commandBuffer_.init(contextRef);
-            }
-
-            bool flush(ContextRef& contextRef) noexcept override {
-                return commandBuffer_.flush(contextRef);
-            }
 
             [[nodiscard]] ContextTypeId expectedUpdateContextTypeId() const noexcept override {
                 return ContextTypeId::template id<UpdateContextType>();
@@ -141,28 +128,27 @@ export namespace helios::ecs::system {
 
     public:
 
-
-        template<typename TCommandBuffer, typename TUpdateContext, typename TConcreteSystem>
+        template<typename TConcreteSystem, typename TUpdateContext, typename TCommandBufferFactory>
         requires concepts::IsRuntimeSystemLike<std::remove_cvref_t<TConcreteSystem>>
-           && ecs::command::concepts::IsCommandBufferLike<TCommandBuffer>
-           && std::default_initializable<TCommandBuffer>
         static System make(TConcreteSystem&& system) {
             using SystemType = std::remove_cvref_t<TConcreteSystem>;
-            return System{std::make_unique<
-                Model<SystemType, TCommandBuffer, TUpdateContext>
-                >(std::forward<TConcreteSystem>(system))};
-        }
 
-        template<typename TCommandBuffer, typename TUpdateContext, typename TConcreteSystem>
-        requires concepts::IsRuntimeSystemLike<std::remove_cvref_t<TConcreteSystem>>
-           && ecs::command::concepts::IsCommandBufferLike<TCommandBuffer>
-           && std::default_initializable<TCommandBuffer>
-        static System make(TConcreteSystem&& system, TCommandBuffer& commandBuffer) {
-            using SystemType = std::remove_cvref_t<TConcreteSystem>;
-            using CommandBufferType = std::remove_cvref_t<TCommandBuffer>;
-            return System{std::make_unique<
-                Model<SystemType, CommandBufferType, TUpdateContext>
-                >(std::forward<TConcreteSystem>(system), commandBuffer)};
+            if constexpr(requires { typename SystemType::CommandTypes;}) {
+                auto cmdBuffer = TCommandBufferFactory::make(typename SystemType::CommandTypes{});
+                using CommandBufferType = std::remove_cvref_t<decltype(cmdBuffer)>;
+                auto erasedCmdBuffer = CommandBuffer::make<CommandBufferType, typename TCommandBufferFactory::FlushContextType>(std::move(cmdBuffer));
+
+                return System{std::make_unique<
+                    Model<SystemType, TUpdateContext, CommandBufferType>
+                    >(std::move(system), std::move(erasedCmdBuffer))};
+            } else {
+                auto erasedCmdBuffer = CommandBuffer::make<NullCommandBuffer, typename TCommandBufferFactory::FlushContextType>(
+                    std::move(NullCommandBuffer{}));
+                return System{std::make_unique<
+                    Model<SystemType, TUpdateContext, NullCommandBuffer>
+                    >(std::move(system), std::move(erasedCmdBuffer))};
+            }
+
         }
 
         System() = delete;
@@ -183,27 +169,6 @@ export namespace helios::ecs::system {
             assert(pimpl_ && "System not initialized");
             return pimpl_->update(contextRef);
         }
-
-        /**
-         * @brief Flushes any outstanding changes, e.g. commands of the associated buffer.
-         *
-         * @param updateContext The current frame's update context.
-         */
-        bool flush(ContextRef& contextRef) noexcept {
-            assert(pimpl_ && "System not initialized");
-            return pimpl_->flush(contextRef);
-        }
-
-        /**
-         * @brief Inits this system.
-         *
-         * @param ContextRef The context ref to use for initialization.
-         */
-        bool init(ContextRef& contextRef) noexcept {
-            assert(pimpl_ && "System not initialized");
-            return pimpl_->init(contextRef);
-        }
-
 
         [[nodiscard]] ContextTypeId expectedUpdateContextTypeId() const noexcept {
             assert(pimpl_ && "System not initialized");
