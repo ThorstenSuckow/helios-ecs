@@ -8,3 +8,4 @@ export import :CommandBufferTypeId;
 export import :CommandTypeId;
 export import :CommandGroupTypeId;
 export import :CommandGroup;
+export import :CommandTypeList;

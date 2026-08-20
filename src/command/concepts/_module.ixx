@@ -5,4 +5,4 @@
 export module helios.ecs.command.concepts;
 
 export import :IsCommandBufferLike;
-export import :IsCommandHandlerLike;
+export import :IsCommandTypeList;
