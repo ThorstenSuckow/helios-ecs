@@ -6,6 +6,7 @@ module;
 
 #include <cassert>
 #include <memory>
+#include <exception>
 
 export module helios.ecs.manager.Manager;
 
@@ -14,7 +15,10 @@ import helios.ecs.common.types;
 import helios.ecs.manager.types;
 import helios.ecs.manager.concepts;
 
+import helios.ecs.command.concepts;
+
 import helios.ecs.command.CommandBuffer;
+import helios.ecs.command.NullCommandBuffer;
 
 export namespace helios::ecs::manager {
 
@@ -26,6 +30,8 @@ export namespace helios::ecs::manager {
 
         using ContextRef = ecs::common::types::ContextRef;
         using ContextTypeId = ecs::common::types::ContextTypeId;
+        using CommandBuffer = ecs::command::CommandBuffer;
+        using NullCommandBuffer = ecs::command::NullCommandBuffer;
 
     private:
         /**
@@ -53,23 +59,26 @@ export namespace helios::ecs::manager {
          *
          * @tparam TConcreteManager The concrete manager type, must satisfy `IsManagerLike<TConcreteManager>`.
          */
-        template<typename TConcreteManager>
+        template<typename TConcreteManager, typename TInitContext, typename TExecutionContext, typename TConcreteCommandBuffer>
         class Model final : public Concept {
             TConcreteManager manager_;
 
-            using ExecutionContextType = typename TConcreteManager::ExecutionContextType;
-            using InitContextType = typename TConcreteManager::InitContextType;
+            using ExecutionContextType = TExecutionContext;
+            using InitContextType = TInitContext;
+
+            CommandBuffer commandBuffer_;
 
             public:
 
-            explicit Model(TConcreteManager sys) :  manager_(std::move(sys)) {}
+            explicit Model(TConcreteManager&& sys, CommandBuffer&& cmdBuffer)
+            :  manager_(std::move(sys)), commandBuffer_(std::move(cmdBuffer)) {}
 
             [[nodiscard]] command::CommandBuffer* commandBuffer() noexcept override {
-                if constexpr(requires(TConcreteManager& t){{t.commandBuffer()}->std::same_as<command::CommandBuffer*>;}) {
-                    return manager_.commandBuffer();
+                if constexpr(std::same_as<NullCommandBuffer, TConcreteCommandBuffer>) {
+                    return nullptr;
                 }
 
-                return nullptr;
+                return &commandBuffer_;
             }
 
             [[nodiscard]] ContextTypeId expectedInitContextTypeId() const noexcept override {
@@ -81,25 +90,77 @@ export namespace helios::ecs::manager {
             }
 
             bool executeCommands(const ContextRef executionContextRef) noexcept override {
-                if (auto* ctx = executionContextRef.tryGet<ExecutionContextType>()) {
-                    return manager_.executeCommands(*ctx);
+
+                if constexpr (!std::same_as<NullCommandBuffer, TConcreteCommandBuffer>) {
+                    static_assert(
+                        requires(TExecutionContext& ctx, TConcreteCommandBuffer& buffer)
+                    {
+                        {manager_.executeCommands(ctx, buffer)} -> std::same_as<bool>;
+
+                    },
+                    "TConcreteManager must have a member function `bool executeCommands(TExecutionContext&, TCommandBuffer&)`");
+
+                    if (auto* ctx = executionContextRef.tryGet<ExecutionContextType>()) {
+                        return manager_.executeCommands(
+                            *ctx, *static_cast<TConcreteCommandBuffer*>(commandBuffer_.underlying()));
+                    }
+                    return false;
+                } else {
+                    static_assert(
+                          requires(TExecutionContext& ctx)
+                      {
+                          {manager_.executeCommands(ctx)} -> std::same_as<bool>;
+
+                      },
+                      "TConcreteManager must have a member function `bool executeCommands(TExecutionContext&)`");
+
+                    if (auto* ctx = executionContextRef.tryGet<ExecutionContextType>()) {
+                        return manager_.executeCommands(*ctx);
+                    }
+                    return false;
                 }
 
                 return false;
             }
 
-            bool executeCommandsParallel(const ContextRef executionContext) noexcept override {
-                
-                if (auto* ctx = executionContext.tryGet<ExecutionContextType>()) {
-                    if constexpr (concepts::HasExecuteCommandsParallel<TConcreteManager>) {
-                        return manager_.executeCommandsParallel(*ctx);
-                    } else {
-                        assert(false && "Manager does not support executeCommandsParallel");
-                        return manager_.executeCommands(*ctx);
-                    }
-                }
+            bool executeCommandsParallel(const ContextRef executionContextRef) noexcept override {
 
-                return false;
+                if constexpr (!concepts::HasExecuteCommandsParallel<TConcreteManager, TExecutionContext>) {
+                    assert(false && "TConcreteManager must have a member function `bool executeCommandsParallel(TExecutionContext&)`");
+                    std::terminate();
+                    return false;
+                } else {
+
+                    if constexpr (!std::same_as<NullCommandBuffer, TConcreteCommandBuffer>) {
+                        static_assert(
+                            requires(TExecutionContext& ctx, TConcreteCommandBuffer& buffer)
+                        {
+                            {manager_.executeCommandsParallel(ctx, buffer)} -> std::same_as<bool>;
+
+                        },
+                        "TConcreteManager must have a member function `bool executeCommandsParallel(TExecutionContext&, TCommandBuffer&)`");
+
+                        if (auto* ctx = executionContextRef.tryGet<ExecutionContextType>()) {
+                            return manager_.executeCommandsParallel(
+                                *ctx, *static_cast<TConcreteCommandBuffer*>(commandBuffer_.underlying()));
+                        }
+                        return false;
+                    } else {
+                        static_assert(
+                              requires(TExecutionContext& ctx)
+                          {
+                              {manager_.executeCommandsParallel(ctx)} -> std::same_as<bool>;
+
+                          },
+                          "TConcreteManager must have a member function `bool executeCommands(TExecutionContext&)`");
+
+                        if (auto* ctx = executionContextRef.tryGet<ExecutionContextType>()) {
+                            return manager_.executeCommandsParallel(*ctx);
+                        }
+                        return false;
+                    }
+                    return false;
+                }
             }
 
             bool init(ContextRef initContext) noexcept override {
@@ -124,6 +185,10 @@ export namespace helios::ecs::manager {
 
         std::unique_ptr<Concept> pimpl_;
 
+        explicit Manager(std::unique_ptr<Concept>&& pimpl)
+            : pimpl_(std::move(pimpl))
+        {}
+
     public:
 
         /**
@@ -138,10 +203,40 @@ export namespace helios::ecs::manager {
          *
          * @param manager The concrete manager instance to wrap (moved into internal storage).
          */
-        template<typename TConcreteManager>
+        template<typename TConcreteManager, typename TInitContext, typename TExecutionContext, typename TCommandBufferFactory>
         requires concepts::IsManagerLike<TConcreteManager>
-        explicit Manager(TConcreteManager manager)
-            : pimpl_(std::make_unique<Model<TConcreteManager>>(std::move(manager))) {}
+        static Manager make(TConcreteManager&& manager) {
+
+            using ManagerType = std::remove_cvref_t<TConcreteManager>;
+
+            if constexpr(requires { typename ManagerType::CommandTypes;}) {
+                auto cmdBuffer = TCommandBufferFactory::make(typename ManagerType::CommandTypes{});
+                using CommandBufferType = std::remove_cvref_t<decltype(cmdBuffer)>;
+                auto erasedCmdBuffer = CommandBuffer::make<CommandBufferType, typename TCommandBufferFactory::FlushContextType>(
+                    std::move(cmdBuffer));
+
+                return Manager(
+                std::make_unique<Model<
+                    std::remove_cvref_t<TConcreteManager>,
+                    TInitContext,
+                    TExecutionContext,
+                    CommandBufferType
+                    >>(std::move(manager), std::move(erasedCmdBuffer))
+            );
+            } else {
+                auto erasedCmdBuffer = CommandBuffer::make<NullCommandBuffer, typename TCommandBufferFactory::FlushContextType>(
+                    std::move(NullCommandBuffer{}));
+                return Manager(
+                    std::make_unique<Model<
+                        std::remove_cvref_t<TConcreteManager>,
+                        TInitContext,
+                        TExecutionContext,
+                        NullCommandBuffer
+                        >>(std::move(manager), std::move(erasedCmdBuffer))
+                );
+            }
+
+        }
 
         Manager(const Manager&) = delete;
         Manager& operator=(const Manager&) = delete;
