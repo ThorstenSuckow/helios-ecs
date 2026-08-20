@@ -14,6 +14,7 @@ export module helios.ecs.system.CallableSystem;
 import helios.ecs.system.tags;
 import helios.ecs.common.concepts;
 import helios.ecs.command.concepts;
+import helios.ecs.command.types;
 import helios.ecs.component;
 
 export namespace helios::ecs::system {
@@ -27,8 +28,8 @@ export namespace helios::ecs::system {
      * @tparam THandle Handle type used by the surrounding system graph.
      * @tparam TFunc lambda function type
      */
-    template <typename THandle, typename TFunc>
-    class CallableSystem<THandle, TFunc> {
+    template <typename THandle, typename TFunc, typename ... TCommands>
+    class CallableSystem<THandle, TFunc, TCommands...> {
 
         TFunc lambda_;
 
@@ -37,6 +38,9 @@ export namespace helios::ecs::system {
         using Handle_type = THandle;
 
         using EcsRoleTag = ecs::system::tags::CallableSystemRole;
+
+        using CommandTypes = ecs::command::types::CommandTypeList<TCommands...>;
+
 
         /**
          * @brief Creates the system from an update callback.
@@ -61,11 +65,11 @@ export namespace helios::ecs::system {
 
 
 
-    template<typename THandle, typename TFunc>
+    template<typename THandle, typename ... TCommands, typename TFunc>
     [[nodiscard]] auto Lambda(TFunc&& func) {
         using FuncType = std::remove_cvref_t<TFunc>;
 
-        return CallableSystem<THandle, FuncType>(std::forward<TFunc>(func));
+        return CallableSystem<THandle, FuncType, TCommands...>(std::forward<TFunc>(func));
     };
 
 
