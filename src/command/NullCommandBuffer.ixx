@@ -19,17 +19,15 @@ export namespace helios::ecs::command {
     public:
 
         using EcsRoleTag = tags::CommandBufferRole;
-        using InitContextType = ecs::common::types::NullInitContext;
-        using FlushContextType = ecs::common::types::NullFlushContext;
 
         template<class T, class... Args>
         void add(Args&&...) {/*intentionally noop*/}
 
-        bool flush(FlushContextType&) noexcept {return true;}
+        template<typename TFlushContextType>
+        bool flush(TFlushContextType&) noexcept {return true;}
 
         bool clear() noexcept {return true;}
 
-        bool init(InitContextType&) noexcept {return true;}
 
     };
 
