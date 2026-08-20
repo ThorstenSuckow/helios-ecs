@@ -8,6 +8,8 @@ module;
 
 export module helios.ecs.command.concepts:IsCommandBufferLike;
 
+
+import helios.ecs.common.concepts;
 import helios.ecs.command.tags;
 
 export namespace helios::ecs::command::concepts {
@@ -23,15 +25,9 @@ export namespace helios::ecs::command::concepts {
      */
     template<class TBuffer>
     concept IsCommandBufferLike = requires (
-        TBuffer& buffer,
-        typename TBuffer::InitContextType& initCtx,
-        typename TBuffer::FlushContextType& flushCtx
+        TBuffer& buffer
     )
     {
-        std::same_as<typename TBuffer::EcsRoleTag, tags::CommandBufferRole>;
-        {buffer.init(initCtx)} -> std::same_as<bool>;
-        {buffer.flush(flushCtx)} -> std::same_as<bool>;
-        {buffer.clear()} -> std::same_as<bool>;
-
+        requires ecs::common::concepts::HasEcsTag<TBuffer, tags::CommandBufferRole>;
     };
 }

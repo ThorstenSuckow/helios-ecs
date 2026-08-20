@@ -26,13 +26,8 @@ export namespace helios::ecs::command {
      * @tparam TCommandTypes The command types this buffer manages.
 
      */
-    template <typename TInitContext, typename TFlushContext, typename... TCommandTypes>
-    requires common::concepts::ProvidesCommandHandlerRegistry<TFlushContext, command::CommandHandlerRegistry> &&
-        common::concepts::ProvidesCommandHandlerRegistry<TFlushContext, command::CommandHandlerRegistry> &&
-        common::concepts::ProvidesManagerRegistry<TFlushContext, ecs::manager::ManagerRegistry>
+    template <typename... TCommandTypes>
     class TypedCommandBuffer {
-
-
         /**
          * @brief Per-type command queues stored as a tuple of vectors.
          */
@@ -59,7 +54,7 @@ export namespace helios::ecs::command {
          *
          * @param updateContext The current frame's update context.
          */
-        template<typename TCommandType>
+        template<typename TFlushContext, typename TCommandType>
         void flushCommandQueue(TFlushContext& flushContext) noexcept {
 
             auto& commandHandlerRegistry = flushContext.commandHandlerRegistry();
@@ -83,9 +78,6 @@ export namespace helios::ecs::command {
 
         using EcsRoleTag = tags::CommandBufferRole;
 
-        using InitContextType = TInitContext;
-        using FlushContextType = TFlushContext;
-
         /**
          * @brief Enqueues a command of the specified type.
          *
@@ -104,16 +96,6 @@ export namespace helios::ecs::command {
         }
 
         /**
-         * @brief Binds external services required for command dispatch.
-         *
-         * @param TInitContext
-         */
-        bool init(TInitContext&) noexcept {
-            // intentionally left empty
-            return true;
-        }
-
-        /**
          * @brief Discards all queued commands without executing them.
          */
         bool clear() noexcept {
@@ -124,8 +106,11 @@ export namespace helios::ecs::command {
         /**
          * @brief Flushes all command queues in template parameter order.
          */
+        template<typename TFlushContext>
+        requires common::concepts::ProvidesCommandHandlerRegistry<TFlushContext, command::CommandHandlerRegistry> &&
+       common::concepts::ProvidesManagerRegistry<TFlushContext, ecs::manager::ManagerRegistry>
         bool flush(TFlushContext& flushContext) noexcept {
-            (flushCommandQueue<TCommandTypes>(flushContext), ...);
+            (flushCommandQueue<TFlushContext, TCommandTypes>(flushContext), ...);
             return true;
         }
 

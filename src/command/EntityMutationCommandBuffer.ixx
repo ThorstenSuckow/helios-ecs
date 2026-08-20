@@ -26,9 +26,7 @@ export namespace helios::ecs::command {
     /**
      * @brief Collects deferred entity-mutation commands and dispatches them in bulk.
      */
-    template<typename THandle, typename TInitContext, typename TFlushContext>
-    requires common::concepts::ProvidesCommandHandlerRegistry<TFlushContext, command::CommandHandlerRegistry> &&
-             common::concepts::ProvidesManagerRegistry<TFlushContext, ecs::manager::ManagerRegistry>
+    template<typename THandle>
     class EntityMutationCommandBuffer {
 
         /** @brief Registry of lazily created per-command-type `InternalBuffer` instances. */
@@ -66,6 +64,7 @@ export namespace helios::ecs::command {
              *
              * @param flushContext Frame-local flush context (currently unused; kept for interface uniformity).
              */
+            template<typename TFlushContext>
             void flush(TFlushContext& flushContext) {
 
                 auto& managerRegistry = flushContext.managerRegistry();
@@ -84,16 +83,6 @@ export namespace helios::ecs::command {
                 commands_.clear();
             }
 
-            /**
-             * @brief Initialises buffer-local state from the init context.
-             *
-             * The current implementation is intentionally a no-op.
-             *
-             * @param initContext Frame-local init context (currently unused).
-             */
-            void init(TInitContext& initContext) {
-                // intentionally no-op
-            }
 
             /**
              * @brief Enqueues a new command, constructing it in-place from `args`.
@@ -168,22 +157,15 @@ export namespace helios::ecs::command {
             return bufferFor<TCommand>();
         }
 
-        /**
-         * @brief Initialises this buffer and all already-registered internal buffers.
-         * @param initContext Frame-local init context passed to each internal buffer.
-         */
-        void init(TInitContext& initContext) {
-
-            for (auto* buffer : commandBufferRegistry_.items()) {
-                buffer->init(initContext);
-            }
-        }
 
         /**
          * @brief Flushes all internal buffers, dispatching every queued command.
          *
          * @param flushContext Frame-local flush context passed to each internal buffer.
          */
+        template<typename TFlushContext>
+        requires common::concepts::ProvidesCommandHandlerRegistry<TFlushContext, command::CommandHandlerRegistry> &&
+           common::concepts::ProvidesManagerRegistry<TFlushContext, ecs::manager::ManagerRegistry>
         void flush(TFlushContext& flushContext) {
             for (auto* buffer : commandBufferRegistry_.items()) {
                 buffer->flush(flushContext);
