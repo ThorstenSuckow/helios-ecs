@@ -53,13 +53,13 @@ export namespace helios::ecs::system {
          * @param updateContext Runtime context of the engine update.
          */
         template<typename TUpdateContext>
-        bool update(TUpdateContext& updateContext) noexcept {
-            return std::invoke(lambda_, updateContext);
+        void update(TUpdateContext& updateContext) noexcept {
+            std::invoke(lambda_, updateContext);
         }
 
         template<typename TUpdateContext, typename TCommandBuffer>
-        bool update(TUpdateContext& updateContext, TCommandBuffer& commandBuffer) noexcept {
-            return std::invoke(lambda_, updateContext, commandBuffer);
+        void update(TUpdateContext& updateContext, TCommandBuffer& commandBuffer) noexcept {
+            std::invoke(lambda_, updateContext, commandBuffer);
         }
     };
 
