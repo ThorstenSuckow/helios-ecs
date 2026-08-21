@@ -7,6 +7,7 @@ module;
 #include <cassert>
 #include <memory>
 #include <optional>
+#include <variant>
 
 export module helios.ecs.system.System;
 
@@ -16,6 +17,7 @@ import helios.ecs.command.concepts;
 
 import helios.ecs.common.types;
 import helios.ecs.system.concepts;
+import helios.ecs.system.types;
 
 export namespace helios::ecs::system {
 
@@ -29,6 +31,26 @@ export namespace helios::ecs::system {
         using ContextTypeId = ecs::common::types::ContextTypeId;
         using CommandBuffer = ecs::command::CommandBuffer;
         using NullCommandBuffer = ecs::command::NullCommandBuffer;
+        using SystemResultMap = ecs::system::types::SystemResultMap;
+
+
+        template<typename>
+        struct FunctionSignatureTraits;
+
+        template<typename TResult, typename TClass, typename... TArgs>
+        struct FunctionSignatureTraits<TResult(TClass::*)(TArgs...) noexcept>
+        {
+            using ReturnType = TResult;
+            using ArgumentTypes = std::tuple<TArgs...>;
+
+            static constexpr size_t NumArgs = sizeof...(TArgs);
+
+            template<std::size_t I>
+            using Arg = std::tuple_element_t<I, ArgumentTypes>;
+
+            using LastArg = std::tuple_element_t<sizeof...(TArgs) - 1, ArgumentTypes>;
+        };
+
 
     private:
         /**
@@ -38,7 +60,7 @@ export namespace helios::ecs::system {
         public:
 
             virtual ~Concept() = default;
-            virtual bool update(ContextRef& contextRef) noexcept = 0;
+            virtual bool update(ContextRef& contextRef, const SystemResultMap& frameResults) noexcept = 0;
 
             [[nodiscard]] virtual CommandBuffer* commandBuffer() noexcept = 0;
 
@@ -46,6 +68,8 @@ export namespace helios::ecs::system {
 
             [[nodiscard]] virtual void* underlying() noexcept = 0;
             [[nodiscard]] virtual const void* underlying() const noexcept = 0;
+
+            virtual bool flush(SystemResultMap& frameResults) noexcept = 0;
         };
 
 
@@ -56,10 +80,49 @@ export namespace helios::ecs::system {
 
             TConcreteSystem system_;
 
+            static constexpr bool HasCommandBuffer = !std::same_as<TCommandBuffer, NullCommandBuffer>;
+
+            static consteval auto updateFunctionType() {
+                if constexpr (HasCommandBuffer) {
+                    return &TConcreteSystem::template update<TUpdateContext, TCommandBuffer>;
+                } else {
+                    return &TConcreteSystem::template update<TUpdateContext>;
+                }
+            }
+
+            using UpdateFunction = decltype(updateFunctionType());
+            using Traits = FunctionSignatureTraits<UpdateFunction>;
+            using ProducedFrameResultType = typename Traits::ReturnType;
+
+            static constexpr std::size_t NumArgs = HasCommandBuffer ? 2 : 1;
+
+            static constexpr bool ConsumesFrameResult = Traits::NumArgs == NumArgs + 1;
+
+            using ConsumedFrameResultType = std::remove_cvref_t<typename Traits::LastArg>;
+
+            using StoredFrameResultType = std::conditional_t<
+                std::is_void_v<ProducedFrameResultType>,
+                std::monostate,
+                ProducedFrameResultType
+            >;
+
+            std::optional<StoredFrameResultType> frameResult_;
+
             /**
              * @brief Wrapped CommandBuffer to make sure init/flush can be called with ContextRef.
              */
             CommandBuffer commandBuffer_;
+
+            template<typename ... TArgs>
+            void updateAndStore(TArgs&& ... args) {
+
+                if constexpr(std::is_void_v<ProducedFrameResultType>) {
+                    system_.update(std::forward<TArgs>(args)...);
+                } else {
+                    frameResult_.emplace(system_.update(std::forward<TArgs>(args)...));
+                }
+
+            }
 
         public:
 
@@ -67,35 +130,31 @@ export namespace helios::ecs::system {
             system_(std::move(sys)),
             commandBuffer_(std::move(cmdBuffer)) {}
 
-            bool update(ContextRef& contextRef) noexcept override {
+            bool update(ContextRef& contextRef, const SystemResultMap& frameResults) noexcept override {
 
-                if constexpr (!std::is_same_v<TCommandBuffer, command::NullCommandBuffer>) {
-
-                    static_assert(requires(TConcreteSystem& system, UpdateContextType& ctx, TCommandBuffer& buffer)
-                    {
-                        {system.update(ctx, buffer)}->std::same_as<bool>;
-                    },
-                    "TConcreteSystem must have a member function `bool update(UpdateContextType&, TCommandBuffer&)`"
-                    );
-
-                    if (auto* ctx = contextRef.tryGet<UpdateContextType>()) {
-                        return system_.update(*ctx, *static_cast<TCommandBuffer*>(commandBuffer_.underlying()));
-                    }
-                    return false;
-                } else {
-                    static_assert(requires(TConcreteSystem& system, UpdateContextType& ctx)
-                        {
-                            {system.update(ctx)}->std::same_as<bool>;
-                        },
-                        "TConcreteSystem must have a member function `bool update(UpdateContextType&)`"
-                        );
-
-                    if (auto* ctx = contextRef.tryGet<UpdateContextType>()) {
-                        return system_.update(*ctx);
-                    }
-
+                auto* ctx = contextRef.tryGet<UpdateContextType>();
+                if (!ctx) {
                     return false;
                 }
+
+                if constexpr (HasCommandBuffer) {
+                    if constexpr (ConsumesFrameResult) {
+                        const ConsumedFrameResultType& consumedResult = frameResults.get<ConsumedFrameResultType>();
+                        updateAndStore(*ctx, *static_cast<TCommandBuffer*>(commandBuffer_.underlying()), consumedResult);
+                    } else {
+                        updateAndStore(*ctx, *static_cast<TCommandBuffer*>(commandBuffer_.underlying()));
+                    }
+
+                } else {
+                    if constexpr (ConsumesFrameResult) {
+                        const ConsumedFrameResultType& consumedResult = frameResults.get<ConsumedFrameResultType>();
+                        updateAndStore(*ctx, consumedResult);
+                    } else {
+                        updateAndStore(*ctx);
+                    }
+                }
+
+                return true;
             }
 
 
@@ -109,6 +168,16 @@ export namespace helios::ecs::system {
                 }
 
                 return &commandBuffer_;
+            }
+
+            bool flush(SystemResultMap& frameResults) noexcept override {
+                if constexpr(std::is_void_v<ProducedFrameResultType>) {
+                    return true;
+                } else {
+                    frameResults.add<ProducedFrameResultType>(std::move(*frameResult_));
+                    frameResult_.reset();
+                    return true;
+                };
             }
 
             void* underlying() noexcept override {
@@ -165,9 +234,14 @@ export namespace helios::ecs::system {
          *
          * @pre System must be initialized (pimpl_ != nullptr).
          */
-        bool update(ContextRef& contextRef) noexcept {
+        bool update(ContextRef& contextRef, const SystemResultMap& frameResults) noexcept {
             assert(pimpl_ && "System not initialized");
-            return pimpl_->update(contextRef);
+            return pimpl_->update(contextRef, frameResults);
+        }
+
+        bool flush(ecs::system::types::SystemResultMap& frameResults) {
+            assert(pimpl_ && "System not initialized");
+            return pimpl_->flush(frameResults);
         }
 
         [[nodiscard]] ContextTypeId expectedUpdateContextTypeId() const noexcept {
