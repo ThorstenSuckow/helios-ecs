@@ -6,7 +6,7 @@ module;
 
 export module helios.ecs.command.NullCommandBuffer;
 
-import helios.ecs.command.tags;
+
 import helios.ecs.common.types;
 
 export namespace helios::ecs::command {
@@ -18,7 +18,7 @@ export namespace helios::ecs::command {
 
     public:
 
-        using EcsRoleTag = tags::CommandBufferRole;
+
 
         template<class T, class... Args>
         void add(Args&&...) {/*intentionally noop*/}

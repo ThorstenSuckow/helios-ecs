@@ -12,7 +12,7 @@ export module helios.ecs.command.TypedCommandBuffer;
 
 import helios.ecs.common.types;
 import helios.ecs.command.CommandHandlerRegistry;
-import helios.ecs.command.tags;
+
 import helios.ecs.common.concepts;
 import helios.ecs.manager.ManagerRegistry;
 
@@ -73,8 +73,6 @@ export namespace helios::ecs::command {
         }
 
     public:
-
-        using EcsRoleTag = tags::CommandBufferRole;
 
         /**
          * @brief Enqueues a command of the specified type.

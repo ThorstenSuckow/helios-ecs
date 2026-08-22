@@ -12,9 +12,13 @@ module;
 
 export module helios.ecs.command.CommandBuffer;
 
+import helios.core.common.traits;
+
+import helios.ecs.common;
+
 import helios.ecs.command.concepts;
 import helios.ecs.command.types;
-import helios.ecs.common.types;
+
 
 export namespace helios::ecs::command {
 
@@ -24,9 +28,9 @@ export namespace helios::ecs::command {
      */
     class CommandBuffer {
 
-        using ContextRef = ecs::common::types::ContextRef;
-        using ContextTypeId = ecs::common::types::ContextTypeId;
+        using EcsDataContainer = ecs::common::container::EcsDataContainer;
         using CommandBufferTypeId = ecs::command::types::CommandBufferTypeId;
+        using EcsDataContainerArgumentResolver = ecs::common::container::EcsDataContainerArgumentResolver;
 
     private:
 
@@ -36,10 +40,8 @@ export namespace helios::ecs::command {
         class Concept {
         public:
             virtual ~Concept() = default;
-            virtual bool flush(ContextRef& flushContext) noexcept = 0;
+            virtual bool flush(EcsDataContainer& typeMap) noexcept = 0;
             virtual bool clear() noexcept = 0;
-
-            [[nodiscard]] virtual ContextTypeId expectedFlushContextTypeId() const noexcept = 0;
 
             [[nodiscard]] virtual CommandBufferTypeId typeId() const noexcept = 0;
 
@@ -52,10 +54,8 @@ export namespace helios::ecs::command {
          *
          * @tparam TConcreteCommandBuffer The concrete command buffer type.
          */
-        template<typename TConcreteCommandBuffer, typename TFlushContextType>
+        template<typename TConcreteCommandBuffer>
         class Model final : public Concept {
-
-            using FlushContextType = TFlushContextType;
 
             /**
              * @brief The owned command buffer instance.
@@ -64,26 +64,31 @@ export namespace helios::ecs::command {
 
             ecs::command::types::CommandBufferTypeId typeId_ = ecs::command::types::CommandBufferTypeId::template id<TConcreteCommandBuffer>();
 
+            using FlushFunction = decltype( &TConcreteCommandBuffer::flush);
+            using Traits = core::common::traits::FunctionSignatureTraits<FlushFunction>;
+
+            template<std::size_t... Idx>
+            auto invokeFlush(EcsDataContainer& typeMap, std::index_sequence<Idx...>) {
+                return cmdBuffer_.flush(
+                    EcsDataContainerArgumentResolver::resolve<
+                        typename Traits::template Arg<Idx>
+                    >(typeMap)...
+                );
+            }
 
             public:
 
             explicit Model(TConcreteCommandBuffer cmdBuffer) :  cmdBuffer_(std::move(cmdBuffer)) {}
 
-            bool flush(ContextRef& flushContext) noexcept override {
+            bool flush(EcsDataContainer& typeMap) noexcept override {
 
-                if (auto*ctx = flushContext.tryGet<FlushContextType>()) {
-                    return cmdBuffer_.flush(*ctx);
-                }
+                invokeFlush(typeMap, std::make_index_sequence<Traits::NumArgs>{});
 
-                return false;
+                return true;
             }
 
             bool clear() noexcept override {
                 return cmdBuffer_.clear();
-            }
-
-            [[nodiscard]] ContextTypeId expectedFlushContextTypeId() const noexcept override {
-                return ContextTypeId::template id<FlushContextType>();
             }
 
             [[nodiscard]] void* underlying() noexcept override {
@@ -97,6 +102,7 @@ export namespace helios::ecs::command {
             [[nodiscard]] CommandBufferTypeId typeId() const noexcept override {
                 return typeId_;
             }
+
         };
 
         /**
@@ -105,8 +111,7 @@ export namespace helios::ecs::command {
         std::unique_ptr<Concept> pimpl_;
 
 
-        explicit CommandBuffer(std::unique_ptr<Concept> pimpl) :
-        pimpl_(std::move(pimpl)){}
+
 
     public:
 
@@ -121,13 +126,15 @@ export namespace helios::ecs::command {
         template<typename TConcreteCommandBuffer, typename TFlushContext>
         requires concepts::IsCommandBufferLike<TConcreteCommandBuffer>
         static CommandBuffer make(TConcreteCommandBuffer&& cmdBuffer) {
-            return CommandBuffer(
-                std::make_unique<Model<
-                    std::remove_cvref_t<TConcreteCommandBuffer>,
-                    TFlushContext
-                >>(std::move(cmdBuffer))
+            return CommandBuffer(std::move(cmdBuffer)
             );
         }
+
+        template<typename TConcreteCommandBuffer>
+        requires concepts::IsCommandBufferLike<TConcreteCommandBuffer>
+        explicit CommandBuffer(TConcreteCommandBuffer&& cmdBuffer) :
+            pimpl_(std::make_unique<Model<TConcreteCommandBuffer>>(std::move(cmdBuffer))) {}
+
 
         CommandBuffer(const CommandBuffer&) = delete;
         CommandBuffer& operator=(const CommandBuffer&) = delete;
@@ -142,9 +149,9 @@ export namespace helios::ecs::command {
          *
          * @pre The CommandBuffer must be initialized (not default-constructed).
          */
-        bool flush(ContextRef& flushContext) noexcept {
+        bool flush(EcsDataContainer& typeMap) noexcept {
             assert(pimpl_ && "CommandBuffer not initialized");
-            return pimpl_->flush(flushContext);
+            return pimpl_->flush(typeMap);
         }
 
         /**
@@ -155,12 +162,6 @@ export namespace helios::ecs::command {
         bool clear() noexcept {
             assert(pimpl_ && "CommandBuffer not initialized");
             return pimpl_->clear();
-        }
-
-
-        [[nodiscard]] ContextTypeId expectedFlushContextTypeId() const noexcept {
-            assert(pimpl_ && "CommandBuffer not initialized");
-            return pimpl_->expectedFlushContextTypeId();
         }
 
         /**

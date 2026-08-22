@@ -15,7 +15,7 @@ export module helios.ecs.command.EntityMutationCommandBuffer;
 import helios.ecs.command.CommandHandlerRegistry;
 import helios.ecs.command.CommandBufferRegistry;
 import helios.ecs.manager.ManagerRegistry;
-import helios.ecs.command.tags;
+
 import helios.ecs.common.types;
 import helios.ecs.common.concepts;
 
@@ -49,8 +49,7 @@ export namespace helios::ecs::command {
             std::vector<TCommandType> commands_;
 
             public:
-            /** @brief Role tag marking this as a command buffer for the engine registry. */
-            using EcsRoleTag = command::tags::CommandBufferRole;
+
 
             /** @brief Reserves default capacity for the command vector. */
             explicit InternalBuffer() {
@@ -123,8 +122,7 @@ export namespace helios::ecs::command {
     public:
 
 
-        /** @brief Role tag marking this as a command buffer for the engine registry. */
-        using EcsRoleTag = command::tags::CommandBufferRole;
+
 
         EntityMutationCommandBuffer() = default;
 
