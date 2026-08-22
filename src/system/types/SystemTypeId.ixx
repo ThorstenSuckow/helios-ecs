@@ -12,6 +12,6 @@ export namespace helios::ecs::system::types {
 
     struct helios_ecs_system_tag_SystemTypes{};
 
-    using SystemTypeId = core::common::TypeId<helios_ecs_system_tag_SystemTypes>;
+    using SystemTypeId = core::common::types::TypeId<helios_ecs_system_tag_SystemTypes>;
 
 };
