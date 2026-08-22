@@ -15,7 +15,7 @@ export module helios.ecs.system.SystemRegistry;
 import helios.ecs.system.System;
 import helios.ecs.system.types;
 
-import helios.core.container;
+import helios.core.common.container;
 
 export namespace helios::ecs::system {
 
@@ -25,6 +25,6 @@ export namespace helios::ecs::system {
      * @see ConceptModelRegistry
      * @see System
      */
-    using SystemRegistry = core::container::ConceptModelRegistry<System, types::SystemTypeId>;
+    using SystemRegistry = core::common::container::ConceptModelRegistry<System, types::SystemTypeId>;
 
 }
