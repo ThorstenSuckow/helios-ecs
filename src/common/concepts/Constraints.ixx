@@ -1,13 +1,13 @@
 /**
- * @file Traits.ixx
- * @brief Compile-time traits for ECS component lifecycle hooks.
+ * @file Constraints.ixx
+ * @brief Compile-time constraints for ECS component lifecycle hooks.
  */
 module;
 
 #include <concepts>
 #include <utility>
 
-export module helios.ecs.common.concepts:Traits;
+export module helios.ecs.common.concepts:Constraints;
 
 import helios.ecs.command.commands;
 import helios.ecs.component.components;
