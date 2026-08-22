@@ -7,4 +7,3 @@ export module helios.ecs.system.types;
 
 export import :SystemTypeId;
 export import :TypedSystemSpec;
-export import :SystemResultMap;

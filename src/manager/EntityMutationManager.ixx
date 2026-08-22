@@ -21,7 +21,7 @@ import helios.core.thread.JobSystem;
 
 import helios.ecs.command.CommandBuffer;
 import helios.ecs.command.CommandBufferRegistry;
-import helios.ecs.command.tags;
+
 import helios.ecs.command.types;
 import helios.ecs.command.commands;
 
@@ -113,10 +113,6 @@ export namespace helios::ecs::manager {
 
             using Handle_type = THandle;
 
-            /**
-             * @brief Role tag identifying this as a command buffer in the engine registry.
-             */
-            using EcsRoleTag = command::tags::CommandBufferRole;
 
             /**
              * @brief The command type stored in this buffer.
