@@ -52,13 +52,11 @@ export namespace helios::ecs::command {
          *
          * @tparam TCommandType The command type to flush.
          *
-         * @param updateContext The current frame's update context.
+         * @param commandHandlerRegistry The registry used to resolve command handlers.
          */
-        template<typename TFlushContext, typename TCommandType>
-        void flushCommandQueue(TFlushContext& flushContext) noexcept {
+        template<typename TCommandType>
+        void flushCommandQueue(const CommandHandlerRegistry& commandHandlerRegistry) noexcept {
 
-            auto& commandHandlerRegistry = flushContext.commandHandlerRegistry();
-            auto& managerRegistry = flushContext.managerRegistry();
             auto& queue = commandQueue<TCommandType>();
 
             if (queue.empty()) {
@@ -67,7 +65,7 @@ export namespace helios::ecs::command {
 
             if (commandHandlerRegistry.template has<TCommandType>()) {
                 for (auto& cmd : queue) {
-                    commandHandlerRegistry.template submit<TCommandType>(std::move(cmd), managerRegistry);
+                    commandHandlerRegistry.template submit<TCommandType>(std::move(cmd));
                 }
             }
 
@@ -106,11 +104,8 @@ export namespace helios::ecs::command {
         /**
          * @brief Flushes all command queues in template parameter order.
          */
-        template<typename TFlushContext>
-        requires common::concepts::ProvidesCommandHandlerRegistry<TFlushContext, command::CommandHandlerRegistry> &&
-       common::concepts::ProvidesManagerRegistry<TFlushContext, ecs::manager::ManagerRegistry>
-        bool flush(TFlushContext& flushContext) noexcept {
-            (flushCommandQueue<TFlushContext, TCommandTypes>(flushContext), ...);
+        bool flush(const CommandHandlerRegistry& commandHandlerRegistry) noexcept {
+            (flushCommandQueue<TCommandTypes>(commandHandlerRegistry), ...);
             return true;
         }
 
