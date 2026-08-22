@@ -6,8 +6,7 @@
 export module helios.ecs;
 
 
-export import helios.ecs.common.concepts;
-export import helios.ecs.common.types;
+export import helios.ecs.common;
 export import helios.ecs.storage;
 export import helios.ecs.command;
 export import helios.ecs.component;
