@@ -14,7 +14,6 @@ module;
 export module helios.ecs.command.CommandHandlerRegistry;
 
 import helios.ecs.command.types;
-import helios.ecs.manager.ManagerRegistry;
 import helios.ecs.manager.Manager;
 import helios.ecs.manager.types;
 
@@ -41,7 +40,6 @@ export namespace helios::ecs::command {
 
         using ManagerTypeId = manager::types::ManagerTypeId;
         using Manager = manager::Manager;
-        using ManagerRegistry = manager::ManagerRegistry;
 
         
         std::vector<CommandHandlerRef> commandToHandlerRef_;
@@ -202,7 +200,7 @@ export namespace helios::ecs::command {
          * @return true when a handler exists and accepts the command.
          */
         template<typename TCommandType>
-        bool submit(TCommandType&& cmd, ManagerRegistry& managerRegistry) const noexcept {
+        bool submit(TCommandType&& cmd) const noexcept {
             using Cmd = std::remove_cvref_t<TCommandType>;
 
             if (auto* handler = tryHandler<Cmd>()) {
@@ -219,7 +217,7 @@ export namespace helios::ecs::command {
          * @param cmd Command or batch input to submit.
          */
         template<typename TCommandType>
-        bool submitBatch(TCommandType&& cmd, ManagerRegistry& managerRegistry) const noexcept {
+        bool submitBatch(TCommandType&& cmd) const noexcept {
             assert(false && "not implemented");
         }
 
