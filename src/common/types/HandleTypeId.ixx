@@ -15,6 +15,6 @@ import helios.core.common.types;
 export namespace helios::ecs::common::types {
 
     struct HandleTypeIdDomain{};
-    using HandleTypeId = helios::core::common::TypeId<HandleTypeIdDomain>;
+    using HandleTypeId = helios::core::common::types::TypeId<HandleTypeIdDomain>;
 
  };

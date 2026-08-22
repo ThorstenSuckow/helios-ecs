@@ -15,6 +15,6 @@ export namespace helios::ecs::common::types {
 
     struct RuntimeContextTypeIdDomain{};
 
-    using ContextTypeId = helios::core::common::TypeId<RuntimeContextTypeIdDomain>;
+    using ContextTypeId = helios::core::common::types::TypeId<RuntimeContextTypeIdDomain>;
 
 }
