@@ -8,12 +8,9 @@ module;
  */
 export module helios.ecs.system.concepts:SystemConcepts;
 
-import helios.ecs.system.tags;
 import helios.ecs.common.concepts;
 
 export namespace helios::ecs::system::concepts {
-
-
 
 
     /**
@@ -22,18 +19,10 @@ export namespace helios::ecs::system::concepts {
      * @tparam T The type to inspect.
      */
     template<class T>
-    concept IsTypedSystemLike = common::concepts::HasEcsTag<T, tags::TypedSystemRole>;
-
-
-    /**
-     * @brief Concept that constrains a type to a callable-backed system.
-     *
-     * @tparam T The type to inspect.
-     */
-    template<class T>
-     concept IsCallableSystemLike = common::concepts::HasEcsTag<T, tags::CallableSystemRole>;
+    concept IsEcsSystemLike = requires{&std::remove_cvref_t<T>::update;};
 
     template<class T>
-    concept IsRuntimeSystemLike = IsTypedSystemLike<T> || IsCallableSystemLike<T>;
+    concept IsCallableSystem = requires {&std::remove_cvref_t<T>::operator();};
+
 
 };

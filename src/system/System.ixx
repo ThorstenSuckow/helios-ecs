@@ -11,11 +11,15 @@ module;
 
 export module helios.ecs.system.System;
 
+import helios.core.common.traits;
+import helios.core.common.concepts;
+
 import helios.ecs.command.CommandBuffer;
 import helios.ecs.command.NullCommandBuffer;
 import helios.ecs.command.concepts;
+import helios.ecs.command.traits;
 
-import helios.ecs.common.types;
+import helios.ecs.common;
 import helios.ecs.system.concepts;
 import helios.ecs.system.types;
 
@@ -31,26 +35,9 @@ export namespace helios::ecs::system {
         using ContextTypeId = ecs::common::types::ContextTypeId;
         using CommandBuffer = ecs::command::CommandBuffer;
         using NullCommandBuffer = ecs::command::NullCommandBuffer;
-        using SystemResultMap = ecs::system::types::SystemResultMap;
-
-
-        template<typename>
-        struct FunctionSignatureTraits;
-
-        template<typename TResult, typename TClass, typename... TArgs>
-        struct FunctionSignatureTraits<TResult(TClass::*)(TArgs...) noexcept>
-        {
-            using ReturnType = TResult;
-            using ArgumentTypes = std::tuple<TArgs...>;
-
-            static constexpr size_t NumArgs = sizeof...(TArgs);
-
-            template<std::size_t I>
-            using Arg = std::tuple_element_t<I, ArgumentTypes>;
-
-            using LastArg = std::tuple_element_t<sizeof...(TArgs) - 1, ArgumentTypes>;
-        };
-
+        using EcsDataContainer = ecs::common::container::EcsDataContainer;
+        using EcsDataContainerArgumentResolver = ecs::common::container::EcsDataContainerArgumentResolver;
+    
 
     private:
         /**
@@ -60,45 +47,57 @@ export namespace helios::ecs::system {
         public:
 
             virtual ~Concept() = default;
-            virtual bool update(ContextRef& contextRef, const SystemResultMap& frameResults) noexcept = 0;
+            virtual bool update(EcsDataContainer& ecsDataContainer) noexcept = 0;
 
             [[nodiscard]] virtual CommandBuffer* commandBuffer() noexcept = 0;
-
-            [[nodiscard]] virtual ContextTypeId expectedUpdateContextTypeId() const noexcept = 0;
 
             [[nodiscard]] virtual void* underlying() noexcept = 0;
             [[nodiscard]] virtual const void* underlying() const noexcept = 0;
 
-            virtual bool flush(SystemResultMap& frameResults) noexcept = 0;
+            virtual bool flush(EcsDataContainer& ecsDataContainer) noexcept = 0;
         };
 
 
-        template<typename TConcreteSystem, typename TUpdateContext, typename TCommandBuffer>
+        template<typename TConcreteSystem>
         class Model final : public Concept {
-
-            using UpdateContextType = TUpdateContext;
 
             TConcreteSystem system_;
 
-            static constexpr bool HasCommandBuffer = !std::same_as<TCommandBuffer, NullCommandBuffer>;
-
-            static consteval auto updateFunctionType() {
-                if constexpr (HasCommandBuffer) {
-                    return &TConcreteSystem::template update<TUpdateContext, TCommandBuffer>;
+            static consteval auto updateFunction() {
+                if constexpr(ecs::system::concepts::IsCallableSystem<TConcreteSystem>) {
+                    return &TConcreteSystem::operator();
                 } else {
-                    return &TConcreteSystem::template update<TUpdateContext>;
+                    return &TConcreteSystem::update;
                 }
             }
 
-            using UpdateFunction = decltype(updateFunctionType());
-            using Traits = FunctionSignatureTraits<UpdateFunction>;
+            using UpdateFunction = decltype(updateFunction());
+            using Traits = core::common::traits::FunctionSignatureTraits<UpdateFunction>;
+
+            using CommandBufferInfo = ecs::command::traits::CommandBufferFromArguments<typename Traits::ArgumentTypes>;
+            static_assert(CommandBufferInfo::Count <= 1, "System update function must have at most one command buffer argument.");
+            using ConcreteCommandBufferType = typename CommandBufferInfo::Type;
+
+            template<std::size_t... Idx>
+            auto invokeUpdate(EcsDataContainer& typeMap,
+                ConcreteCommandBufferType& concreteCommandBuffer, std::index_sequence<Idx...>) {
+
+                if constexpr(ecs::system::concepts::IsCallableSystem<TConcreteSystem>) {
+                    return std::invoke(system_, EcsDataContainerArgumentResolver::resolve<
+                        typename Traits::template Arg<Idx>,
+                        ConcreteCommandBufferType
+                    >(typeMap, concreteCommandBuffer)...);
+                } else {
+                    return system_.update(
+                        EcsDataContainerArgumentResolver::resolve<
+                            typename Traits::template Arg<Idx>,
+                            ConcreteCommandBufferType
+                        >(typeMap, concreteCommandBuffer)...);
+                }
+
+            }
+
             using ProducedFrameResultType = typename Traits::ReturnType;
-
-            static constexpr std::size_t NumArgs = HasCommandBuffer ? 2 : 1;
-
-            static constexpr bool ConsumesFrameResult = Traits::NumArgs == NumArgs + 1;
-
-            using ConsumedFrameResultType = std::remove_cvref_t<typename Traits::LastArg>;
 
             using StoredFrameResultType = std::conditional_t<
                 std::is_void_v<ProducedFrameResultType>,
@@ -111,70 +110,44 @@ export namespace helios::ecs::system {
             /**
              * @brief Wrapped CommandBuffer to make sure init/flush can be called with ContextRef.
              */
-            CommandBuffer commandBuffer_;
 
-            template<typename ... TArgs>
-            void updateAndStore(TArgs&& ... args) {
+            CommandBuffer commandBuffer_{ConcreteCommandBufferType{}};
 
+            void updateAndStore(EcsDataContainer& typeMap) {
                 if constexpr(std::is_void_v<ProducedFrameResultType>) {
-                    system_.update(std::forward<TArgs>(args)...);
+                    invokeUpdate(typeMap, *commandBuffer_.tryGet<ConcreteCommandBufferType>(),
+                        std::make_index_sequence<Traits::NumArgs>{});
                 } else {
-                    frameResult_.emplace(system_.update(std::forward<TArgs>(args)...));
+                    frameResult_.emplace(invokeUpdate(typeMap, *commandBuffer_.tryGet<ConcreteCommandBufferType>(),
+                        std::make_index_sequence<Traits::NumArgs>{}));
                 }
 
             }
 
         public:
 
-            explicit Model(TConcreteSystem&& sys, CommandBuffer&& cmdBuffer) :
-            system_(std::move(sys)),
-            commandBuffer_(std::move(cmdBuffer)) {}
+            explicit Model(TConcreteSystem&& sys) :
+            system_(std::move(sys)) {}
 
-            bool update(ContextRef& contextRef, const SystemResultMap& frameResults) noexcept override {
-
-                auto* ctx = contextRef.tryGet<UpdateContextType>();
-                if (!ctx) {
-                    return false;
-                }
-
-                if constexpr (HasCommandBuffer) {
-                    if constexpr (ConsumesFrameResult) {
-                        const ConsumedFrameResultType& consumedResult = frameResults.get<ConsumedFrameResultType>();
-                        updateAndStore(*ctx, *static_cast<TCommandBuffer*>(commandBuffer_.underlying()), consumedResult);
-                    } else {
-                        updateAndStore(*ctx, *static_cast<TCommandBuffer*>(commandBuffer_.underlying()));
-                    }
-
-                } else {
-                    if constexpr (ConsumesFrameResult) {
-                        const ConsumedFrameResultType& consumedResult = frameResults.get<ConsumedFrameResultType>();
-                        updateAndStore(*ctx, consumedResult);
-                    } else {
-                        updateAndStore(*ctx);
-                    }
-                }
-
+            bool update(EcsDataContainer& typeMap) noexcept override {
+                updateAndStore(typeMap);
                 return true;
             }
 
 
-            [[nodiscard]] ContextTypeId expectedUpdateContextTypeId() const noexcept override {
-                return ContextTypeId::template id<UpdateContextType>();
-            }
-
             [[nodiscard]] CommandBuffer* commandBuffer() noexcept override {
-                if constexpr(std::is_same_v<TCommandBuffer, command::NullCommandBuffer>) {
+                if constexpr(std::is_same_v<ConcreteCommandBufferType, command::NullCommandBuffer>) {
                     return nullptr;
                 }
 
                 return &commandBuffer_;
             }
 
-            bool flush(SystemResultMap& frameResults) noexcept override {
+            bool flush(EcsDataContainer& typeMap) noexcept override {
                 if constexpr(std::is_void_v<ProducedFrameResultType>) {
                     return true;
                 } else {
-                    frameResults.add<ProducedFrameResultType>(std::move(*frameResult_));
+                    typeMap.emplace<ProducedFrameResultType>(std::move(*frameResult_));
                     frameResult_.reset();
                     return true;
                 };
@@ -197,28 +170,11 @@ export namespace helios::ecs::system {
 
     public:
 
-        template<typename TConcreteSystem, typename TUpdateContext, typename TCommandBufferFactory>
-        requires concepts::IsRuntimeSystemLike<std::remove_cvref_t<TConcreteSystem>>
-        static System make(TConcreteSystem&& system) {
-            using SystemType = std::remove_cvref_t<TConcreteSystem>;
 
-            if constexpr(requires { typename SystemType::CommandTypes;}) {
-                auto cmdBuffer = TCommandBufferFactory::make(typename SystemType::CommandTypes{});
-                using CommandBufferType = std::remove_cvref_t<decltype(cmdBuffer)>;
-                auto erasedCmdBuffer = CommandBuffer::make<CommandBufferType, typename TCommandBufferFactory::FlushContextType>(std::move(cmdBuffer));
-
-                return System{std::make_unique<
-                    Model<SystemType, TUpdateContext, CommandBufferType>
-                    >(std::move(system), std::move(erasedCmdBuffer))};
-            } else {
-                auto erasedCmdBuffer = CommandBuffer::make<NullCommandBuffer, typename TCommandBufferFactory::FlushContextType>(
-                    std::move(NullCommandBuffer{}));
-                return System{std::make_unique<
-                    Model<SystemType, TUpdateContext, NullCommandBuffer>
-                    >(std::move(system), std::move(erasedCmdBuffer))};
-            }
-
-        }
+        template<typename TConcreteSystem>
+        explicit System(TConcreteSystem&& system)
+           : pimpl_(std::make_unique<Model<std::remove_cvref_t<TConcreteSystem>>>(std::move(system)))
+        {}
 
         System() = delete;
         System(const System&) = delete;
@@ -234,19 +190,14 @@ export namespace helios::ecs::system {
          *
          * @pre System must be initialized (pimpl_ != nullptr).
          */
-        bool update(ContextRef& contextRef, const SystemResultMap& frameResults) noexcept {
+        bool update(EcsDataContainer& typeMap) noexcept {
             assert(pimpl_ && "System not initialized");
-            return pimpl_->update(contextRef, frameResults);
+            return pimpl_->update(typeMap);
         }
 
-        bool flush(ecs::system::types::SystemResultMap& frameResults) {
+        bool flush(EcsDataContainer& typeMap) {
             assert(pimpl_ && "System not initialized");
-            return pimpl_->flush(frameResults);
-        }
-
-        [[nodiscard]] ContextTypeId expectedUpdateContextTypeId() const noexcept {
-            assert(pimpl_ && "System not initialized");
-            return pimpl_->expectedUpdateContextTypeId();
+            return pimpl_->flush(typeMap);
         }
 
         [[nodiscard]] CommandBuffer* commandBuffer() noexcept {
