@@ -15,6 +15,6 @@ export namespace helios::ecs::command::types {
 
     struct CommandBufferTypesIdDomain{};
 
-    using CommandBufferTypeId = helios::core::common::TypeId<CommandBufferTypesIdDomain>;
+    using CommandBufferTypeId = helios::core::common::types::TypeId<CommandBufferTypesIdDomain>;
 
 };

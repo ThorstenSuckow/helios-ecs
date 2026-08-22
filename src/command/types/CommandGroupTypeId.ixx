@@ -14,7 +14,7 @@ import helios.core.common;
 export namespace helios::ecs::command::types {
 
     struct helios_ecs_tag_CommandGroupTypes{};
-    using CommandGroupTypeId = helios::core::common::TypeId<helios_ecs_tag_CommandGroupTypes>;
+    using CommandGroupTypeId = helios::core::common::types::TypeId<helios_ecs_tag_CommandGroupTypes>;
 
 
 };
