@@ -6,7 +6,7 @@ module;
 
 export module helios.ecs.manager.ManagerRegistry;
 
-import helios.core.container;
+import helios.core.common.container;
 import helios.ecs.manager.Manager;
 import helios.ecs.manager.types;
 
@@ -18,6 +18,6 @@ export namespace helios::ecs::manager {
      * @see ConceptModelRegistry
      * @see Manager
      */
-    using ManagerRegistry = core::container::ConceptModelRegistry<Manager, types::ManagerTypeId>;
+    using ManagerRegistry = core::common::container::ConceptModelRegistry<Manager, types::ManagerTypeId>;
 
 }
