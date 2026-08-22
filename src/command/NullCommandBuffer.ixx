@@ -23,8 +23,7 @@ export namespace helios::ecs::command {
         template<class T, class... Args>
         void add(Args&&...) {/*intentionally noop*/}
 
-        template<typename TFlushContextType>
-        bool flush(TFlushContextType&) noexcept {return true;}
+        bool flush() noexcept {return true;}
 
         bool clear() noexcept {return true;}
 
