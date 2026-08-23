@@ -4,22 +4,17 @@
  */
 module;
 
+#include <utility>
 
 export module helios.ecs.manager.concepts:IsManagerLike;
 
-import helios.ecs.manager.tags;
-import helios.ecs.command.concepts;
-import helios.ecs.common.concepts;
 
 export namespace helios::ecs::manager::concepts {
 
-    /**
-     * @brief Constrains T to types that provide `flush(UpdateContext&)` and
-     *        declare `EcsRoleTag = ManagerRole`.
-     *
-     * @tparam TManager The manager type to constrain.
-     */
     template<class TManager>
-    concept IsManagerLike = ecs::common::concepts::HasEcsTag<TManager, tags::ManagerRole>;
-    ;
+    concept IsManagerLike = requires
+    {
+        &std::remove_cvref_t<TManager>::executeCommands;
+        &std::remove_cvref_t<TManager>::reset;
+    };
 }

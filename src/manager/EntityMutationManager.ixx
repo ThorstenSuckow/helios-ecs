@@ -15,6 +15,7 @@ module;
 export module helios.ecs.manager.EntityMutationManager;
 
 import helios.ecs.common.types;
+import helios.ecs.common.container;
 import helios.ecs.EntityManager;
 
 import helios.core.thread.JobSystem;
@@ -25,10 +26,11 @@ import helios.ecs.command.CommandBufferRegistry;
 import helios.ecs.command.types;
 import helios.ecs.command.commands;
 
+import helios.ecs.EcsWorld;
 
 import helios.ecs.command.CommandHandlerRegistry;
 import helios.ecs.manager.ManagerRegistry;
-import helios.ecs.manager.tags;
+
 import helios.ecs.manager.types;
 
 import helios.ecs.component.components;
@@ -68,6 +70,8 @@ export namespace helios::ecs::manager {
          * @brief Registry of lazily created per-command-type `InternalExecutionManager` instances.
          */
         manager::ManagerRegistry internalExecutionManagerRegistry_{};
+
+        ecs::common::container::EcsDataContainer ecsDataContainer_{};
 
         /**
          * @brief Job system used by `executeCommandsParallel()` for concurrent buffer execution.
@@ -138,13 +142,9 @@ export namespace helios::ecs::manager {
              *
              * @param executionContext Execution context (currently unused; kept for interface uniformity).
              */
-            template<typename TExecutionContext>
-            requires common::concepts::ProvidesEntityManager<TExecutionContext, EntityManager<THandle>>
-            bool executeCommands(TExecutionContext& executionContext){
+            bool executeCommands(EntityManager<THandle>& entityManager) {
 
                 using Component_type = typename TCommandType::Component_type;
-
-                auto& entityManager = executionContext.template entityManager<THandle>();
 
                 logger_.info("Processing {0} commands", commands_.size());
 
@@ -174,8 +174,7 @@ export namespace helios::ecs::manager {
             /**
              * @brief No-op; satisfies the buffer initialisation interface.
              */
-            template<typename TInitContext>
-            bool init(TInitContext& initContext) {
+            bool init() {
                 return true;
             }
 
@@ -255,10 +254,6 @@ export namespace helios::ecs::manager {
          */
         using Handle_type = THandle;
 
-        /**
-         * @brief Role tag identifying this as a manager in the engine registry.
-         */
-        using EcsRoleTag = manager::tags::ManagerRole;
 
         /**
          * @brief Constructs the manager bound to `jobSystem`.
@@ -316,17 +311,18 @@ export namespace helios::ecs::manager {
          *
          * @param initContext Init context providing access to the command handler registry.
          */
-        template<typename TInitContext>
-        requires common::concepts::ProvidesCommandHandlerRegistry<TInitContext, command::CommandHandlerRegistry>
-        bool init(TInitContext& initContext) {
+        bool init(CommandHandlerRegistry& commandHandlerRegistry, EntityManager<THandle>& entityManager) noexcept {
 
-            initContext.commandHandlerRegistry().template registerHandlerForCommandGroup<
+            commandHandlerRegistry.registerHandlerForCommandGroup<
                 command::types::CommandGroup<commands::AddComponentCommand, THandle>
             >(*this);
 
-            initContext.commandHandlerRegistry().template registerHandlerForCommandGroup<
+            commandHandlerRegistry.registerHandlerForCommandGroup<
                 command::types::CommandGroup<commands::RemoveComponentCommand, THandle>
             >(*this);
+
+            ecsDataContainer_.bind<EntityManager<THandle>>(entityManager);
+
 
             return true;
         }
@@ -334,19 +330,16 @@ export namespace helios::ecs::manager {
         /**
          * @brief Executes all internal buffers sequentially, applying every queued mutation.
          *
-         * @param executionContext Frame-local ECS context forwarded to each internal executor.
+         * @param entityManager Entity manager to which the mutations are applied.
          */
-        template<typename TExecutionContext>
-        requires common::concepts::ProvidesEntityManager<TExecutionContext, EntityManager<THandle>>
-        bool executeCommands(TExecutionContext& executionContext) {
+        bool executeCommands(EntityManager<THandle>& entityManager) noexcept {
 
-            auto contextRef = ContextRef{executionContext};
 
             for (auto* manager : internalExecutionManagerRegistry_.items()) {
-                manager->executeCommands(contextRef);
+                manager->executeCommands(ecsDataContainer_);
             }
 
-            executionContext.template entityManager<THandle>().finalizeMutations();
+            entityManager.finalizeMutations();
 
             return true;
         }
@@ -359,7 +352,7 @@ export namespace helios::ecs::manager {
          *
          * @param executionContext Execution context forwarded to each internal executor.
          */
-        template<typename TExecutionContext>
+        /*template<typename TExecutionContext>
         requires common::concepts::ProvidesEntityManager<TExecutionContext, EntityManager<THandle>>
         bool executeCommandsParallel(TExecutionContext& executionContext) {
 
@@ -383,7 +376,7 @@ export namespace helios::ecs::manager {
             });
 
             return true;
-        }
+        }*/
 
         void reset() {/* intentionally noop */}
 
