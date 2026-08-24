@@ -76,23 +76,23 @@ export namespace helios::ecs::system {
 
             using CommandBufferInfo = ecs::command::traits::CommandBufferFromArguments<typename Traits::ArgumentTypes>;
             static_assert(CommandBufferInfo::Count <= 1, "System update function must have at most one command buffer argument.");
-            using ConcreteCommandBufferType = typename CommandBufferInfo::Type;
+            using ConcreteCommandBufferType = CommandBufferInfo::Type;
 
             template<std::size_t... Idx>
-            auto invokeUpdate(EcsDataContainer& typeMap,
+            auto invokeUpdate(EcsDataContainer& ecsDataContainer,
                 ConcreteCommandBufferType& concreteCommandBuffer, std::index_sequence<Idx...>) {
 
                 if constexpr(ecs::system::concepts::IsCallableSystem<TConcreteSystem>) {
                     return std::invoke(system_, EcsDataContainerArgumentResolver::resolve<
                         typename Traits::template Arg<Idx>,
                         ConcreteCommandBufferType
-                    >(typeMap, concreteCommandBuffer)...);
+                    >(ecsDataContainer, concreteCommandBuffer)...);
                 } else {
                     return system_.update(
                         EcsDataContainerArgumentResolver::resolve<
                             typename Traits::template Arg<Idx>,
                             ConcreteCommandBufferType
-                        >(typeMap, concreteCommandBuffer)...);
+                        >(ecsDataContainer, concreteCommandBuffer)...);
                 }
 
             }
@@ -113,12 +113,12 @@ export namespace helios::ecs::system {
 
             CommandBuffer commandBuffer_{ConcreteCommandBufferType{}};
 
-            void updateAndStore(EcsDataContainer& typeMap) {
+            void updateAndStore(EcsDataContainer& ecsDataContainer) {
                 if constexpr(std::is_void_v<ProducedFrameResultType>) {
-                    invokeUpdate(typeMap, *commandBuffer_.tryGet<ConcreteCommandBufferType>(),
+                    invokeUpdate(ecsDataContainer, *commandBuffer_.tryGet<ConcreteCommandBufferType>(),
                         std::make_index_sequence<Traits::NumArgs>{});
                 } else {
-                    frameResult_.emplace(invokeUpdate(typeMap, *commandBuffer_.tryGet<ConcreteCommandBufferType>(),
+                    frameResult_.emplace(invokeUpdate(ecsDataContainer, *commandBuffer_.tryGet<ConcreteCommandBufferType>(),
                         std::make_index_sequence<Traits::NumArgs>{}));
                 }
 
@@ -129,8 +129,8 @@ export namespace helios::ecs::system {
             explicit Model(TConcreteSystem&& sys) :
             system_(std::move(sys)) {}
 
-            bool update(EcsDataContainer& typeMap) noexcept override {
-                updateAndStore(typeMap);
+            bool update(EcsDataContainer& ecsDataContainer) noexcept override {
+                updateAndStore(ecsDataContainer);
                 return true;
             }
 
@@ -143,11 +143,11 @@ export namespace helios::ecs::system {
                 return &commandBuffer_;
             }
 
-            bool flush(EcsDataContainer& typeMap) noexcept override {
+            bool flush(EcsDataContainer& ecsDataContainer) noexcept override {
                 if constexpr(std::is_void_v<ProducedFrameResultType>) {
                     return true;
                 } else {
-                    typeMap.emplace<ProducedFrameResultType>(std::move(*frameResult_));
+                    ecsDataContainer.emplace<ProducedFrameResultType>(std::move(*frameResult_));
                     frameResult_.reset();
                     return true;
                 };
@@ -190,14 +190,14 @@ export namespace helios::ecs::system {
          *
          * @pre System must be initialized (pimpl_ != nullptr).
          */
-        bool update(EcsDataContainer& typeMap) noexcept {
+        bool update(EcsDataContainer& ecsDataContainer) noexcept {
             assert(pimpl_ && "System not initialized");
-            return pimpl_->update(typeMap);
+            return pimpl_->update(ecsDataContainer);
         }
 
-        bool flush(EcsDataContainer& typeMap) {
+        bool flush(EcsDataContainer& ecsDataContainer) {
             assert(pimpl_ && "System not initialized");
-            return pimpl_->flush(typeMap);
+            return pimpl_->flush(ecsDataContainer);
         }
 
         [[nodiscard]] CommandBuffer* commandBuffer() noexcept {
