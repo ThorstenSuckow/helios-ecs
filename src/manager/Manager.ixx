@@ -32,8 +32,6 @@ export namespace helios::ecs::manager {
      */
     class Manager {
 
-        using ContextRef = ecs::common::types::ContextRef;
-        using ContextTypeId = ecs::common::types::ContextTypeId;
         using CommandBuffer = ecs::command::CommandBuffer;
         using NullCommandBuffer = ecs::command::NullCommandBuffer;  
         using EcsDataContainer = ecs::common::container::EcsDataContainer;
@@ -197,7 +195,7 @@ export namespace helios::ecs::manager {
         /**
          * @brief Delegates to the wrapped manager's `init()` method, if present.
          *
-         * @param initContext The initialization context.
+         * @param dataContainer
          *
          * @pre Manager must be initialized (pimpl_ != nullptr).
          */

@@ -6,7 +6,6 @@ export module helios.ecs.command;
 
 export import helios.ecs.command.CommandBuffer;
 export import helios.ecs.command.CommandBufferRegistry;
-export import helios.ecs.command.CommandBufferFactory;
 export import helios.ecs.command.CommandHandlerRegistry;
 export import helios.ecs.command.NullCommandBuffer;
 export import helios.ecs.command.TypedCommandBuffer;

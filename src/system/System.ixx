@@ -31,8 +31,7 @@ export namespace helios::ecs::system {
      */
     class System {
 
-        using ContextRef = ecs::common::types::ContextRef;
-        using ContextTypeId = ecs::common::types::ContextTypeId;
+
         using CommandBuffer = ecs::command::CommandBuffer;
         using NullCommandBuffer = ecs::command::NullCommandBuffer;
         using EcsDataContainer = ecs::common::container::EcsDataContainer;
@@ -106,10 +105,6 @@ export namespace helios::ecs::system {
             >;
 
             std::optional<StoredFrameResultType> frameResult_;
-
-            /**
-             * @brief Wrapped CommandBuffer to make sure init/flush can be called with ContextRef.
-             */
 
             CommandBuffer commandBuffer_{ConcreteCommandBufferType{}};
 

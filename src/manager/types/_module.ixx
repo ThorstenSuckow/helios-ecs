@@ -5,4 +5,3 @@
 export module helios.ecs.manager.types;
 
 export import :ManagerTypeId;
-export import :NullExecutionContext;
