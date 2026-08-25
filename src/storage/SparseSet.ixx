@@ -97,8 +97,7 @@ export namespace helios::ecs::storage {
         /**
          * @brief Resets the specified entity to the data from sourceId found in the sourceSparseSet.
          *
-         * @details Components not defined on the sourceSparseSet will be removed from the target entity. Components
-         * must satisfy the std::is_copy_assignable-constraint.
+         * @details Components must satisfy the std::is_copy_assignable-constraint.
          *
          * @param targetId The target entity id to reset.
          * @param sourceSparseSet The source SparseSet.

@@ -50,19 +50,14 @@ export namespace helios::ecs {
         /**
          * @brief Registry type used by this manager.
          */
-        using EntityRegistry_type = EntityRegistry<THandle>;
-
-        /**
-         * @brief Entity handle type of this manager.
-         */
-        using Handle_type = THandle;
-
+        using EntityRegistryType = EntityRegistry<THandle>;
+        
         using HandleType = THandle;
 
         /**
          * @brief Component type-id provider bound to `HandleType`.
          */
-        using ComponentTypeId_type = ComponentTypeId<HandleType>;
+        using ComponentTypeIdType = ComponentTypeId<HandleType>;
 
         /**
          * @brief Non-copyable: copying an EntityManager is explicitly disabled.
@@ -182,7 +177,7 @@ export namespace helios::ecs {
             }
 
             const auto entityId = handle.entityId();
-            const auto typeId = ComponentTypeId_type::template id<T>().value();
+            const auto typeId = ComponentTypeIdType::template id<T>().value();
 
             auto* sparseSet = static_cast<SparseSet<T>*>(components_[typeId].get());
 
@@ -199,7 +194,7 @@ export namespace helios::ecs {
         template<typename T>
         [[nodiscard]] const SparseSet<T>* sparseSet() const noexcept {
 
-            const auto typeId = ComponentTypeId_type::template id<T>().value();
+            const auto typeId = ComponentTypeIdType::template id<T>().value();
 
             if (typeId >= components_.size() || !components_[typeId]) {
                 return nullptr;
@@ -227,7 +222,12 @@ export namespace helios::ecs {
          *
          * @return The associated sparse set, or nullptr if not found.
          */
-        [[nodiscard]] SparseSetBase* sparseSet(ComponentTypeId_type typeId)  noexcept {
+        [[nodiscard]] SparseSetBase* sparseSet(ComponentTypeIdType typeId)  noexcept {
+
+            return const_cast<SparseSetBase*>(std::as_const(*this).sparseSet(typeId));
+        }
+
+        [[nodiscard]] SparseSetBase* sparseSet(ComponentTypeIdType typeId) const noexcept {
 
             const auto idx = typeId.value();
 
@@ -254,7 +254,7 @@ export namespace helios::ecs {
                 return false;
             }
 
-            const auto typeId = ComponentTypeId_type::template id<T>().value();
+            const auto typeId = ComponentTypeIdType::template id<T>().value();
 
             if (typeId < components_.size() && components_[typeId]) {
                 return components_[typeId]->contains(handle.entityId());
@@ -271,7 +271,7 @@ export namespace helios::ecs {
          *
          * @return `true` if the entity has the component, `false` otherwise.
          */
-        [[nodiscard]] bool has(const HandleType handle, const ComponentTypeId_type typeId) const {
+        [[nodiscard]] bool has(const HandleType handle, const ComponentTypeIdType typeId) const {
             if (!registry_.isValid(handle)) {
                 return false;
             }
@@ -297,7 +297,7 @@ export namespace helios::ecs {
         template<typename TComponent>
         [[nodiscard]] SparseSet<TComponent>* ensureSparseSet() {
 
-            const auto typeId = ComponentTypeId_type::template id<TComponent>().value();
+            const auto typeId = ComponentTypeIdType::template id<TComponent>().value();
 
             if (typeId >= components_.size()) {
                 components_.resize(typeId + 1);
@@ -336,7 +336,7 @@ export namespace helios::ecs {
 
             const auto entityId = handle.entityId();
 
-            const auto typeId = ComponentTypeId_type::template id<T>().value();
+            const auto typeId = ComponentTypeIdType::template id<T>().value();
 
             auto* sparseSet = ensureSparseSet<T>();
 
@@ -398,7 +398,7 @@ export namespace helios::ecs {
                 return false;
             }
 
-            const auto typeId = ComponentTypeId_type::template id<T>();
+            const auto typeId = ComponentTypeIdType::template id<T>();
 
             return components_[typeId.value()]->remove(handle.entityId());
         }
@@ -413,7 +413,7 @@ export namespace helios::ecs {
         template<typename TComponent>
         [[nodiscard]] bool managesDirty() {
 
-            auto typeId = ComponentTypeId_type::template id<DirtyComponentSpec<TComponent>>().value();
+            auto typeId = ComponentTypeIdType::template id<DirtyComponentSpec<TComponent>>().value();
 
             return typeId < components_.size() && components_[typeId];
         }
@@ -425,7 +425,7 @@ export namespace helios::ecs {
          */
         template<typename TComponent>
         void trackDirty() {
-            auto typeId = ComponentTypeId_type::template id<DirtyComponentSpec<TComponent>>().value();
+            auto typeId = ComponentTypeIdType::template id<DirtyComponentSpec<TComponent>>().value();
 
             if (typeId >= components_.size()) {
                 components_.resize(typeId + 1);
@@ -481,7 +481,7 @@ export namespace helios::ecs {
         template<typename... T>
         void clearDirtySet() {
             ([this] {
-                const auto typeId = ComponentTypeId_type::template id<DirtyComponentSpec<T>>().value();
+                const auto typeId = ComponentTypeIdType::template id<DirtyComponentSpec<T>>().value();
                 if (typeId < components_.size() && components_[typeId]) {
                     components_[typeId]->clear();
                 }
@@ -495,7 +495,7 @@ export namespace helios::ecs {
          * for each type whose `SparseSet` contains the given entity.
          * Does nothing if the handle is invalid.
          *
-         * @tparam TFunc Callable with signature `void(ComponentTypeId_type)`.
+         * @tparam TFunc Callable with signature `void(ComponentTypeIdType)`.
          * @param handle The entity to query.
          * @param func   Callback invoked for each attached component type.
          */
@@ -507,7 +507,7 @@ export namespace helios::ecs {
 
             for (size_t i = 0; i < components_.size(); i++) {
                 if (components_[i] && components_[i]->contains(handle.entityId())) {
-                    std::forward<TFunc>(func)(ComponentTypeId_type{i});
+                    std::forward<TFunc>(func)(ComponentTypeIdType{i});
                 }
             }
          }
@@ -531,7 +531,7 @@ export namespace helios::ecs {
 
             forEachComponentTypeId(
                     source,
-                [&](const ComponentTypeId_type typeId) {
+                [&](const ComponentTypeIdType typeId) {
                     if (!has(target, typeId)) {
 
                         std::ignore = components_[typeId.value()]->copy(source.entityId(), target.entityId());
@@ -540,6 +540,49 @@ export namespace helios::ecs {
             );
 
             return true;
+        }
+
+        /**
+         * @brief Resets the specified targetHandle's component set to the components of the entity represented by sourceHandle.
+         *
+         * @details Components not defined on the source entity will be removed from the target entity.
+         *
+         * @param targetHandle The handle of the entity to reset.
+         * @param source The entity manager of the source entity.
+         * @param sourceHandle The handle of the source entity.
+         *
+         * @return true if resetting succeeded, otherwise false.
+         */
+        [[nodiscard]] bool resetTo(const HandleType targetHandle, const EntityManager& source, const HandleType sourceHandle) {
+
+            if (!sourceHandle.isValid() || !targetHandle.isValid()) {
+                assert(false && "destination and source handles must be valid");
+                return false;
+            }
+
+            bool allReset = true;
+            bool called = false;
+            forEachComponentTypeId(targetHandle, [&](const ComponentTypeIdType typeId) {
+                const auto idx = typeId.value();
+                if (!source.has(sourceHandle, typeId)) {
+                    sparseSet(typeId)->remove(targetHandle.entityId());
+                    return;
+                }
+
+                called = true;
+                allReset &= sparseSet(typeId)->resetTo(
+                    targetHandle.entityId(),
+                    *source.sparseSet(typeId),
+                    sourceHandle.entityId()
+                );
+            });
+
+            if (!allReset || !called) {
+                assert(false && "Failed to copy source to target");
+                return false;
+            }
+
+            return allReset;
         }
 
         /**
@@ -560,7 +603,7 @@ export namespace helios::ecs {
             auto targetHandle = create();
             bool called = false;
             bool allCopied = true;
-            sourceEntityManager.forEachComponentTypeId(sourceHandle, [&](const ComponentTypeId_type typeId) {
+            sourceEntityManager.forEachComponentTypeId(sourceHandle, [&](const ComponentTypeIdType typeId) {
                 const auto idx = typeId.value();
                 const auto* source = sourceEntityManager.sparseSet(typeId);
                 if (idx >= components_.size()) {
@@ -592,7 +635,7 @@ export namespace helios::ecs {
          *
          * @return Raw pointer to the component, or `nullptr` if not found.
          */
-        [[nodiscard]] void* raw(const HandleType handle, const ComponentTypeId_type typeId ) const {
+        [[nodiscard]] void* get(const HandleType handle, const ComponentTypeIdType typeId ) const {
             if (!has(handle, typeId)) {
                 return nullptr;
             }
@@ -676,7 +719,7 @@ export namespace helios::ecs {
          *
          * @param typeId Component type id.
          */
-        void finalizeMutations(const ComponentTypeId_type typeId) {
+        void finalizeMutations(const ComponentTypeIdType typeId) {
             assert (components_[typeId.value()] && "Component-group not existing.");
             components_[typeId.value()]->finalizeMutations();
         }
@@ -698,7 +741,7 @@ export namespace helios::ecs {
         /**
          * @brief Entity registry owned by this EntityManager.
          */
-        EntityRegistry_type registry_;
+        EntityRegistryType registry_;
 
         /**
          * @brief Initial reserved capacity for sparse sets.
