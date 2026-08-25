@@ -93,6 +93,21 @@ export namespace helios::ecs::storage {
          */
         [[nodiscard]] virtual bool copyTo(EntityId sourceId, SparseSetBase& targetSparseSet, EntityId targetId) const = 0;
 
+
+        /**
+         * @brief Resets the specified entity to the data from sourceId found in the sourceSparseSet.
+         *
+         * @details Components not defined on the sourceSparseSet will be removed from the target entity. Components
+         * must satisfy the std::is_copy_assignable-constraint.
+         *
+         * @param targetId The target entity id to reset.
+         * @param sourceSparseSet The source SparseSet.
+         * @param sourceId The source entity id to copy from.
+         *
+         * @return True if the reset was successful, false otherwise.
+         */
+        [[nodiscard]] virtual bool resetTo(EntityId targetId, SparseSetBase& sourceSparseSet, EntityId sourceId) = 0;
+
         /**
          * @brief Creates a new unique ptr to a SparseSetBase.
          *
@@ -378,6 +393,32 @@ export namespace helios::ecs::storage {
 
                 return target.emplace(targetId, sourceCmp) != nullptr;
             }
+        }
+
+
+        /**
+         * @copydoc SparseSetBase::resetTo
+         */
+        [[nodiscard]] bool resetTo(const EntityId targetId, SparseSetBase& sourceSparseSet, const EntityId sourceId) override {
+
+            if constexpr (!std::is_copy_assignable_v<TComponent>) {
+                assert(false && "cannot copy the component, is this intentional?");
+                return false;
+            } else {
+
+                auto& source = static_cast<SparseSet<TComponent>&>(sourceSparseSet);
+
+                auto* sourceCmp = source.get(sourceId);
+                if (!sourceCmp) {
+                    assert(false && "cannot reset the component, source is not present");
+                    return false;
+                }
+
+                storage_[sparse_[targetId]] = *sourceCmp;
+
+                return true;
+            }
+
         }
 
 
