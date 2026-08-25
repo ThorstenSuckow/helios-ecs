@@ -296,7 +296,7 @@ export namespace helios::ecs {
         auto withActive()
             requires (sizeof...(TOptional) == 0 && sizeof...(TDirty) == 0)
         {
-            using ActiveComponent = Active<typename TEntityManager::Handle_type>;
+            using ActiveComponent = Active<typename TEntityManager::HandleType>;
 
             return PartialView<
                TEntityManager,
