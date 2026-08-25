@@ -84,6 +84,26 @@ export namespace helios::ecs::storage {
         [[nodiscard]] virtual void* copy(EntityId sourceId, EntityId targetId) = 0;
 
         /**
+         * @brief Copies the data ot the sourceId to the targetSparseSet at targetId.
+         *
+         * @param sourceId The source entity id of the data to copy.
+         * @param targetSparseSet The target SparseSet.
+         * @param targetId The targetId to use as the slot index for the new copied data.
+         * @return
+         */
+        [[nodiscard]] virtual bool copyTo(EntityId sourceId, SparseSetBase& targetSparseSet, EntityId targetId) const = 0;
+
+        /**
+         * @brief Creates a new unique ptr to a SparseSetBase.
+         *
+         * @details Creates a unique ptr to a SparseSetBase. Used in implementation to
+         * create a SparseSet for the concrete data type, while callable via the base class API.
+         *
+         * @return A unique ptr to the SparseSet.
+         */
+        [[nodiscard]] virtual std::unique_ptr<SparseSetBase> makeEmpty() const = 0;
+
+        /**
          * @brief Returns the highest `EntityId` currently stored in this set.
          *
          * Returns `Tombstone` if the set is empty.
@@ -141,10 +161,8 @@ export namespace helios::ecs::storage {
      *
      * @tparam T Stored value type.
      */
-    template <typename T>
+    template <typename TComponent>
     class SparseSet : public SparseSetBase {
-
-
         /**
          * @brief Maps EntityId to dense storage index.
          *
@@ -162,7 +180,7 @@ export namespace helios::ecs::storage {
         /**
          * @brief Contiguous storage of elements.
          */
-        std::vector<T> storage_;
+        std::vector<TComponent> storage_;
 
         /**
          * @brief Max EntityId available in this SparseSet, defaults to `Tombstone`.
@@ -196,7 +214,7 @@ export namespace helios::ecs::storage {
     public:
 
 
-        using Component_type = T;
+        using Component_type = TComponent;
 
 
         /**
@@ -234,12 +252,12 @@ export namespace helios::ecs::storage {
         SparseSet& operator=(SparseSet&&) noexcept = default;
 
         /**
-         * @brief Returns the component type id for `T`.
+         * @brief Returns the component type id for `TComponent`.
          *
          * @return Type id of this sparse-set component type.
          */
-        ComponentTypeId<T> componentTypeId() {
-            return ComponentTypeId<typename T::Handle_type>::template id<T>();
+        ComponentTypeId<TComponent> componentTypeId() {
+            return ComponentTypeId<typename TComponent::Handle_type>::template id<TComponent>();
         };
 
         /**
@@ -259,17 +277,17 @@ export namespace helios::ecs::storage {
         /**
          * @brief Constructs and inserts an element at the given index.
          *
-         * Forwards arguments to construct `T` in-place.
+         * Forwards arguments to construct `TComponent` in-place.
          *
          * @tparam Args Constructor argument types.
          *
          * @param idx The EntityId to associate with the element.
-         * @param args Arguments forwarded to the `T` constructor.
+         * @param args Arguments forwarded to the `TComponent` constructor.
          *
          * @return Pointer to the inserted element, or `nullptr` if the index is already occupied.
          */
         template <typename... Args>
-        [[nodiscard]] T* emplace(const EntityId idx, Args&& ...args) {
+        [[nodiscard]] TComponent* emplace(const EntityId idx, Args&& ...args) {
 
             // already in use
             if (idx < sparse_.size() && sparse_[idx] != Tombstone) {
@@ -303,7 +321,7 @@ export namespace helios::ecs::storage {
          *
          * @return Pointer to the inserted element, or `nullptr` if the index is already occupied.
          */
-        [[nodiscard]] T* insert(const EntityId idx, T&& obj) {
+        [[nodiscard]] TComponent* insert(const EntityId idx, TComponent&& obj) {
 
             // already in use
             if (idx < sparse_.size() && sparse_[idx] != Tombstone) {
@@ -327,40 +345,41 @@ export namespace helios::ecs::storage {
         }
 
         /**
+         * @copydoc SparseSetBase::makeEmpty
+         */
+        [[nodiscard]] std::unique_ptr<SparseSetBase> makeEmpty() const override {
+            return std::make_unique<SparseSet<TComponent>>();
+        }
+
+        /**
          * @copydoc SparseSetBase::copy
          */
         [[nodiscard]] void* copy(const EntityId sourceId, const EntityId targetId) override {
 
-            if constexpr (!std::copy_constructible<T>) {
-                return nullptr;
+            if (copyTo(sourceId, *this, targetId)) {
+                return raw(targetId);
+            }
+
+            return nullptr;
+        }
+
+        /**
+         * @copydoc SparseSetBase::makeEmpty
+         */
+        bool copyTo(const EntityId sourceId, SparseSetBase& targetSparseSet, const EntityId targetId) const override {
+
+            if constexpr (!std::copy_constructible<TComponent>) {
+                assert(false && "cannot copy the component, is this intentional?");
+                return false;
             } else {
-                // not existing
-                if (sourceId >= sparse_.size() || sparse_[sourceId] == Tombstone) {
-                    return nullptr;
-                }
+                auto& target = static_cast<SparseSet<TComponent>&>(targetSparseSet);
 
-                // already in use
-                if (targetId < sparse_.size() && sparse_[targetId] != Tombstone) {
-                    return nullptr;
-                }
+                const TComponent& sourceCmp = *get(sourceId);
 
-                if (targetId >= sparse_.size()) {
-                    sparse_.resize(targetId + 1, Tombstone);
-                }
-
-                const auto denseIndex = storage_.size();
-
-                denseToSparse_.push_back(targetId);
-                const T& cmp = storage_[sparse_[sourceId]];
-                storage_.emplace_back(cmp);
-
-                sparse_[targetId] = denseIndex;
-
-                updateMaxEntityId(targetId);
-
-                return &storage_.back();
+                return target.emplace(targetId, sourceCmp) != nullptr;
             }
         }
+
 
         /**
          * @brief Removes an element via swap-and-pop.
@@ -409,7 +428,7 @@ export namespace helios::ecs::storage {
          *
          * @return Pointer to the element, or `nullptr` if not found.
          */
-        [[nodiscard]] T* get(const EntityId idx) {
+        [[nodiscard]] TComponent* get(const EntityId idx) {
 
             if (idx >= sparse_.size() || sparse_[idx] == Tombstone) {
                 return nullptr;
@@ -425,7 +444,7 @@ export namespace helios::ecs::storage {
          *
          * @return Const pointer to the element, or `nullptr` if not found.
          */
-        [[nodiscard]] const T* get(const EntityId idx) const  {
+        [[nodiscard]] const TComponent* get(const EntityId idx) const  {
 
             if (idx >= sparse_.size() || sparse_[idx] == Tombstone) {
                 return nullptr;
@@ -450,7 +469,7 @@ export namespace helios::ecs::storage {
          * @copydoc SparseSetBase::raw
          */
         [[nodiscard]] void* raw(const EntityId id) override {
-            T* ptr = get(id);
+            TComponent* ptr = get(id);
             return static_cast<void*>(ptr);
         }
 
@@ -509,7 +528,7 @@ export namespace helios::ecs::storage {
          * @brief Forward iterator over dense values and corresponding entity ids.
          */
         struct Iterator {
-            using DataIt = typename std::vector<T>::iterator;
+            using DataIt = typename std::vector<TComponent>::iterator;
             using IdIt = typename std::vector<EntityId>::iterator;
 
             /**
@@ -523,10 +542,10 @@ export namespace helios::ecs::storage {
             IdIt idIt_;
 
             using iterator_category = std::forward_iterator_tag;
-            using value_type = T;
+            using value_type = TComponent;
             using difference_type = std::ptrdiff_t;
-            using pointer = T*;
-            using reference = T&;
+            using pointer = TComponent*;
+            using reference = TComponent&;
 
             Iterator() = default;
 
@@ -560,7 +579,7 @@ export namespace helios::ecs::storage {
          * @brief Const forward iterator over dense values and entity ids.
          */
         struct ConstIterator {
-            using DataIt = typename std::vector<T>::const_iterator;
+            using DataIt = typename std::vector<TComponent>::const_iterator;
             using IdIt = typename std::vector<EntityId>::const_iterator;
 
             /**
@@ -574,10 +593,10 @@ export namespace helios::ecs::storage {
             IdIt idIt_;
 
             using iterator_category = std::forward_iterator_tag;
-            using value_type = T;
+            using value_type = TComponent;
             using difference_type = std::ptrdiff_t;
-            using pointer = const T*;
-            using reference = const T&;
+            using pointer = const TComponent*;
+            using reference = const TComponent&;
 
             ConstIterator() = default;
 
