@@ -6,6 +6,7 @@ module;
 
 #include <cassert>
 #include <utility>
+#include <type_traits>
 
 
 export module helios.ecs.Entity;
@@ -28,10 +29,17 @@ export namespace helios::ecs {
     template<typename TEntityManager>
     class Entity {
 
+        // used to access const EntityManager spezialisation in resetTo
+        template<typename>
+        friend class Entity;
+
+        using HandleType = typename std::remove_const_t<TEntityManager>::HandleType;
+
+
         /**
          * @brief The underlying entity identifier.
          */
-        TEntityManager::Handle_type entityHandle_{0,0};
+        HandleType entityHandle_{0,0};
 
         /**
          * @brief Non-owning pointer to the EntityManager.
@@ -55,13 +63,12 @@ export namespace helios::ecs {
 
     public:
 
-        /** @brief The entity handle type managed by the bound `TEntityManager`. */
-        using Handle_type = TEntityManager::Handle_type;
-        /** @brief Concrete `ComponentTypeId` bound to this entity's handle type. */
+        using Handle_type = HandleType;
+
         using ComponentTypeId_type = ComponentTypeId<Handle_type>;
-        /** @brief `Active` tag component specialisation for this entity's handle type. */
+
         using ActiveComponent_type = Active<Handle_type>;
-        /** @brief `Inactive` tag component specialisation for this entity's handle type. */
+
         using InactiveComponent_type = Inactive<Handle_type>;
         
         /**
@@ -86,6 +93,17 @@ export namespace helios::ecs {
         template<typename TFunc>
         void forEachComponentTypeId(TFunc&& func) const {
             entityManager_->forEachComponentTypeId(entityHandle_, std::forward<TFunc>(func));
+        }
+
+        /**
+         * @brief Reset this entity to the component set of the specified entity
+         *
+         * @param sourceEntity The entity to use the component set from.
+         *
+         * @return True if the reset was successful, false otherwise.
+         */
+        bool resetTo(const Entity<const TEntityManager>& sourceEntity) {
+            return entityManager_->resetTo(entityHandle_, *sourceEntity.entityManager_, sourceEntity.handle());
         }
 
         /**
@@ -344,39 +362,9 @@ export namespace helios::ecs {
             return entityManager_->has(entityHandle_, typeId);
         }
 
-        /**
-         * @brief Enables a specific component by type ID.
-         *
-         * @param typeId The component type identifier.
-         */
-        void enableComponent(const ComponentTypeId_type typeId) {
-            entityManager_->enable(entityHandle_, typeId);
-        }
-
-        /**
-         * @brief Disables a specific component by type ID.
-         *
-         * @param typeId The component type identifier.
-         */
-        void disableComponent(const ComponentTypeId_type typeId) {
-            entityManager_->disable(entityHandle_, typeId);
-        }
 
         /**
          * @brief Sets the activation state of this Entity.
-         *
-         * @details When deactivated:
-         * - The `Active` tag component is removed
-         * - If a `HierarchyComponent` is present, it is marked dirty for propagation
-         * - Inactive will be marked as dirty component to indicate state change.
-         *
-         * When activated:
-         * - The `Inactive` tag component is removed
-         * - An `Active` tag component is added
-         * - If a `HierarchyComponent` is present, it is marked dirty for propagation
-         * - Active will be marked as dirty component to indicate state change.
-         *
-         * @note Does **not** call `enable()`/`disable()` on components.
          *
          * @param active True to activate, false to deactivate.
          *
