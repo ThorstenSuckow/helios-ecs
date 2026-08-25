@@ -159,17 +159,10 @@ export namespace helios::ecs {
          * @return Optional entity facade.
          */
         template<typename THandle>
-        [[nodiscard]] auto find(THandle handle) {
+        [[nodiscard]] std::optional<Entity<EntityManager<THandle>>> find(THandle handle) {
             auto& em = entityManager<THandle>();
 
-            using EM = std::remove_reference_t<decltype(em)>;
-            using Entity_type = Entity<EM>;
-
-            if (!em.isValid(handle)) {
-                return std::optional<Entity_type>{std::nullopt};
-            }
-
-            return std::optional<Entity_type>{std::in_place, handle, &em};
+            return em.entity(handle);
         }
 
         /**

@@ -9,9 +9,12 @@ module;
 #include <utility>
 #include <cassert>
 #include <algorithm>
+#include <optional>
 #include "helios-ecs-config.h"
 
 export module helios.ecs.EntityManager;
+
+import helios.ecs.Entity;
 
 import helios.ecs.storage.SparseSet;
 import helios.ecs.EntityRegistry;
@@ -84,6 +87,22 @@ export namespace helios::ecs {
         explicit EntityManager(const size_t capacity = 0)
         : capacity_(capacity) {
             reserve(capacity);
+        }
+
+        /**
+         * @brief Return the Entity for the specified handle.
+         *
+         * @param handle The handle to look up.
+         *
+         * @return The entity wrapped in an optional, or nullopt if not available.
+         */
+        [[nodiscard]] std::optional<Entity<EntityManager>> entity(HandleType handle) {
+
+            if (!isValid(handle)) {
+                return std::nullopt;
+            }
+
+            return Entity<EntityManager>(handle, this);
         }
 
         /**

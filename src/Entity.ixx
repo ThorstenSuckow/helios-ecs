@@ -11,7 +11,6 @@ module;
 
 export module helios.ecs.Entity;
 
-import helios.ecs.EntityManager;
 import helios.ecs.component;
 import helios.ecs.command;
 import helios.ecs.common.concepts;
