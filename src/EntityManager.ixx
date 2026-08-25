@@ -45,7 +45,6 @@ export namespace helios::ecs {
     class EntityManager {
 
 
-
     public:
 
         /**
@@ -219,6 +218,24 @@ export namespace helios::ecs {
         template<typename T>
         [[nodiscard]] SparseSet<T>* sparseSet() {
             return const_cast<SparseSet<T>*>(std::as_const(*this).template sparseSet<T>());
+        }
+
+        /**
+         * @brief Retrives a ptr to a SparseSetBase based on the ComponentTyoeIdType.
+         *
+         * @param typeId The type id of the component to look up
+         *
+         * @return The associated sparse set, or nullptr if not found.
+         */
+        [[nodiscard]] SparseSetBase* sparseSet(ComponentTypeId_type typeId)  noexcept {
+
+            const auto idx = typeId.value();
+
+            if (idx >= components_.size() || !components_[idx]) {
+                return nullptr;
+            }
+
+            return &*components_[idx];
         }
 
         /**
@@ -505,10 +522,11 @@ export namespace helios::ecs {
          * @param source The entity to copy from.
          * @param target The entity to copy to.
          */
-        void copy(const HandleType source, const HandleType target) {
+        bool copy(const HandleType source, const HandleType target) {
 
-            if (!registry_.isValid(source)) {
-                return;
+            if (!registry_.isValid(source) || !registry_.isValid(target)) {
+                assert(false && "Source/target handle not valid.");
+                return false;
             }
 
             forEachComponentTypeId(
@@ -521,7 +539,50 @@ export namespace helios::ecs {
                 }
             );
 
+            return true;
         }
+
+        /**
+         * @brief Creates a new entity and copies all components from a source entity in another EntityManager.
+         *
+         * @param sourceEntityManager The source entity manager to copy from.
+         * @param sourceHandle The source handle to copy from. Must be valid.
+         *
+         * @return The newly created handle, or an invalid, temporary handle.
+         */
+        HandleType copyFrom(EntityManager& sourceEntityManager, const HandleType sourceHandle) {
+
+            if (!sourceHandle.isValid()) {
+                assert(false && "Source handle not valid.");
+                return HandleType{};
+            }
+
+            auto targetHandle = create();
+            bool called = false;
+            bool allCopied = true;
+            sourceEntityManager.forEachComponentTypeId(sourceHandle, [&](const ComponentTypeId_type typeId) {
+                const auto idx = typeId.value();
+                const auto* source = sourceEntityManager.sparseSet(typeId);
+                if (idx >= components_.size()) {
+                    components_.resize(idx + 1);
+                }
+                if (!components_[idx]) {
+                    components_[idx] = source->makeEmpty();
+                }
+                allCopied = allCopied && source->copyTo(sourceHandle.entityId(), *components_[idx], targetHandle.entityId());
+                called = true;
+            });
+
+            const bool success = called && allCopied;
+
+            assert(success && "Failed to copy source to target");
+            if (!success) {
+                destroy(targetHandle);
+                return HandleType{};
+            }
+            return targetHandle;
+        }
+
 
         /**
          * @brief Returns raw void pointer to a component.
