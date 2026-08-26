@@ -95,13 +95,21 @@ export namespace helios::ecs::manager {
                 );
             }
 
-            template<std::size_t ... Idx>
-            auto invokeExecuteCommands(EcsDataContainer& ecsDataContainer, ConcreteCommandBufferType& concreteCommandBuffer, std::index_sequence<Idx...>) {
+            template<std::size_t ... Idx, typename ... TConcreteTypes>
+            auto invokeExecuteCommands(
+                EcsDataContainer& ecsDataContainer,
+                std::index_sequence<Idx...>,
+                TConcreteTypes& ... concreteTypes
+                ) {
+
                 return manager_.executeCommands(
                     EcsDataContainerArgumentResolver::resolve<
                         typename ExecuteFunctionSignature::template Arg<Idx>,
-                        ConcreteCommandBufferType
-                    >(ecsDataContainer, concreteCommandBuffer)...
+                        TConcreteTypes...
+                    >(
+                        ecsDataContainer,
+                        concreteTypes...
+                    )...
                 );
 
             }
@@ -125,8 +133,8 @@ export namespace helios::ecs::manager {
             bool executeCommands(EcsDataContainer& ecsDataContainer) noexcept override {
                 invokeExecuteCommands(
                     ecsDataContainer,
-                    *static_cast<ConcreteCommandBufferType*>(commandBuffer_.underlying()),
-                    std::make_index_sequence<ExecuteFunctionSignature::NumArgs>{}
+                    std::make_index_sequence<ExecuteFunctionSignature::NumArgs>{},
+                    *static_cast<ConcreteCommandBufferType*>(commandBuffer_.underlying()), ecsDataContainer
                 );
                 return true;
             }
