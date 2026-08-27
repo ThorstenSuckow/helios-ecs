@@ -15,6 +15,8 @@ export module helios.ecs.common.types:EntityHandle;
 import :TypeDefs;
 import helios.core.common.types;
 
+import :EntityHandleValue;
+
 using namespace helios::ecs::common::types;
 using namespace helios::core::common::types;
 export namespace helios::ecs::common::types {
@@ -49,6 +51,10 @@ export namespace helios::ecs::common::types {
         VersionId versionId_ = InvalidVersion;
 
     public:
+
+        static constexpr EntityHandle from(const EntityHandleValue value) {
+            return value.get<EntityHandle>();
+        }
 
         using DomainTag_type = TDomainTag;
 
@@ -118,6 +124,10 @@ export namespace helios::ecs::common::types {
          */
         [[nodiscard]] bool isValid() const noexcept {
             return versionId_ != InvalidVersion;
+        }
+
+        [[nodiscard]] EntityHandleValue value() const noexcept {
+            return EntityHandleValue(*this);
         }
 
     };
