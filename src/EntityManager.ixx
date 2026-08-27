@@ -14,6 +14,7 @@ module;
 
 export module helios.ecs.EntityManager;
 
+import helios.core.common.types;
 import helios.ecs.Entity;
 
 import helios.ecs.storage.SparseSet;
@@ -96,13 +97,27 @@ export namespace helios::ecs {
          *
          * @return The entity wrapped in an optional, or nullopt if not available.
          */
-        [[nodiscard]] std::optional<Entity<EntityManager>> entity(HandleType handle) {
-
+        [[nodiscard]] std::optional<Entity<EntityManager>> entity(HandleType handle) noexcept {
             if (!isValid(handle)) {
                 return std::nullopt;
             }
 
             return Entity<EntityManager>(handle, this);
+        }
+
+        /**
+         * @brief Returns a const Entity for the specified handle.
+         *
+         * @param handle The handle to look up.
+         * @return The entity wrapped in an optional, or nullopt if not available.
+         */
+        [[nodiscard]] std::optional<Entity<const EntityManager>> entity(HandleType handle) const noexcept {
+
+            if (!isValid(handle)) {
+                return std::nullopt;
+            }
+
+            return Entity<const EntityManager>(handle, this);
         }
 
         /**
@@ -524,7 +539,7 @@ export namespace helios::ecs {
                 return;
             }
 
-            for (size_t i = 0; i < components_.size(); i++) {
+            for (core::common::types::TypeId_t i = 0; i < components_.size(); i++) {
                 if (components_[i] && components_[i]->contains(handle.entityId())) {
                     std::forward<TFunc>(func)(ComponentTypeIdType{i});
                 }
