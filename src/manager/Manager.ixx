@@ -36,7 +36,7 @@ export namespace helios::ecs::manager {
         using NullCommandBuffer = ecs::command::NullCommandBuffer;  
         using EcsDataContainer = ecs::common::container::EcsDataContainer;
         using EcsDataContainerArgumentResolver = ecs::common::container::EcsDataContainerArgumentResolver;
-
+        using EcsDataContainerFunctionInvoker = ecs::common::container::EcsDataContainerFunctionInvoker;
     private:
         /**
          * @brief Internal virtual interface for type erasure.
@@ -63,17 +63,9 @@ export namespace helios::ecs::manager {
         class Model final : public Concept {
 
             using ExecuteCommandFunction = decltype(&TConcreteManager::executeCommands);
-            using InitFunction = decltype(&TConcreteManager::init);
-
             using ExecuteFunctionSignature = core::common::traits::FunctionSignatureTraits<ExecuteCommandFunction>;
-            using InitFunctionSignature = core::common::traits::FunctionSignatureTraits<InitFunction>;
-
             using CommandBufferInfo = ecs::command::traits::CommandBufferFromArguments<typename ExecuteFunctionSignature::ArgumentTypes>;
             static_assert(CommandBufferInfo::Count <= 1, "Manager executeCommands function must have at most one command buffer argument.");
-
-            using CommandBufferForInitInfo = ecs::command::traits::CommandBufferFromArguments<typename InitFunctionSignature::ArgumentTypes>;
-            static_assert(CommandBufferForInitInfo::Count == 0, "Manager init function must not have CommandBuffer argument.");
-
             using ConcreteCommandBufferType = CommandBufferInfo::Type;
 
             TConcreteManager manager_;
@@ -86,33 +78,7 @@ export namespace helios::ecs::manager {
                 return true;
             }
 
-            template<std::size_t ... Idx>
-            auto invokeInit(EcsDataContainer& ecsDataContainer, std::index_sequence<Idx...>) {
-                return manager_.init(
-                    EcsDataContainerArgumentResolver::resolve<
-                    typename InitFunctionSignature::template ArgumentType<Idx>
-                    >(ecsDataContainer)...
-                );
-            }
 
-            template<std::size_t ... Idx, typename ... TConcreteTypes>
-            auto invokeExecuteCommands(
-                EcsDataContainer& ecsDataContainer,
-                std::index_sequence<Idx...>,
-                TConcreteTypes& ... concreteTypes
-                ) {
-
-                return manager_.executeCommands(
-                    EcsDataContainerArgumentResolver::resolve<
-                        typename ExecuteFunctionSignature::template ArgumentType<Idx>,
-                        TConcreteTypes...
-                    >(
-                        ecsDataContainer,
-                        concreteTypes...
-                    )...
-                );
-
-            }
 
 
             public:
@@ -131,17 +97,20 @@ export namespace helios::ecs::manager {
             
 
             bool executeCommands(EcsDataContainer& ecsDataContainer) noexcept override {
-                invokeExecuteCommands(
-                    ecsDataContainer,
-                    std::make_index_sequence<ExecuteFunctionSignature::NumArgs>{},
-                    *static_cast<ConcreteCommandBufferType*>(commandBuffer_.underlying()), ecsDataContainer
+
+                EcsDataContainerFunctionInvoker::invoke<&TConcreteManager::executeCommands>(
+                    manager_,  ecsDataContainer, ecsDataContainer,
+                    *static_cast<ConcreteCommandBufferType*>(commandBuffer_.underlying())
                 );
                 return true;
             }
 
             bool init(EcsDataContainer& ecsDataContainer) noexcept override {
-                invokeInit(ecsDataContainer, std::make_index_sequence<InitFunctionSignature::NumArgs>{});
-                
+
+                EcsDataContainerFunctionInvoker::invoke<&TConcreteManager::init>(
+                    manager_,  ecsDataContainer
+                );
+
                 return true;
             }
             void reset() noexcept override {
