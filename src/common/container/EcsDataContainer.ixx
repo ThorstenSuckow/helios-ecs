@@ -53,10 +53,10 @@ export namespace helios::ecs::common::container {
          * @return
          */
         template<typename TArg, typename ... TConcreteTypes>
-        static auto& resolve(EcsDataContainer& ecsDataContainer, TConcreteTypes& ... concreteTypes) {
+        static decltype(auto) resolve(EcsDataContainer& ecsDataContainer, TConcreteTypes& ... concreteTypes) {
 
             using Type = std::remove_cvref_t<TArg>;
-            using QualifiedType = std::remove_reference_t<std::remove_reference_t<TArg>>;
+            using QualifiedType = std::remove_reference_t<TArg>;
 
             static_assert(!std::is_rvalue_reference_v<TArg>, "Function arguments must be lvalue references.");
 
