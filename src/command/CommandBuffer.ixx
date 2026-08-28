@@ -71,7 +71,7 @@ export namespace helios::ecs::command {
             auto invokeFlush(EcsDataContainer& typeMap, std::index_sequence<Idx...>) {
                 return cmdBuffer_.flush(
                     EcsDataContainerArgumentResolver::resolve<
-                        typename Traits::template Arg<Idx>
+                        typename Traits::template ArgumentType<Idx>
                     >(typeMap)...
                 );
             }

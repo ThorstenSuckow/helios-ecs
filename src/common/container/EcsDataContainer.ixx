@@ -91,7 +91,7 @@ export namespace helios::ecs::common::container {
                 TFunction,
                 member,
                 EcsDataContainerArgumentResolver::resolve<
-                    typename FunctionSignature::template Arg<Idx>,
+                    typename FunctionSignature::template ArgumentType<Idx>,
                     TConcreteTypes...
                 >(
                     ecsDataContainer,
