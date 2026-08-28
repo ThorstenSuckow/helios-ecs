@@ -83,13 +83,13 @@ export namespace helios::ecs::system {
 
                 if constexpr(ecs::system::concepts::IsCallableSystem<TConcreteSystem>) {
                     return std::invoke(system_, EcsDataContainerArgumentResolver::resolve<
-                        typename Traits::template Arg<Idx>,
+                        typename Traits::template ArgumentType<Idx>,
                         ConcreteCommandBufferType
                     >(ecsDataContainer, concreteCommandBuffer)...);
                 } else {
                     return system_.update(
                         EcsDataContainerArgumentResolver::resolve<
-                            typename Traits::template Arg<Idx>,
+                            typename Traits::template ArgumentType<Idx>,
                             ConcreteCommandBufferType
                         >(ecsDataContainer, concreteCommandBuffer)...);
                 }

@@ -90,7 +90,7 @@ export namespace helios::ecs::manager {
             auto invokeInit(EcsDataContainer& ecsDataContainer, std::index_sequence<Idx...>) {
                 return manager_.init(
                     EcsDataContainerArgumentResolver::resolve<
-                    typename InitFunctionSignature::template Arg<Idx>
+                    typename InitFunctionSignature::template ArgumentType<Idx>
                     >(ecsDataContainer)...
                 );
             }
@@ -104,7 +104,7 @@ export namespace helios::ecs::manager {
 
                 return manager_.executeCommands(
                     EcsDataContainerArgumentResolver::resolve<
-                        typename ExecuteFunctionSignature::template Arg<Idx>,
+                        typename ExecuteFunctionSignature::template ArgumentType<Idx>,
                         TConcreteTypes...
                     >(
                         ecsDataContainer,
