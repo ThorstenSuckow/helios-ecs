@@ -32,8 +32,9 @@ export namespace helios::ecs {
         template<typename>
         friend class Entity;
 
+    public:
         using HandleType = typename std::remove_const_t<TEntityManager>::HandleType;
-
+    private:
 
         /**
          * @brief The underlying entity identifier.
@@ -64,11 +65,11 @@ export namespace helios::ecs {
 
         using Handle_type = HandleType;
 
-        using ComponentTypeId_type = ComponentTypeId<Handle_type>;
+        using ComponentTypeId_type = ComponentTypeId<HandleType>;
 
-        using ActiveComponent_type = Active<Handle_type>;
+        using ActiveComponent_type = Active<HandleType>;
 
-        using InactiveComponent_type = Inactive<Handle_type>;
+        using InactiveComponent_type = Inactive<HandleType>;
         
         /**
          * @brief Constructs a Entity wrapper.
@@ -77,7 +78,7 @@ export namespace helios::ecs {
          * @param entityManager Pointer to the EntityManager. Must not be null.
          */
         explicit Entity(
-            const Handle_type entityHandle,
+            const HandleType entityHandle,
             TEntityManager* entityManager
 
         ) noexcept : entityHandle_(entityHandle), entityManager_(entityManager) {
@@ -110,7 +111,7 @@ export namespace helios::ecs {
          *
          * @return The EntityHandle for this Entity.
          */
-        [[nodiscard]] Handle_type handle() noexcept {
+        [[nodiscard]] HandleType handle() noexcept {
             return entityHandle_;
         }
 
@@ -119,7 +120,7 @@ export namespace helios::ecs {
          *
          * @return The EntityHandle for this Entity.
          */
-        [[nodiscard]] Handle_type handle() const noexcept {
+        [[nodiscard]] HandleType handle() const noexcept {
             return entityHandle_;
         }
 
@@ -150,13 +151,13 @@ export namespace helios::ecs {
          * when the buffer is flushed by the `EntityMutationManager`.
          *
          * @tparam TComponent Component type to add.
-         * @tparam TBuffer    Command buffer type. Its `Handle_type` must match this entity's.
+         * @tparam TBuffer    Command buffer type. Its `HandleType` must match this entity's.
          * @tparam Args       Constructor argument types for `TComponent`.
          * @param  buffer     Target command buffer to enqueue into.
          * @param  args       Arguments forwarded to the `TComponent` constructor.
          */
         template<typename TComponent, typename TBuffer, typename ...Args>
-        requires std::is_same_v<typename TEntityManager::Handle_type, typename TBuffer::Handle_type>
+        requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
         void deferAdd(TBuffer& buffer, Args&& ...args) {
             buffer.template add<commands::AddComponentCommand<TComponent>>(entityHandle_, std::forward<Args>(args)...);
         }
@@ -168,11 +169,11 @@ export namespace helios::ecs {
          * when the buffer is flushed by the `EntityMutationManager`.
          *
          * @tparam TComponent Component type to remove.
-         * @tparam TBuffer    Command buffer type. Its `Handle_type` must match this entity's.
+         * @tparam TBuffer    Command buffer type. Its `HandleType` must match this entity's.
          * @param  buffer     Target command buffer to enqueue into.
          */
         template<typename TComponent, typename TBuffer>
-        requires std::is_same_v<typename TEntityManager::Handle_type, typename TBuffer::Handle_type>
+        requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
         void deferRemove(TBuffer& buffer) {
             buffer.template add<commands::RemoveComponentCommand<TComponent>>(entityHandle_);
         }
@@ -184,17 +185,17 @@ export namespace helios::ecs {
          * via deferred commands. Also registers `Active` for dirty tracking immediately.
          * Commands are applied when the buffer is flushed by the `EntityMutationManager`.
          *
-         * @tparam TBuffer Command buffer type. Its `Handle_type` must match this entity's.
+         * @tparam TBuffer Command buffer type. Its `HandleType` must match this entity's.
          * @param  buffer  Target command buffer to enqueue into.
          */
         template<typename TBuffer>
-        requires std::is_same_v<typename TEntityManager::Handle_type, typename TBuffer::Handle_type>
+        requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
         void deferSetActive(TBuffer& buffer) {
-            buffer.template add<commands::AddComponentCommand<Active<typename TEntityManager::Handle_type>>>(entityHandle_);
-            buffer.template add<commands::RemoveComponentCommand<Active<typename TEntityManager::Handle_type>>>(entityHandle_);
-            buffer.template add<commands::AddComponentCommand<DirtyComponentSpec<Active<typename TEntityManager::Handle_type>>>>(entityHandle_);
+            buffer.template add<commands::AddComponentCommand<Active<typename TEntityManager::HandleType>>>(entityHandle_);
+            buffer.template add<commands::RemoveComponentCommand<Active<typename TEntityManager::HandleType>>>(entityHandle_);
+            buffer.template add<commands::AddComponentCommand<DirtyComponentSpec<Active<typename TEntityManager::HandleType>>>>(entityHandle_);
 
-            trackDirty<Active<typename TEntityManager::Handle_type>>();
+            trackDirty<Active<typename TEntityManager::HandleType>>();
         }
 
         /**
@@ -204,17 +205,17 @@ export namespace helios::ecs {
          * via deferred commands. Also registers `Inactive` for dirty tracking immediately.
          * Commands are applied when the buffer is flushed by the `EntityMutationManager`.
          *
-         * @tparam TBuffer Command buffer type. Its `Handle_type` must match this entity's.
+         * @tparam TBuffer Command buffer type. Its `HandleType` must match this entity's.
          * @param  buffer  Target command buffer to enqueue into.
          */
         template<typename TBuffer>
-        requires std::is_same_v<typename TEntityManager::Handle_type, typename TBuffer::Handle_type>
+        requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
         void deferSetInactive(TBuffer& buffer) {
-            buffer.template add<commands::AddComponentCommand<Inactive<typename TEntityManager::Handle_type>>>(entityHandle_);
-            buffer.template add<commands::RemoveComponentCommand<Active<typename TEntityManager::Handle_type>>>(entityHandle_);
-            buffer.template add<commands::AddComponentCommand<DirtyComponentSpec<Inactive<typename TEntityManager::Handle_type>>>>(entityHandle_);
+            buffer.template add<commands::AddComponentCommand<Inactive<typename TEntityManager::HandleType>>>(entityHandle_);
+            buffer.template add<commands::RemoveComponentCommand<Active<typename TEntityManager::HandleType>>>(entityHandle_);
+            buffer.template add<commands::AddComponentCommand<DirtyComponentSpec<Inactive<typename TEntityManager::HandleType>>>>(entityHandle_);
 
-            trackDirty<Inactive<typename TEntityManager::Handle_type>>();
+            trackDirty<Inactive<typename TEntityManager::HandleType>>();
         }
 
         /**
@@ -316,15 +317,15 @@ export namespace helios::ecs {
         template<
             template<typename> typename TComponent
         >
-        TComponent<Handle_type>* get() {
-            return entityManager_->template  get<TComponent<Handle_type>>(entityHandle_);
+        TComponent<HandleType>* get() {
+            return entityManager_->template  get<TComponent<HandleType>>(entityHandle_);
         }
 
         template<
             template<typename> typename TComponent
         >
-        const TComponent<Handle_type>* get() const {
-            return entityManager_->template  get<TComponent<Handle_type>>(entityHandle_);
+        const TComponent<HandleType>* get() const {
+            return entityManager_->template  get<TComponent<HandleType>>(entityHandle_);
         }
 
 
