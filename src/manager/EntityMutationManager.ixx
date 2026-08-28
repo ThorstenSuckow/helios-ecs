@@ -26,7 +26,6 @@ import helios.ecs.command.CommandBufferRegistry;
 import helios.ecs.command.types;
 import helios.ecs.command.commands;
 
-import helios.ecs.EcsWorld;
 
 import helios.ecs.command.CommandHandlerRegistry;
 import helios.ecs.manager.ManagerRegistry;
@@ -72,11 +71,6 @@ export namespace helios::ecs::manager {
         manager::ManagerRegistry internalExecutionManagerRegistry_{};
 
         ecs::common::container::EcsDataContainer ecsDataContainer_{};
-
-        /**
-         * @brief Job system used by `executeCommandsParallel()` for concurrent buffer execution.
-         */
-        JobSystem& jobSystem_;
 
         /**
          * @brief Maps component type IDs to the `ManagerTypeId`s of their associated buffers.
@@ -254,13 +248,6 @@ export namespace helios::ecs::manager {
          */
         using Handle_type = THandle;
 
-
-        /**
-         * @brief Constructs the manager bound to `jobSystem`.
-         *
-         * @param jobSystem Job system used for parallel command execution.
-         */
-        explicit EntityMutationManager(JobSystem& jobSystem) : jobSystem_(jobSystem) {}
 
         /**
          * @brief Accepts a command from the `CommandHandlerRegistry` and enqueues it.
