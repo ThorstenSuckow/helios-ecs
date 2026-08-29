@@ -7,6 +7,7 @@ module;
 #include <iostream>
 #include <optional>
 #include <ostream>
+#include <utility>
 
 export module helios.ecs.EcsWorld;
 
@@ -109,6 +110,11 @@ export namespace helios::ecs {
 
         template<typename THandle>
         EntityManager<THandle>& entityManager() {
+            return const_cast<EntityManager<THandle>&>(std::as_const(*this).entityManager<THandle>());
+        }
+
+        template<typename THandle>
+        [[nodiscard]] const EntityManager<THandle>& entityManager() const {
 
             auto idx = common::types::HandleTypeId::template id<THandle>().value();
 
@@ -239,10 +245,10 @@ export namespace helios::ecs {
          * @tparam THandle
          * @return SparseSet<THandle> or nullptr if not available.
          */
-        template<typename THandle>
-        [[nodiscard]] storage::SparseSet<THandle>* sparseSet() {
+        template<typename THandle, typename TComponent>
+        [[nodiscard]] storage::SparseSet<TComponent>* sparseSet() {
             auto& em = entityManager<THandle>();
-            return em.sparseSet();
+            return em.template sparseSet<TComponent>();
         }
 
     };
