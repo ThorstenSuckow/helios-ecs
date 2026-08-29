@@ -11,8 +11,9 @@ export namespace helios::ecs::components {
      *
      * @tparam TOwnerHandle Handle type of the entity owning this component.
      * @tparam TTargetHandle Handle type of the referenced target entity.
+     * @tparam TDomainTag Optional tag type for domain-specific specialization.
      */
-    template<typename TOwnerHandle, typename TTargetHandle>
+    template<typename TOwnerHandle, typename TTargetHandle, typename TDomainTag>
     class BindingComponent {
 
         TTargetHandle targetHandle_{};
