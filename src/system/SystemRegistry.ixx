@@ -5,10 +5,6 @@
 module;
 
 #include <cassert>
-#include <memory>
-#include <span>
-#include <vector>
-
 
 export module helios.ecs.system.SystemRegistry;
 
@@ -19,12 +15,12 @@ import helios.core.common.container;
 
 export namespace helios::ecs::system {
 
-    /**
-     * @brief Type alias for a ConceptModelRegistry specialized for Systems.
-     *
-     * @see ConceptModelRegistry
-     * @see System
-     */
-    using SystemRegistry = core::common::container::ConceptModelRegistry<System, types::SystemTypeId>;
+/**
+ * @brief Type alias for a ConceptModelRegistry specialized for Systems.
+ *
+ * @see ConceptModelRegistry
+ * @see System
+ */
+using SystemRegistry = core::common::container::ConceptModelRegistry<System, types::SystemTypeId>;
 
-}
+} // namespace helios::ecs::system

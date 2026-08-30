@@ -1,6 +1,6 @@
 module;
 
-#include <concepts>
+#include <type_traits>
 
 /**
  * @file System.ixx
@@ -12,17 +12,15 @@ import helios.ecs.common.concepts;
 
 export namespace helios::ecs::system::concepts {
 
+/**
+ * @brief Concept that constrains a type to a TypedSystem-like type.
+ *
+ * @tparam T The type to inspect.
+ */
+template <class T>
+concept IsEcsSystemLike = requires { &std::remove_cvref_t<T>::update; };
 
-    /**
-     * @brief Concept that constrains a type to a TypedSystem-like type.
-     *
-     * @tparam T The type to inspect.
-     */
-    template<class T>
-    concept IsEcsSystemLike = requires{&std::remove_cvref_t<T>::update;};
+template <class T>
+concept IsCallableSystem = requires { &std::remove_cvref_t<T>::operator(); };
 
-    template<class T>
-    concept IsCallableSystem = requires {&std::remove_cvref_t<T>::operator();};
-
-
-};
+}; // namespace helios::ecs::system::concepts

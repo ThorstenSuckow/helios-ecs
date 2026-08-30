@@ -15,5 +15,3 @@ export import helios.ecs.command.commands;
 export import helios.ecs.command.concepts;
 export import helios.ecs.command.types;
 export import helios.ecs.command.traits;
-
-

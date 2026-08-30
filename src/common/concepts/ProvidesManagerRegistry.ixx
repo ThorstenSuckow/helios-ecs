@@ -4,19 +4,15 @@
  */
 module;
 
-
 #include <concepts>
-
 
 export module helios.ecs.common.concepts:ProvidesManagerRegistry;
 
 export namespace helios::ecs::common::concepts {
 
+template <typename T, typename TManagerRegistry>
+concept ProvidesManagerRegistry = requires(T& t) {
+    { t.managerRegistry() } -> std::same_as<TManagerRegistry&>;
+};
 
-    template<typename T, typename TManagerRegistry>
-    concept ProvidesManagerRegistry = requires(T& t) {
-        {t.managerRegistry()} -> std::same_as<TManagerRegistry&>;
-    };
-
-
-}
+} // namespace helios::ecs::common::concepts

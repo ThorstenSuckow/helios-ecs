@@ -7,7 +7,6 @@
  */
 module;
 
-#include <functional>
 #include <cstddef>
 
 export module helios.ecs.common.types:ComponentTypeId;
@@ -15,6 +14,6 @@ export module helios.ecs.common.types:ComponentTypeId;
 import helios.core.common;
 
 export namespace helios::ecs::common::types {
-    template<typename THandle>
-    using ComponentTypeId = helios::core::common::types::TypeId<THandle>;
+template <typename THandle>
+using ComponentTypeId = helios::core::common::types::TypeId<THandle>;
 };

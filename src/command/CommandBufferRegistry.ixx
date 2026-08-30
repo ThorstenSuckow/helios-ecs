@@ -13,9 +13,10 @@ import helios.ecs.command.CommandBuffer;
 
 export namespace helios::ecs::command {
 
-    /**
-     * @brief Type alias for a ConceptModelRegistry specialized for CommandBuffers.
-     */
-    using CommandBufferRegistry = helios::core::common::container::ConceptModelRegistry<CommandBuffer, types::CommandBufferTypeId>;
+/**
+ * @brief Type alias for a ConceptModelRegistry specialized for CommandBuffers.
+ */
+using CommandBufferRegistry =
+    helios::core::common::container::ConceptModelRegistry<CommandBuffer, types::CommandBufferTypeId>;
 
-}
+} // namespace helios::ecs::command

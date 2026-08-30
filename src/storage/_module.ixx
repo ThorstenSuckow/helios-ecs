@@ -5,5 +5,4 @@
 
 export module helios.ecs.storage;
 
-
 export import helios.ecs.storage.SparseSet;

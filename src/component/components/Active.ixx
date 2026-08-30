@@ -8,15 +8,15 @@ export module helios.ecs.component.components:Active;
 
 export namespace helios::ecs::components {
 
-    /**
-     * @brief Tag component indicating that an entity is active.
-     *
-     * @tparam THandle The entity handle type used for domain-specific typing.
-     */
-    template<typename THandle>
-    struct Active {
+/**
+ * @brief Tag component indicating that an entity is active.
+ *
+ * @tparam THandle The entity handle type used for domain-specific typing.
+ */
+template <typename THandle>
+struct Active {
 
-        using Handle_type = THandle;
-    };
+    using Handle_type = THandle;
+};
 
-}
+} // namespace helios::ecs::components

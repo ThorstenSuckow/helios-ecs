@@ -4,17 +4,15 @@
  */
 module;
 
-#include <utility>
+#include <type_traits>
 
 export module helios.ecs.manager.concepts:IsManagerLike;
 
-
 export namespace helios::ecs::manager::concepts {
 
-    template<class TManager>
-    concept IsManagerLike = requires
-    {
-        &std::remove_cvref_t<TManager>::executeCommands;
-        &std::remove_cvref_t<TManager>::reset;
-    };
-}
+template <class TManager>
+concept IsManagerLike = requires {
+    &std::remove_cvref_t<TManager>::executeCommands;
+    &std::remove_cvref_t<TManager>::reset;
+};
+} // namespace helios::ecs::manager::concepts

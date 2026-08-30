@@ -1,7 +1,6 @@
 
 module;
 
-#include <optional>
 
 export module helios.ecs.EntityAccessor;
 
@@ -13,19 +12,15 @@ import helios.ecs.common.types;
 using namespace helios::ecs::common::types;
 export namespace helios::ecs {
 
-    template<typename THandle>
-    class EntityAccessor {
+template <typename THandle>
+class EntityAccessor {
 
-        
-        /**
-         * @brief Non-owning pointer to the EntityManager used for validation.
-         */
-        EntityManager<THandle>* const em;
+    /**
+     * @brief Non-owning pointer to the EntityManager used for validation.
+     */
+    EntityManager<THandle>* const em;
 
-    public:
-
-        explicit EntityAccessor(EntityManager<THandle>* em) noexcept
-            : em(em) {}
-
-    };
-}
+public:
+    explicit EntityAccessor(EntityManager<THandle>* em) noexcept : em(em) {}
+};
+} // namespace helios::ecs

@@ -8,18 +8,17 @@ export module helios.ecs.component.components:DirtyComponentSpec;
 
 export namespace helios::ecs::components {
 
-    /**
-     * @brief Template for dirty component specifications.
-     *
-     * @tparam TComponent The component type that is marked as dirty.
-     */
-    template<typename TComponent>
-    struct DirtyComponentSpec {
+/**
+ * @brief Template for dirty component specifications.
+ *
+ * @tparam TComponent The component type that is marked as dirty.
+ */
+template <typename TComponent>
+struct DirtyComponentSpec {
 
-        using Component_type = TComponent;
+    using Component_type = TComponent;
 
-        using Handle_type = typename TComponent::Handle_type;
-    };
+    using Handle_type = TComponent::Handle_type;
+};
 
-
-}
+} // namespace helios::ecs::components

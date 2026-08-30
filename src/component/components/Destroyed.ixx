@@ -1,5 +1,5 @@
 /**
-* @file DestroyedComponent.ixx
+ * @file DestroyedComponent.ixx
  * @brief Lifecycle tag component that marks an entity as destroyed.
  */
 module;
@@ -15,11 +15,10 @@ export namespace helios::ecs::components {
  *
  * @tparam THandle Entity handle type associated with the owning world.
  */
-template<typename THandle>
+template <typename THandle>
 struct Destroyed {
 
     using Handle_type = THandle;
-
 };
 
-}
+} // namespace helios::ecs::components

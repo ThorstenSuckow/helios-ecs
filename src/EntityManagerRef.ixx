@@ -13,31 +13,29 @@ import helios.ecs.common.types;
 import helios.ecs.EntityManager;
 import helios.ecs.Entity;
 
-
 export namespace helios::ecs {
 
-    class EntityManagerRef {
+class EntityManagerRef {
 
-        ecs::common::types::HandleTypeId handleId_;
-        void* entityManager_{};
-    public:
+    ecs::common::types::HandleTypeId handleId_;
+    void* entityManager_{};
 
-        template<typename THandle>
-        EntityManagerRef(ecs::EntityManager<THandle>& entityManager)
-        :   handleId_(ecs::common::types::HandleTypeId::template id<THandle>()),
-            entityManager_(static_cast<void*>(&entityManager))
-        {}
+public:
+    template <typename THandle>
+    EntityManagerRef(ecs::EntityManager<THandle>& entityManager)
+        : handleId_(ecs::common::types::HandleTypeId::template id<THandle>()),
+          entityManager_(static_cast<void*>(&entityManager)) {}
 
-        template<typename THandle>
-        ecs::EntityManager<THandle>& get() const {
+    template <typename THandle>
+    ecs::EntityManager<THandle>& get() const {
 
-            if (ecs::common::types::HandleTypeId::template id<THandle>() != handleId_) [[unlikely]] {
-                assert(false && "EntityRef does not contain the requested handle type.");
-                std::terminate();
-            }
-
-            return *static_cast<ecs::EntityManager<THandle>*>(entityManager_);
+        if (ecs::common::types::HandleTypeId::template id<THandle>() != handleId_) [[unlikely]] {
+            assert(false && "EntityRef does not contain the requested handle type.");
+            std::terminate();
         }
-    };
 
-}
+        return *static_cast<ecs::EntityManager<THandle>*>(entityManager_);
+    }
+};
+
+} // namespace helios::ecs

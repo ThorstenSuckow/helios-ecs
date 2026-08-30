@@ -10,30 +10,28 @@ import :TypeDefs;
 
 export namespace helios::ecs::common::types {
 
-    class EntityHandleValue {
+class EntityHandleValue {
 
-        HandleTypeId handleTypeId_;
+    HandleTypeId handleTypeId_;
 
-        EntityId entityId_;
-        VersionId versionId_;
+    EntityId entityId_;
+    VersionId versionId_;
 
-    public:
+public:
+    template <typename THandle>
+    explicit EntityHandleValue(THandle handle)
+        : handleTypeId_(HandleTypeId::template id<THandle>()), entityId_(handle.entityId()),
+          versionId_(handle.versionId()) {}
 
-        template<typename THandle>
-        explicit EntityHandleValue(THandle handle)
-        : handleTypeId_(HandleTypeId::template id<THandle>()),
-        entityId_(handle.entityId()), versionId_(handle.versionId()) {}
-
-        template<typename THandle>
-        THandle get() const {
-            if (handleTypeId_ != HandleTypeId::template id<THandle>()) {
-                assert(false && "Handle type mismatch");
-                std::terminate();
-            }
-
-            return THandle{entityId_, versionId_};
+    template <typename THandle>
+    THandle get() const {
+        if (handleTypeId_ != HandleTypeId::template id<THandle>()) {
+            assert(false && "Handle type mismatch");
+            std::terminate();
         }
 
-    };
+        return THandle{entityId_, versionId_};
+    }
+};
 
-}
+} // namespace helios::ecs::common::types

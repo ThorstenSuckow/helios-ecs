@@ -5,7 +5,6 @@
 
 export module helios.ecs;
 
-
 export import helios.ecs.common;
 export import helios.ecs.storage;
 export import helios.ecs.command;

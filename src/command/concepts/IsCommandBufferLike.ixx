@@ -4,20 +4,18 @@
  */
 module;
 
-#include <concepts>
+#include <type_traits>
+
 
 export module helios.ecs.command.concepts:IsCommandBufferLike;
 
-
 import helios.ecs.common.concepts;
-
 
 export namespace helios::ecs::command::concepts {
 
-    template<class TBuffer>
-    concept IsCommandBufferLike = requires
-    {
-        &std::remove_cvref_t<TBuffer>::flush;
-        &std::remove_cvref_t<TBuffer>::clear;
-    };
-}
+template <class TBuffer>
+concept IsCommandBufferLike = requires {
+    &std::remove_cvref_t<TBuffer>::flush;
+    &std::remove_cvref_t<TBuffer>::clear;
+};
+} // namespace helios::ecs::command::concepts

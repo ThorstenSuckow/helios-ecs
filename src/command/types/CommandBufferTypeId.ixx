@@ -4,7 +4,6 @@
  */
 module;
 
-#include <functional>
 #include <cstddef>
 
 export module helios.ecs.command.types:CommandBufferTypeId;
@@ -13,8 +12,8 @@ import helios.core;
 
 export namespace helios::ecs::command::types {
 
-    struct CommandBufferTypesIdDomain{};
+struct CommandBufferTypesIdDomain {};
 
-    using CommandBufferTypeId = helios::core::common::types::TypeId<CommandBufferTypesIdDomain>;
+using CommandBufferTypeId = helios::core::common::types::TypeId<CommandBufferTypesIdDomain>;
 
-};
+}; // namespace helios::ecs::command::types
