@@ -3,6 +3,36 @@ project(helios-ecs LANGUAGES CXX)
 
 include(CTest)
 
+set(HELIOS_USE_DEVTOOLS_DEFAULT OFF)
+if(PROJECT_IS_TOP_LEVEL)
+    set(HELIOS_USE_DEVTOOLS_DEFAULT ON)
+endif()
+
+option(HELIOS_USE_DEVTOOLS "Load shared tooling from helios-devtools" ${HELIOS_USE_DEVTOOLS_DEFAULT})
+set(HELIOS_DEVTOOLS_GIT_REPOSITORY "https://github.com/thorstensuckow/helios-devtools.git" CACHE STRING "helios-devtools git repository")
+set(HELIOS_DEVTOOLS_GIT_TAG "v1.0.0" CACHE STRING "helios-devtools git tag or commit")
+set(HELIOS_DEVTOOLS_LOCAL_PATH "${CMAKE_CURRENT_LIST_DIR}/../helios-devtools" CACHE PATH "Optional local path to helios-devtools")
+
+if(HELIOS_USE_DEVTOOLS)
+    include(FetchContent)
+
+    if(HELIOS_DEVTOOLS_LOCAL_PATH)
+        FetchContent_Declare(
+                helios_devtools
+                SOURCE_DIR "${HELIOS_DEVTOOLS_LOCAL_PATH}"
+        )
+    else()
+        FetchContent_Declare(
+                helios_devtools
+                GIT_REPOSITORY "${HELIOS_DEVTOOLS_GIT_REPOSITORY}"
+                GIT_TAG "${HELIOS_DEVTOOLS_GIT_TAG}"
+        )
+    endif()
+
+    FetchContent_MakeAvailable(helios_devtools)
+    include("${helios_devtools_SOURCE_DIR}/cmake/HeliosDevtools.cmake")
+endif()
+
 if(PROJECT_IS_TOP_LEVEL)
     set(CMAKE_CXX_STANDARD 23)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -75,6 +105,10 @@ target_include_directories(helios_ecs PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
         $<INSTALL_INTERFACE:include>
 )
+
+if(HELIOS_USE_DEVTOOLS)
+    helios_configure_target(helios_ecs)
+endif()
 
 if(PROJECT_IS_TOP_LEVEL AND BUILD_TESTING)
     include(FetchContent)

@@ -54,6 +54,50 @@ cmake -S . -B build
 cmake --build build
 ```
 
+Quick devtools entrypoint from this repository:
+
+```bash
+sh ./run-devtools.sh format
+sh ./run-devtools.sh format-fix
+sh ./run-devtools.sh tidy
+sh ./run-devtools.sh tidy-fix
+```
+
+`run-devtools.sh` is a thin wrapper around CMake targets and expects an already configured build directory (default: `cmake-build-debug`).
+
+Run formatting checks:
+
+```bash
+cmake --build cmake-build-debug --target format
+```
+
+Run formatting with in-place fixes:
+
+```bash
+cmake --build cmake-build-debug --target format-fix
+```
+
+Run clang-tidy checks:
+
+```bash
+cmake --build cmake-build-debug --target tidy
+```
+
+Run clang-tidy with autofix:
+
+```bash
+cmake --build cmake-build-debug --target tidy-fix
+```
+
+Target-specific variants are also available:
+
+```bash
+cmake --build cmake-build-debug --target format-helios_ecs
+cmake --build cmake-build-debug --target tidy-helios_ecs
+```
+
+Formatting and clang-tidy checks are sourced from shared `helios-devtools` config.
+
 Run tests when test discovery is enabled:
 
 ```bash
