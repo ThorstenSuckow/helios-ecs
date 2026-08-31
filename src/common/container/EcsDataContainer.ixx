@@ -12,6 +12,10 @@ export module helios.ecs.common.container:EcsDataContainer;
 import helios.core.common.container;
 import helios.core.common.traits;
 import helios.ecs.command.concepts;
+import helios.ecs.entity.Query;
+import helios.ecs.entity.View;
+import helios.ecs.entity.EntityManager;
+import helios.ecs.entity.EntityAccessSet;
 
 namespace helios::ecs::common::container::_detail {
 struct EcsDataContainerTag {};
@@ -24,20 +28,11 @@ using EcsDataContainer =
 
 struct EcsDataContainerArgumentResolver {
 
-    template <typename TNeedle, typename... THaystack>
-    struct LookupList;
+    template<typename TNeedle, typename... THaystack>
+    using IsInList = helios::core::common::traits::IsInList<TNeedle, THaystack...>;
 
-    template <typename TNeedle>
-    struct LookupList<TNeedle> {
-        constexpr static bool contains = false;
-        constexpr static std::size_t index = 0;
-    };
 
-    template <typename TNeedle, typename First, typename... Rest>
-    struct LookupList<TNeedle, First, Rest...> {
-        constexpr static bool contains = std::same_as<TNeedle, First> || LookupList<TNeedle, Rest...>::contains;
-        constexpr static std::size_t index = std::same_as<TNeedle, First> ? 0 : 1 + LookupList<TNeedle, Rest...>::index;
-    };
+
 
     /**
      * @brief Compares the specified current type against a list of pre-fabricated types and returns an item
@@ -58,13 +53,22 @@ struct EcsDataContainerArgumentResolver {
 
         static_assert(!std::is_rvalue_reference_v<TArg>, "Function arguments must be lvalue references.");
 
-        using ConcreteTypesList = LookupList<Type, std::remove_cvref_t<TConcreteTypes>...>;
+        using ConcreteTypesList = IsInList<Type, std::remove_cvref_t<TConcreteTypes>...>;
 
-        if constexpr (ConcreteTypesList::contains) {
+        if constexpr (ConcreteTypesList::value) {
             constexpr auto index = ConcreteTypesList::index;
             auto tuple = std::tie(concreteTypes...);
             return std::get<index>(tuple);
-        } else if constexpr (std::is_const_v<QualifiedType>) {
+        } else if constexpr(ecs::entity::IsQuery<Type>::value) {
+
+            using EntityManager =  ecs::entity::EntityManager<
+                std::tuple_element_t<0,
+                typename ecs::entity::EntityAccessSet<typename Type::ReadSet, typename Type::WriteSet>::AccessHandles
+            >>;
+
+            return Type{&ecsDataContainer.get<EntityManager>()};
+
+        }  else if constexpr (std::is_const_v<QualifiedType>) {
             return static_cast<const Type&>(ecsDataContainer.get<Type>());
         } else {
             return static_cast<Type&>(ecsDataContainer.get<Type>());
