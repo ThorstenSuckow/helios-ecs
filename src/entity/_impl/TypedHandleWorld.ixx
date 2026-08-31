@@ -10,11 +10,10 @@ module;
 #include <type_traits>
 #include <utility>
 
-export module helios.ecs.EcsWorld:TypedHandleWorld;
+export module helios.ecs.entity.EntityWorld:TypedHandleWorld;
 
-import helios.ecs.View;
-import helios.ecs.Entity;
-import helios.ecs.EntityManager;
+import helios.ecs.entity.Entity;
+import helios.ecs.entity.EntityManager;
 
 /**
  * @brief Maps a handle type to its `EntityManager` index in a pack.
@@ -65,7 +64,7 @@ public:
     /**
      * @brief Tuple type of all underlying entity managers.
      */
-    using EntityManager_types = std::tuple<EntityManager<THandles>...>;
+    using EntityManager_types = std::tuple<entity::EntityManager<THandles>...>;
 
     /**
      * @brief Constructs an empty typed-handle world.
@@ -85,7 +84,7 @@ public:
      */
     template <typename THandle>
     auto& entityManager() {
-        constexpr size_t idx = HandleToManager<THandle, EntityManager<THandles>...>::value;
+        constexpr size_t idx = HandleToManager<THandle, entity::EntityManager<THandles>...>::value;
         return std::get<idx>(entityManagers_);
     }
 
@@ -97,7 +96,7 @@ public:
      */
     template <typename THandle>
     const auto& entityManager() const {
-        constexpr size_t idx = HandleToManager<THandle, EntityManager<THandles>...>::value;
+        constexpr size_t idx = HandleToManager<THandle, entity::EntityManager<THandles>...>::value;
         return std::get<idx>(entityManagers_);
     }
 
@@ -122,7 +121,7 @@ public:
 
         auto handle = em.create();
 
-        return Entity{handle, &em};
+        return entity::Entity{handle, &em};
     }
 
     /**
@@ -151,7 +150,7 @@ public:
         auto& em = entityManager<THandle>();
 
         using EM = std::remove_reference_t<decltype(em)>;
-        using Entity_type = Entity<EM>;
+        using Entity_type = entity::Entity<EM>;
 
         if (!em.isValid(handle)) {
             return std::optional<Entity_type>{std::nullopt};
@@ -178,19 +177,6 @@ public:
         return entity;
     }
 
-    /**
-     * @brief Creates a typed view for one handle domain.
-     *
-     * @tparam THandle Handle domain.
-     * @tparam TComponents Component filter pack.
-     * @return View object for iterating matching entities.
-     */
-    template <typename THandle, typename... TComponents>
-    [[nodiscard]] auto view() {
-        auto& em = entityManager<THandle>();
-        using EM = std::remove_reference_t<decltype(em)>;
-        return View<EM, TComponents...>(&em);
-    }
 
     /**
      * @brief Clears dirty sets for one handle domain.

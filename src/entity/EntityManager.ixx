@@ -4,7 +4,7 @@
  */
 module;
 
-#include "helios-ecs-config.h"
+#include "../helios-ecs-config.h"
 #include <algorithm>
 #include <cassert>
 #include <memory>
@@ -12,13 +12,15 @@ module;
 #include <utility>
 #include <vector>
 
-export module helios.ecs.EntityManager;
+export module helios.ecs.entity.EntityManager;
 
 import helios.core.common.types;
-import helios.ecs.Entity;
 
-import helios.ecs.storage.SparseSet;
-import helios.ecs.EntityRegistry;
+import helios.ecs.entity.Entity;
+
+import helios.ecs.entity.storage.SparseSet;
+
+import :EntityRegistry;
 
 import helios.ecs.common.types;
 import helios.ecs.component;
@@ -27,9 +29,9 @@ import helios.ecs.common.concepts;
 
 using namespace helios::ecs::common::types;
 using namespace helios::ecs::components;
-using namespace helios::ecs::storage;
+using namespace helios::ecs::entity::storage;
 using namespace helios::ecs::common::concepts;
-export namespace helios::ecs {
+export namespace helios::ecs::entity {
 
 /**
  * @brief Sorting criteria for `SparseSetBase*` lists.

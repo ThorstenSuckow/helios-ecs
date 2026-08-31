@@ -10,12 +10,12 @@ module;
 #include <span>
 #include <vector>
 
-export module helios.ecs.storage.SparseSet;
+export module helios.ecs.entity.storage.SparseSet;
 
 import helios.ecs.common.types;
 
 using namespace helios::ecs::common::types;
-export namespace helios::ecs::storage {
+export namespace helios::ecs::entity::storage {
 
 /**
  * @brief Type-erased sparse-set interface.

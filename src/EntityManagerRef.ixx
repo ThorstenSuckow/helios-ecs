@@ -10,8 +10,8 @@ module;
 export module helios.ecs.EntityManagerRef;
 
 import helios.ecs.common.types;
-import helios.ecs.EntityManager;
-import helios.ecs.Entity;
+import helios.ecs.entity.EntityManager;
+import helios.ecs.entity.Entity;
 
 export namespace helios::ecs {
 
@@ -22,19 +22,19 @@ class EntityManagerRef {
 
 public:
     template <typename THandle>
-    EntityManagerRef(ecs::EntityManager<THandle>& entityManager)
+    EntityManagerRef(ecs::entity::EntityManager<THandle>& entityManager)
         : handleId_(ecs::common::types::HandleTypeId::template id<THandle>()),
           entityManager_(static_cast<void*>(&entityManager)) {}
 
     template <typename THandle>
-    ecs::EntityManager<THandle>& get() const {
+    ecs::entity::EntityManager<THandle>& get() const {
 
         if (ecs::common::types::HandleTypeId::template id<THandle>() != handleId_) [[unlikely]] {
             assert(false && "EntityRef does not contain the requested handle type.");
             std::terminate();
         }
 
-        return *static_cast<ecs::EntityManager<THandle>*>(entityManager_);
+        return *static_cast<ecs::entity::EntityManager<THandle>*>(entityManager_);
     }
 };
 

@@ -14,7 +14,7 @@ export module helios.ecs.manager.EntityMutationManager;
 
 import helios.ecs.common.types;
 import helios.ecs.common.container;
-import helios.ecs.EntityManager;
+import helios.ecs.entity.EntityManager;
 
 import helios.core.thread.JobSystem;
 
@@ -127,7 +127,7 @@ class EntityMutationManager {
          *
          * @param executionContext Execution context (currently unused; kept for interface uniformity).
          */
-        bool executeCommands(EntityManager<THandle>& entityManager) {
+        bool executeCommands(entity::EntityManager<THandle>& entityManager) {
 
             using Component_type = TCommandType::Component_type;
 
@@ -285,7 +285,7 @@ public:
      *
      * @param initContext Init context providing access to the command handler registry.
      */
-    bool init(CommandHandlerRegistry& commandHandlerRegistry, EntityManager<THandle>& entityManager) noexcept {
+    bool init(CommandHandlerRegistry& commandHandlerRegistry, entity::EntityManager<THandle>& entityManager) noexcept {
 
         commandHandlerRegistry
             .registerHandlerForCommandGroup<command::types::CommandGroup<commands::AddComponentCommand, THandle>>(
@@ -297,7 +297,7 @@ public:
                 *this
             );
 
-        ecsDataContainer_.bind<EntityManager<THandle>>(entityManager);
+        ecsDataContainer_.bind<entity::EntityManager<THandle>>(entityManager);
 
         return true;
     }
@@ -307,7 +307,7 @@ public:
      *
      * @param entityManager Entity manager to which the mutations are applied.
      */
-    bool executeCommands(EntityManager<THandle>& entityManager) noexcept {
+    bool executeCommands(entity::EntityManager<THandle>& entityManager) noexcept {
 
         for (auto* manager : internalExecutionManagerRegistry_.items()) {
             manager->executeCommands(ecsDataContainer_);

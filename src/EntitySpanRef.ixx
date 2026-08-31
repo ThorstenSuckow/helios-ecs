@@ -10,8 +10,8 @@ module;
 
 export module helios.ecs.EntitySpanRef;
 
-import helios.ecs.Entity;
-import helios.ecs.EntityManager;
+import helios.ecs.entity.Entity;
+import helios.ecs.entity.EntityManager;
 import helios.ecs.common.types;
 
 export namespace helios::ecs {
@@ -24,7 +24,7 @@ class EntitySpanRef {
     std::size_t size_{};
 
     template <typename THandle>
-    using EntityType = Entity<EntityManager<THandle>>;
+    using EntityType = entity::Entity<entity::EntityManager<THandle>>;
 
 public:
     template <typename THandle>

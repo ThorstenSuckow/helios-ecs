@@ -36,7 +36,13 @@ namespace {
             Write<VelocityComponent<GameObjectHandle>>
         >;
 
+        using EntityAccessSet2 = EntityAccessSet<
+            Read<PositionComponent<GameObjectHandle>>,
+            Write<VelocityComponent<GameObjectHandle>>
+        >;
+
         EntityAccessSet entityAccessSet;
+        EntityAccessSet2 entityAccessSet2;
     };
 };
 
@@ -67,6 +73,8 @@ TEST(EntityAccessSet, tuples) {
     EXPECT_EQ(2, (std::tuple_size_v<typename Foo::EntityAccessSet::ReadHandles>));
     EXPECT_EQ(1, (std::tuple_size_v<typename Foo::EntityAccessSet::WriteHandles>));
     EXPECT_EQ(2, (std::tuple_size_v<typename Foo::EntityAccessSet::AccessHandles>));
+
+    EXPECT_EQ(1, (std::tuple_size_v<typename Foo::EntityAccessSet2::AccessHandles>));
 
 
     // READ

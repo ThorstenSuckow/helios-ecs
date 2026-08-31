@@ -8,18 +8,17 @@ module;
 #include <type_traits>
 #include <utility>
 
-export module helios.ecs.Entity;
+export module helios.ecs.entity.Entity;
 
 import helios.ecs.component;
-import helios.ecs.command;
+import helios.ecs.command.commands;
 import helios.ecs.common.concepts;
 import helios.ecs.common.types;
 
 using namespace helios::ecs::common::types;
-using namespace helios::ecs::command;
 using namespace helios::ecs::common::concepts::traits;
 using namespace helios::ecs::components;
-export namespace helios::ecs {
+export namespace helios::ecs::entity {
 
 /**
  * @brief Lightweight facade for entity component manipulation.
@@ -137,6 +136,19 @@ public:
         auto typeId = ComponentTypeId_type::template id<T>();
 
         auto* cmp = entityManager_->template emplace<T>(entityHandle_, std::forward<Args>(args)...);
+
+        return *cmp;
+    }
+
+    template <
+        template<typename> typename T,
+        typename... Args
+    >
+    T<HandleType>& add(Args&&... args) {
+
+        auto typeId = ComponentTypeId_type::template id<T<HandleType>>();
+
+        auto* cmp = entityManager_->template emplace<T<HandleType>>(entityHandle_, std::forward<Args>(args)...);
 
         return *cmp;
     }

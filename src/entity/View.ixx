@@ -10,12 +10,17 @@ module;
 #include <tuple>
 #include <vector>
 
-export module helios.ecs.View;
+export module helios.ecs.entity.View;
 
 import helios.ecs.component;
-import helios.ecs.storage.SparseSet;
-import helios.ecs.EntityManager;
-import helios.ecs.Entity;
+import helios.ecs.entity.storage.SparseSet;
+import helios.ecs.entity.EntityManager;
+import helios.ecs.entity.Entity;
+import helios.ecs.entity.EntityAccessSet;
+
+import helios.core.common.types;
+import helios.core.common.traits;
+
 import helios.ecs.common.concepts;
 import helios.ecs.common.types;
 
@@ -23,9 +28,9 @@ import helios.ecs.common.types;
 
 using namespace helios::ecs::common::types;
 using namespace helios::ecs::components;
-using namespace helios::ecs::storage;
+using namespace helios::ecs::entity::storage;
 using namespace helios::ecs::common::concepts::traits;
-export namespace helios::ecs {
+export namespace helios::ecs::entity {
 
 /**
  * @brief A view class to iterate over entities having specific components.
@@ -60,33 +65,48 @@ export namespace helios::ecs {
  */
 template <
     typename TEntityManager,
-    typename TIncludedComponents,
+    typename TReadComponents,
+    typename TWriteComponents,
     typename TDirtyComponents,
     typename TOptionalComponents
 >
 class PartialView;
 
-/**
- * @brief Convenience alias for a view with required components only.
- *
- * Optional components can be attached fluently via `withOptional<...>()`.
- *
- * @tparam TEntityManager Concrete entity manager type.
- * @tparam TRequired Required component types that must be present.
- */
-template <typename TEntityManager, typename... TIncluded>
-using View = PartialView<TEntityManager, std::tuple<TIncluded...>, std::tuple<>, std::tuple<>>;
+template <
+    typename TReadSet,
+    typename TWriteSet
+>
+requires (std::tuple_size_v<typename entity::EntityAccessSet<TReadSet, TWriteSet>::AccessHandles> == 1)
+using View = class PartialView<
+    ecs::entity::EntityManager<
+                std::tuple_element_t<
+                0,
+                typename ecs::entity::EntityAccessSet<TReadSet, TWriteSet>::AccessHandles
+                >
+        >,
+    typename TReadSet::ComponentList,
+    typename TWriteSet::ComponentList,
+    std::tuple<>, std::tuple<>
+>;
 
-template <typename TEntityManager, typename... TIncluded, typename... TDirty, typename... TOptional>
-class PartialView<TEntityManager, std::tuple<TIncluded...>, std::tuple<TDirty...>, std::tuple<TOptional...>> {
+
+template <typename TEntityManager, typename... TReadComponents, typename ... TWriteComponents, typename... TDirty, typename... TOptional>
+requires core::common::traits::IsSubset<
+    core::common::types::TypeList<TWriteComponents...>, core::common::types::TypeList<TReadComponents...>
+    >::value
+class PartialView<TEntityManager, core::common::types::TypeList<TReadComponents...>, core::common::types::TypeList<TWriteComponents...>, std::tuple<TDirty...>, std::tuple<TOptional...>> {
 
 private:
     TEntityManager* em_;
 
+
     /**
      * @brief Pointers to the SparseSets of the included components.
      */
-    std::tuple<SparseSet<TIncluded>*...> includeSets_;
+    std::tuple<const SparseSet<TReadComponents>*...> includeSets_;
+
+    std::tuple<SparseSet<TWriteComponents>*...> writeSets_;
+
 
     /**
      * @brief Optional components, might return nullptr. Are not considered by whereAnyDirty().
@@ -135,7 +155,7 @@ private:
      * smallest set leads iteration.
      */
     void initializeRequiredSets() {
-        (sortedRequires_.push_back(em_->template sparseSet<TIncluded>()), ...);
+        (sortedRequires_.push_back(em_->template sparseSet<TReadComponents>()), ...);
 
         maxEntityId_ = std::ranges::min(std::views::transform(sortedRequires_, [](const auto* set) {
             return set ? set->maxEntityId() : Tombstone;
@@ -152,7 +172,9 @@ public:
      */
     explicit PartialView(TEntityManager* em)
         requires(sizeof...(TOptional) == 0 && sizeof...(TDirty) == 0)
-        : em_(em), includeSets_(std::make_tuple(em_->template sparseSet<TIncluded>()...)) {
+        : em_(em),
+        includeSets_(std::make_tuple(em_->template sparseSet<TReadComponents>()...)),
+        writeSets_(std::make_tuple(em_->template sparseSet<TWriteComponents>()...)) {
         // Retrieve pointers to the specific component sets immediately.
 
         initializeRequiredSets();
@@ -169,15 +191,19 @@ public:
      */
     explicit PartialView(
         TEntityManager* em,
-        std::tuple<SparseSet<TIncluded>*...> includeSets,
+        std::tuple<SparseSet<TReadComponents>*...> includeSets,
+        std::tuple<SparseSet<TWriteComponents>*...> writeSets,
         std::vector<std::function<bool(EntityId)>> excludeChecks,
         const bool filterActiveOnly
     )
-        : em_(em), includeSets_(std::move(includeSets)), excludeChecks_(std::move(excludeChecks)),
+        : em_(em),
+    includeSets_(std::move(includeSets)),
+    writeSets_(std::move(writeSets)),
+    excludeChecks_(std::move(excludeChecks)),
           filterActiveOnly_(filterActiveOnly),
 
-          optionalSets_(std::make_tuple(em_->template sparseSet<TOptional>()...)),
-          anyDirtySets_(std::make_tuple(em_->template sparseSet<DirtyComponentSpec<TDirty>>()...)) {
+        optionalSets_(std::make_tuple(em_->template sparseSet<TOptional>()...)),
+        anyDirtySets_(std::make_tuple(em_->template sparseSet<DirtyComponentSpec<TDirty>>()...)) {
 
         initializeRequiredSets();
     }
@@ -210,10 +236,11 @@ public:
     {
         return PartialView<
             TEntityManager,
-            std::tuple<TIncluded...>,
+            std::tuple<TReadComponents...>,
+            std::tuple<TWriteComponents...>,
             std::tuple<TDirty...>,
             std::tuple<TNewOptional...>
-        >(em_, includeSets_, excludeChecks_, filterActiveOnly_, anyDirtySets_);
+        >(em_, includeSets_, writeSets_, excludeChecks_, filterActiveOnly_, anyDirtySets_);
     }
 
     /**
@@ -225,8 +252,8 @@ public:
     auto whereAnyDirty()
         requires(sizeof...(TOptional) == 0 && sizeof...(TDirty) == 0)
     {
-        return PartialView<TEntityManager, std::tuple<TIncluded...>, std::tuple<TNewDirty...>, std::tuple<>>(
-            em_, includeSets_, excludeChecks_, filterActiveOnly_
+        return PartialView<TEntityManager, std::tuple<TReadComponents...>, std::tuple<TWriteComponents...>, std::tuple<TNewDirty...>, std::tuple<>>(
+            em_, includeSets_, writeSets_, excludeChecks_, filterActiveOnly_
         );
     }
 
@@ -282,9 +309,10 @@ public:
     {
         using ActiveComponent = Active<typename TEntityManager::HandleType>;
 
-        return PartialView<TEntityManager, std::tuple<ActiveComponent, TIncluded...>, std::tuple<>, std::tuple<>>(
+        return PartialView<TEntityManager, std::tuple<ActiveComponent, TReadComponents...>, std::tuple<TWriteComponents...>, std::tuple<>, std::tuple<>>(
             em_,
             std::tuple_cat(std::make_tuple(em_->template sparseSet<ActiveComponent>()), includeSets_),
+            writeSets_,
             excludeChecks_,
             true
         );
@@ -420,14 +448,21 @@ public:
          * @param set The component set.
          * @return A tuple containing the component if it's not active, otherwise an empty tuple.
          */
-        template <typename TSet>
-        static auto includeComponent(EntityId entityId, TSet* set) {
-            using Component_type = TSet::Component_type;
+        template<typename TComponent>
+        auto includeComponent(EntityId entityId, const SparseSet<TComponent>* set) const {
+            using ComponentType = TComponent;
 
-            if constexpr (IsActiveComponent_v<Component_type>) {
-                return std::tuple{};
+            if constexpr (IsActiveComponent_v<ComponentType>) {
+
+                return nullptr;
+
+            } else if constexpr (core::common::traits::IsInList<ComponentType, TWriteComponents...>::value) {
+
+                auto* writeSet = std::get<SparseSet<TComponent>*>(view_->writeSets_);
+                return writeSet->get(entityId);
+
             } else {
-                return std::make_tuple(set->get(entityId));
+                return set->get(entityId);
             }
         }
 
@@ -448,11 +483,16 @@ public:
             EntityId entityId = *current_;
             auto handle = view_->em_->handle(entityId);
 
+
             return std::tuple_cat(
                 std::make_tuple(Entity_type(handle, view_->em_)),
 
                 std::apply(
-                    [entityId](auto*... sets) { return std::tuple_cat(includeComponent(entityId, sets)...); },
+                    [this, entityId](auto*... sets) {
+                        return std::make_tuple(
+                            includeComponent(entityId, sets)...
+                        );
+                    },
                     view_->includeSets_
                 ),
 

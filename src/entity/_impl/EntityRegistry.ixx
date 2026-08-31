@@ -8,7 +8,7 @@ module;
 #include <cstddef>
 #include <vector>
 
-export module helios.ecs.EntityRegistry;
+export module helios.ecs.entity.EntityManager:EntityRegistry;
 
 import helios.ecs.common.types;
 
@@ -16,7 +16,7 @@ import helios.ecs.common.concepts;
 
 using namespace helios::ecs::common::types;
 using namespace helios::ecs::common::types;
-export namespace helios::ecs {
+export namespace helios::ecs::entity {
 
 /**
  * @brief Registry for typed, versioned entity handles.

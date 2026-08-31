@@ -2,27 +2,15 @@ module;
 
 #include <tuple>
 
-export module helios.ecs.common.types:EntityAccessSet;
+export module helios.ecs.entity.EntityAccessSet;
 
-export namespace helios::ecs::common::types {
-/**
- * @brief provides a list of Components.
- */
-template <typename... TComponents>
-struct ComponentList {};
+import helios.core.common.types;
 
-/**
- * @brief Provides a handleList parametrized after a list of Handles.
- *
- * @tparam THandles A list of Entity-handles.
- */
-template <typename... THandles>
-struct HandleList {};
-} // namespace helios::ecs::common::types
+
 
 namespace {
 
-using namespace helios::ecs::common::types;
+using namespace helios::core::common::types;
 /**
  * @brief Primary template to list/tuple conversion.
  * @tparam TList
@@ -35,7 +23,7 @@ struct ToTuple {};
  * @tparam TElements The element types contained in HandleList.
  */
 template <typename... TElements>
-struct ToTuple<HandleList<TElements...>> {
+struct ToTuple<TypeList<TElements...>> {
     using type = std::tuple<TElements...>;
 };
 
@@ -53,7 +41,7 @@ struct Contains {};
  * @tparam TTail The element types contained in HandleList.
  */
 template <typename THandle, typename... TTail>
-struct Contains<THandle, HandleList<TTail...>> {
+struct Contains<THandle, TypeList<TTail...>> {
     static constexpr bool value = (std::is_same_v<THandle, TTail> || ...);
 };
 
@@ -73,8 +61,8 @@ struct AppendIfUnique {};
  * @tparam TTail The element types contained in HandleList.
  */
 template <typename THandle, typename... TTail>
-struct AppendIfUnique<THandle, HandleList<TTail...>, true> {
-    using list = HandleList<TTail...>;
+struct AppendIfUnique<THandle, TypeList<TTail...>, true> {
+    using list = TypeList<TTail...>;
 };
 
 /**
@@ -84,8 +72,8 @@ struct AppendIfUnique<THandle, HandleList<TTail...>, true> {
  * @tparam TTail The element types contained in HandleList.
  */
 template <typename THandle, typename... TTail>
-struct AppendIfUnique<THandle, HandleList<TTail...>, false> {
-    using list = HandleList<TTail..., THandle>;
+struct AppendIfUnique<THandle, TypeList<TTail...>, false> {
+    using list = TypeList<TTail..., THandle>;
 };
 
 /**
@@ -101,8 +89,8 @@ struct UniqueHandleList {};
  * @tparam TUniqueList The unique list of handles
  */
 template <typename... TUniqueList>
-struct UniqueHandleList<HandleList<TUniqueList...>, HandleList<>> {
-    using list = HandleList<TUniqueList...>;
+struct UniqueHandleList<TypeList<TUniqueList...>, TypeList<>> {
+    using list = TypeList<TUniqueList...>;
 };
 
 /**
@@ -114,23 +102,23 @@ struct UniqueHandleList<HandleList<TUniqueList...>, HandleList<>> {
  * @tparam TTail The remaining elements of the HandleList.
  */
 template <typename... TUniqueList, typename THead, typename... TTail>
-struct UniqueHandleList<HandleList<TUniqueList...>, HandleList<THead, TTail...>> {
+struct UniqueHandleList<TypeList<TUniqueList...>, TypeList<THead, TTail...>> {
     using list = UniqueHandleList<
-        typename AppendIfUnique<THead, HandleList<TUniqueList...>>::list,
-        HandleList<TTail...>
+        typename AppendIfUnique<THead, TypeList<TUniqueList...>>::list,
+        TypeList<TTail...>
     >::list;
 };
 } // namespace
 
-export namespace helios::ecs::common::types {
+export namespace helios::ecs::entity {
 /**
  * @brief Template for providing HandleList_type containing unique handles used for read access of component data.
  * @tparam TReadComponents
  */
 template <typename... TReadComponents>
 struct Read {
-    using ComponentList = ComponentList<TReadComponents...>;
-    using HandleList = UniqueHandleList<HandleList<>, HandleList<typename TReadComponents::Handle_type...>>::list;
+    using ComponentList = TypeList<TReadComponents...>;
+    using HandleList = UniqueHandleList<TypeList<>, TypeList<typename TReadComponents::Handle_type...>>::list;
 };
 
 /**
@@ -139,8 +127,8 @@ struct Read {
  */
 template <typename... TWriteComponents>
 struct Write {
-    using ComponentList = ComponentList<TWriteComponents...>;
-    using HandleList = UniqueHandleList<HandleList<>, HandleList<typename TWriteComponents::Handle_type...>>::list;
+    using ComponentList = TypeList<TWriteComponents...>;
+    using HandleList = UniqueHandleList<TypeList<>, TypeList<typename TWriteComponents::Handle_type...>>::list;
 };
 
 template <typename TRead, typename TWrite>
@@ -162,7 +150,9 @@ struct EntityAccessSet<Read<TReadComponents...>, Write<TWriteComponents...>> {
     using WriteHandleList = WriteComponentSet::HandleList;
 
     using AccessHandleList =
-        UniqueHandleList<ReadHandleList, typename UniqueHandleList<HandleList<>, WriteHandleList>::list>::list;
+        UniqueHandleList<
+            ReadHandleList,
+            typename UniqueHandleList<TypeList<>, WriteHandleList>::list>::list;
 
     using ReadHandles = ToTuple<ReadHandleList>::type;
 

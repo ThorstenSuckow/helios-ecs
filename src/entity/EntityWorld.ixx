@@ -9,22 +9,25 @@ module;
 #include <utility>
 #include <vector>
 
-export module helios.ecs.EcsWorld;
+export module helios.ecs.entity.EntityWorld;
 
-import helios.ecs.EntityManager;
-import helios.ecs.View;
-import helios.ecs.Entity;
+import helios.ecs.entity.EntityManager;
+import helios.ecs.entity.Entity;
+import helios.ecs.entity.EntityAccessSet;
+
+import helios.core.common.traits;
+import helios.ecs.common.types;
 
 import helios.ecs.common;
-import helios.ecs.storage;
+import helios.ecs.entity.storage;
 import :TypedHandleWorld;
 
-export namespace helios::ecs {
+export namespace helios::ecs::entity {
 
 /**
  * @brief Type-erased facade for accessing TypedHandleWorld instances.
  */
-class EcsWorld {
+class EntityWorld {
 
     class EntityManagerRef {
         void* entityManager_{};
@@ -76,21 +79,21 @@ class EcsWorld {
     }
 
 public:
-    EcsWorld() = delete;
-    EcsWorld(const EcsWorld&) = delete;
-    EcsWorld& operator=(const EcsWorld&) = delete;
+    EntityWorld() = delete;
+    EntityWorld(const EntityWorld&) = delete;
+    EntityWorld& operator=(const EntityWorld&) = delete;
 
-    EcsWorld(EcsWorld&&) noexcept = default;
-    EcsWorld& operator=(EcsWorld&&) noexcept = default;
+    EntityWorld(EntityWorld&&) noexcept = default;
+    EntityWorld& operator=(EntityWorld&&) noexcept = default;
 
     template <typename... THandles>
-    static EcsWorld make() noexcept {
-        return EcsWorld{TypedHandleWorld<THandles...>{}};
+    static EntityWorld make() noexcept {
+        return EntityWorld{TypedHandleWorld<THandles...>{}};
     }
 
     template <typename TTypedHandleWorld>
         requires(!std::is_lvalue_reference_v<TTypedHandleWorld>)
-    explicit EcsWorld(TTypedHandleWorld&& typedHandleWorld) {
+    explicit EntityWorld(TTypedHandleWorld&& typedHandleWorld) {
 
         using TypedHandleWorld = std::remove_cvref_t<TTypedHandleWorld>;
         auto model = std::make_unique<Model<TypedHandleWorld>>(std::forward<TTypedHandleWorld>(typedHandleWorld));
@@ -106,12 +109,12 @@ public:
     };
 
     template <typename THandle>
-    EntityManager<THandle>& entityManager() {
-        return const_cast<EntityManager<THandle>&>(std::as_const(*this).entityManager<THandle>());
+    entity::EntityManager<THandle>& entityManager() {
+        return const_cast<entity::EntityManager<THandle>&>(std::as_const(*this).entityManager<THandle>());
     }
 
     template <typename THandle>
-    [[nodiscard]] const EntityManager<THandle>& entityManager() const {
+    [[nodiscard]] const entity::EntityManager<THandle>& entityManager() const {
 
         auto idx = common::types::HandleTypeId::template id<THandle>().value();
 
@@ -122,7 +125,7 @@ public:
             std::terminate();
         }
 
-        return *static_cast<EntityManager<THandle>*>(entityManagers_[idx]);
+        return *static_cast<entity::EntityManager<THandle>*>(entityManagers_[idx]);
     }
 
     /**
@@ -137,7 +140,7 @@ public:
 
         auto handle = em.create();
 
-        return Entity{handle, &em};
+        return entity::Entity{handle, &em};
     }
 
     /**
@@ -162,7 +165,7 @@ public:
      * @return Optional entity facade.
      */
     template <typename THandle>
-    [[nodiscard]] std::optional<Entity<EntityManager<THandle>>> find(THandle handle) {
+    [[nodiscard]] std::optional<entity::Entity<entity::EntityManager<THandle>>> find(THandle handle) {
         auto& em = entityManager<THandle>();
 
         return em.entity(handle);
@@ -197,7 +200,7 @@ public:
     [[nodiscard]] auto view() {
         auto& em = entityManager<THandle>();
         using EM = std::remove_reference_t<decltype(em)>;
-        return View<EM, TComponents...>(&em);
+        return View<EM, entity::Read<TComponents...>, entity::Write<TComponents...>>(&em);
     }
 
     /**
@@ -243,7 +246,7 @@ public:
      * @return SparseSet<THandle> or nullptr if not available.
      */
     template <typename THandle, typename TComponent>
-    [[nodiscard]] storage::SparseSet<TComponent>* sparseSet() {
+    [[nodiscard]] entity::storage::SparseSet<TComponent>* sparseSet() {
         auto& em = entityManager<THandle>();
         return em.template sparseSet<TComponent>();
     }
