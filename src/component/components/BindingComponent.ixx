@@ -19,7 +19,7 @@ class BindingComponent {
     TTargetHandle targetHandle_{};
 
 public:
-    using Handle_type = TOwnerHandle;
+    using HandleType = TOwnerHandle;
 
     /**
      * @brief Creates a binding from an explicit target handle.
@@ -31,11 +31,11 @@ public:
     /**
      * @brief Creates a binding from a target entity instance.
      *
-     * @tparam TTargetEntity Entity type exposing `Handle_type` and `handle()`.
+     * @tparam TTargetEntity Entity type exposing `HandleType` and `handle()`.
      * @param targetEntity Referenced target entity.
      */
     template <typename TTargetEntity>
-        requires std::same_as<TTargetHandle, typename TTargetEntity::Handle_type>
+        requires std::same_as<TTargetHandle, typename TTargetEntity::HandleType>
     explicit BindingComponent(const TTargetEntity targetEntity) : targetHandle_(targetEntity.handle()){};
 
     /**

@@ -15,18 +15,18 @@ export namespace helios::ecs::commands {
 /**
  * @brief Deferred command that removes a component of type `TComponent` from an entity.
  *
- * @tparam TComponent Component type to detach. Must expose `Handle_type`.
+ * @tparam TComponent Component type to detach. Must expose `HandleType`.
  */
 template <typename TComponent>
 struct RemoveComponentCommand {
 
-    using Handle_type = TComponent::Handle_type;
+    using HandleType = TComponent::HandleType;
 
     using Component_type = TComponent;
 
-    using CommandGroupType = command::types::CommandGroup<RemoveComponentCommand, Handle_type>;
+    using CommandGroupType = command::types::CommandGroup<RemoveComponentCommand, HandleType>;
 
-    Handle_type handle;
+    HandleType handle;
 
     TComponent component;
 
@@ -35,7 +35,7 @@ struct RemoveComponentCommand {
      *
      * @param handle Target entity handle.
      */
-    explicit RemoveComponentCommand(Handle_type handle)
+    explicit RemoveComponentCommand(HandleType handle)
         requires std::default_initializable<TComponent>
         : handle(handle), component() {}
 
@@ -48,7 +48,7 @@ struct RemoveComponentCommand {
      */
     template <typename... TArgs>
         requires std::constructible_from<TComponent, TArgs...>
-    explicit RemoveComponentCommand(Handle_type handle, TArgs&&... args)
+    explicit RemoveComponentCommand(HandleType handle, TArgs&&... args)
         : handle(handle), component(std::forward<TArgs>(args)...) {}
 };
 

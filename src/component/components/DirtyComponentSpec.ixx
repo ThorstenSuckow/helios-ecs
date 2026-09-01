@@ -18,7 +18,7 @@ struct DirtyComponentSpec {
 
     using Component_type = TComponent;
 
-    using Handle_type = TComponent::Handle_type;
+    using HandleType = TComponent::HandleType;
 };
 
 } // namespace helios::ecs::components

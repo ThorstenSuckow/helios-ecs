@@ -15,7 +15,7 @@ export namespace helios::ecs::components {
  */
 template <typename THandle>
 struct Inactive {
-    using Handle_type = THandle;
+    using HandleType = THandle;
 };
 
 } // namespace helios::ecs::components

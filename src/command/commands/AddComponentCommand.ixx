@@ -15,18 +15,18 @@ export namespace helios::ecs::commands {
 /**
  * @brief Deferred command that adds a component of type `TComponent` to an entity.
  *
- * @tparam TComponent Component type to attach. Must expose `Handle_type`.
+ * @tparam TComponent Component type to attach. Must expose `HandleType`.
  */
 template <typename TComponent>
 struct AddComponentCommand {
 
-    using Handle_type = TComponent::Handle_type;
+    using HandleType = TComponent::HandleType;
 
     using Component_type = TComponent;
 
-    using CommandGroupType = command::types::CommandGroup<AddComponentCommand, Handle_type>;
+    using CommandGroupType = command::types::CommandGroup<AddComponentCommand, HandleType>;
 
-    Handle_type handle;
+    HandleType handle;
 
     TComponent component;
 
@@ -35,7 +35,7 @@ struct AddComponentCommand {
      *
      * @param handle Target entity handle.
      */
-    explicit AddComponentCommand(Handle_type handle)
+    explicit AddComponentCommand(HandleType handle)
         requires std::default_initializable<TComponent>
         : handle(handle), component() {}
 
@@ -48,7 +48,7 @@ struct AddComponentCommand {
      */
     template <typename... TArgs>
         requires std::constructible_from<TComponent, TArgs...>
-    explicit AddComponentCommand(Handle_type handle, TArgs&&... args)
+    explicit AddComponentCommand(HandleType handle, TArgs&&... args)
         : handle(handle), component(std::forward<TArgs>(args)...) {}
 };
 
