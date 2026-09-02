@@ -189,19 +189,7 @@ public:
         return entity;
     }
 
-    /**
-     * @brief Creates a typed view for one handle domain.
-     *
-     * @tparam THandle Handle domain.
-     * @tparam TComponents Component filter pack.
-     * @return View object for iterating matching entities.
-     */
-    template <typename THandle, typename... TComponents>
-    [[nodiscard]] auto view() {
-        auto& em = entityManager<THandle>();
-        using EM = std::remove_reference_t<decltype(em)>;
-        return View<EM, entity::Read<TComponents...>, entity::Write<TComponents...>>(&em);
-    }
+
 
     /**
      * @brief Clears dirty sets for one handle domain.
