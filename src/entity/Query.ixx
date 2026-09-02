@@ -12,20 +12,24 @@ module;
 
 export module helios.ecs.entity.Query;
 
+import :QueryTraits;
+export import :QueryTypes;
+
 import helios.ecs.component;
+
 import helios.ecs.entity.storage.SparseSet;
 import helios.ecs.entity.EntityManager;
 import helios.ecs.entity.Entity;
 import helios.ecs.entity.EntityAccessSet;
-import :QueryTraits;
-
-import helios.core.common.types;
-import helios.core.common.traits;
+import helios.ecs.entity.EntityProxy;
 
 import helios.ecs.common.concepts;
 import helios.ecs.common.types;
 
-import helios.ecs.common.types;
+import helios.core.common.types;
+import helios.core.common.traits;
+
+import helios.ecs.command.EntityMutationCommandSink;
 
 using namespace helios::ecs::common::types;
 using namespace helios::ecs::components;
@@ -44,6 +48,10 @@ requires core::common::traits::IsSubset<
     core::common::types::TypeList<TWriteComponents...>, core::common::types::TypeList<TReadComponents...>
     >::value
 class PartialQuery<TEntityManager, core::common::types::TypeList<TReadComponents...>, core::common::types::TypeList<TWriteComponents...>, std::tuple<TDirty...>, std::tuple<TOptional...>> {
+
+    using EntityMutationCommandSink = ecs::command::EntityMutationCommandSink<
+        typename TEntityManager::HandleType, TWriteComponents...
+    >;
 
 private:
     TEntityManager* em_;
@@ -96,6 +104,8 @@ private:
      */
     EntityId maxEntityId_ = 0;
 
+    EntityMutationCommandSink* entityMutationCommandSink_{};
+
     /**
      * @brief Populates `sortedRequires_` and computes `maxEntityId_`.
      *
@@ -115,19 +125,21 @@ private:
 
 public:
 
-    using ReadSet = entity::Read<TReadComponents...>;
-    using WriteSet = entity::Write<TWriteComponents...>;
+    using HandleType = typename TEntityManager::HandleType;
+    using ReadSet = entity::ReadSet<TReadComponents...>;
+    using WriteSet = entity::WriteSet<TWriteComponents...>;
 
     /**
      * @brief Constructs the view and retrieves the necessary component sets.
      *
      * @param em Pointer to the EntityManager to retrieve sets and construct Entities.
      */
-    explicit PartialQuery(TEntityManager* em)
+    explicit PartialQuery(TEntityManager* em, EntityMutationCommandSink* entityMutationCommandSink = nullptr)
         requires(sizeof...(TOptional) == 0 && sizeof...(TDirty) == 0)
         : em_(em),
         includeSets_(std::make_tuple(em_->template sparseSet<TReadComponents>()...)),
-        writeSets_(std::make_tuple(em_->template sparseSet<TWriteComponents>()...)) {
+        writeSets_(std::make_tuple(em_->template sparseSet<TWriteComponents>()...)),
+        entityMutationCommandSink_(entityMutationCommandSink) {
         // Retrieve pointers to the specific component sets immediately.
 
         initializeRequiredSets();
@@ -144,16 +156,18 @@ public:
      */
     explicit PartialQuery(
         TEntityManager* em,
-        std::tuple<SparseSet<TReadComponents>*...> includeSets,
+        std::tuple<const SparseSet<TReadComponents>*...> includeSets,
         std::tuple<SparseSet<TWriteComponents>*...> writeSets,
         std::vector<std::function<bool(EntityId)>> excludeChecks,
-        const bool filterActiveOnly
-    )
-        : em_(em),
-    includeSets_(std::move(includeSets)),
-    writeSets_(std::move(writeSets)),
-    excludeChecks_(std::move(excludeChecks)),
-          filterActiveOnly_(filterActiveOnly),
+        const bool filterActiveOnly,
+        EntityMutationCommandSink* entityMutationCommandSink = nullptr
+    ) :
+        em_(em),
+        includeSets_(std::move(includeSets)),
+        writeSets_(std::move(writeSets)),
+        excludeChecks_(std::move(excludeChecks)),
+        filterActiveOnly_(filterActiveOnly),
+        entityMutationCommandSink_(entityMutationCommandSink),
 
         optionalSets_(std::make_tuple(em_->template sparseSet<TOptional>()...)),
         anyDirtySets_(std::make_tuple(em_->template sparseSet<DirtyComponentSpec<TDirty>>()...)) {
@@ -193,7 +207,7 @@ public:
             std::tuple<TWriteComponents...>,
             std::tuple<TDirty...>,
             std::tuple<TNewOptional...>
-        >(em_, includeSets_, writeSets_, excludeChecks_, filterActiveOnly_, anyDirtySets_);
+        >(em_, includeSets_, writeSets_, excludeChecks_, filterActiveOnly_, anyDirtySets_, entityMutationCommandSink_);
     }
 
     /**
@@ -204,9 +218,20 @@ public:
     template <typename... TNewDirty>
     auto whereAnyDirty()
         requires(sizeof...(TOptional) == 0 && sizeof...(TDirty) == 0)
+        && (core::common::traits::IsInList<TNewDirty, TReadComponents...>::value && ...)
     {
-        return PartialQuery<TEntityManager, std::tuple<TReadComponents...>, std::tuple<TWriteComponents...>, std::tuple<TNewDirty...>, std::tuple<>>(
-            em_, includeSets_, writeSets_, excludeChecks_, filterActiveOnly_
+        return PartialQuery<
+            TEntityManager,
+            core::common::types::TypeList<TReadComponents...>,
+            core::common::types::TypeList<TWriteComponents...>,
+            std::tuple<TNewDirty...>,
+            std::tuple<>>(
+            em_,
+            includeSets_,
+            writeSets_,
+            excludeChecks_,
+            filterActiveOnly_,
+            entityMutationCommandSink_
         );
     }
 
@@ -262,13 +287,20 @@ public:
     {
         using ActiveComponent = Active<typename TEntityManager::HandleType>;
 
-        return PartialQuery<TEntityManager, std::tuple<ActiveComponent, TReadComponents...>, std::tuple<TWriteComponents...>, std::tuple<>, std::tuple<>>(
-            em_,
-            std::tuple_cat(std::make_tuple(em_->template sparseSet<ActiveComponent>()), includeSets_),
-            writeSets_,
-            excludeChecks_,
-            true
-        );
+        return PartialQuery<
+            TEntityManager,
+            core::common::types::TypeList<ActiveComponent, TReadComponents...>,
+            core::common::types::TypeList<TWriteComponents...>,
+            std::tuple<>,
+            std::tuple<>
+        >(
+                em_,
+                std::tuple_cat(std::make_tuple(em_->template sparseSet<ActiveComponent>()), includeSets_),
+                writeSets_,
+                excludeChecks_,
+                true,
+                entityMutationCommandSink_
+            );
     }
 
     /**
@@ -407,15 +439,15 @@ public:
 
             if constexpr (IsActiveComponent_v<ComponentType>) {
 
-                return nullptr;
+                return std::tuple{}; // Active components are not included in the returned tuple.
 
             } else if constexpr (core::common::traits::IsInList<ComponentType, TWriteComponents...>::value) {
 
                 auto* writeSet = std::get<SparseSet<TComponent>*>(view_->writeSets_);
-                return writeSet->get(entityId);
+                return std::make_tuple(writeSet->get(entityId));
 
             } else {
-                return set->get(entityId);
+                return std::make_tuple(set->get(entityId));
             }
         }
 
@@ -436,14 +468,15 @@ public:
             EntityId entityId = *current_;
             auto handle = view_->em_->handle(entityId);
 
-            auto* constEM = std::as_const(view_->em_);
-
             return std::tuple_cat(
-                std::make_tuple(handle),
+                std::make_tuple(EntityProxy<typename TEntityManager::HandleType, TWriteComponents...>(
+                    handle, view_->entityMutationCommandSink_)),
 
+                // tuple_cat is required to make sure ActiveComponent is not included
+                // since this is treated as meta information we are not interested in
                 std::apply(
                     [this, entityId](auto*... sets) {
-                        return std::make_tuple(
+                        return std::tuple_cat(
                             includeComponent(entityId, sets)...
                         );
                     },
@@ -536,22 +569,6 @@ public:
         const auto entities = sortedRequires_.front()->entityIds();
         return Iterator{entities.end(), entities.end(), this};
     }
-};
-
-template<typename QueryLike>
-struct IsQuery {
-    constexpr static bool value = false;
-};
-
-template<typename TEntityManager, typename TReadSet, typename TWriteSet>
-struct IsQuery<PartialQuery<
-    TEntityManager,
-    TReadSet,
-    TWriteSet,
-    std::tuple<>,
-    std::tuple<>
->>{
-    constexpr static bool value = true;
 };
 
 } // namespace helios::ecs
