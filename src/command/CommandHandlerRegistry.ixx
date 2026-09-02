@@ -13,7 +13,6 @@ module;
 export module helios.ecs.command.CommandHandlerRegistry;
 
 import helios.ecs.command.types;
-import helios.ecs.manager.Manager;
 import helios.ecs.manager.types;
 
 export namespace helios::ecs::command {
@@ -32,7 +31,6 @@ class CommandHandlerRegistry {
     };
 
     using ManagerTypeId = manager::types::ManagerTypeId;
-    using Manager = manager::Manager;
 
     std::vector<CommandHandlerRef> commandToHandlerRef_;
     std::vector<CommandHandlerRef> commandGroupToHandlerRef_;
