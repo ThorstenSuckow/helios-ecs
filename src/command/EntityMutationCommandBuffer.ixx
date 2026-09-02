@@ -10,9 +10,12 @@ module;
 
 export module helios.ecs.command.EntityMutationCommandBuffer;
 
+import helios.ecs.command.CommandBuffer;
 import helios.ecs.command.CommandHandlerRegistry;
 import helios.ecs.command.CommandBufferRegistry;
-import helios.ecs.manager.ManagerRegistry;
+
+import helios.ecs.common.container;
+
 
 import helios.ecs.common.types;
 import helios.ecs.common.concepts;
@@ -56,13 +59,9 @@ class EntityMutationCommandBuffer {
          *
          * @note Must not be called from concurrently running tasks.
          *
-         * @param flushContext Frame-local flush context (currently unused; kept for interface uniformity).
          */
-        template <typename TFlushContext>
-        void flush(TFlushContext& flushContext) {
+        void flush(CommandHandlerRegistry& commandHandlerRegistry) noexcept {
 
-            auto& managerRegistry = flushContext.managerRegistry();
-            auto& commandHandlerRegistry = flushContext.commandHandlerRegistry();
             if (commandHandlerRegistry.template has<TCommandType>()) {
                 for (auto& cmd : commands_) {
                     commandHandlerRegistry.template submitBatch<TCommandType>(std::move(cmd));
@@ -73,8 +72,9 @@ class EntityMutationCommandBuffer {
         }
 
         /** @brief Discards all buffered commands without dispatching them. */
-        void clear() {
+        bool clear() {
             commands_.clear();
+            return true;
         }
 
         /**
@@ -117,14 +117,14 @@ public:
     /**
      * @brief Enqueues a command of type `TCommand`, constructing it from `args`.
      *
-     * `TCommand::Handle_type` must match `THandle`.
+     * `TCommand::HandleType` must match `THandle`.
      *
      * @tparam TCommand ECS command type to enqueue.
      * @tparam Args     Constructor argument types.
      * @param  args     Arguments forwarded to the command constructor.
      */
     template <typename TCommand, typename... Args>
-        requires std::is_same_v<typename TCommand::Handle_type, THandle>
+    requires std::is_same_v<typename TCommand::HandleType, THandle>
     void add(Args&&... args) {
 
         auto* model = bufferFor<TCommand>();
@@ -148,22 +148,21 @@ public:
      *
      * @param flushContext Frame-local flush context passed to each internal buffer.
      */
-    template <typename TFlushContext>
-        requires common::concepts::ProvidesCommandHandlerRegistry<TFlushContext, command::CommandHandlerRegistry> &&
-                 common::concepts::ProvidesManagerRegistry<TFlushContext, ecs::manager::ManagerRegistry>
-    void flush(TFlushContext& flushContext) {
+    void flush(ecs::common::container::EcsDataContainer& ecsDataContainer) noexcept {
         for (auto* buffer : commandBufferRegistry_.items()) {
-            buffer->flush(flushContext);
+            buffer->flush(ecsDataContainer);
         }
     }
 
     /**
      * @brief Discards all queued commands across every internal buffer without dispatching.
      */
-    void clear() {
+    bool clear() {
         for (auto* buffer : commandBufferRegistry_.items()) {
             buffer->clear();
         }
+
+        return true;
     }
 };
 
