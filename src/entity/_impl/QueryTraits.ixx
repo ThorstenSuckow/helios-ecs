@@ -1,3 +1,7 @@
+/**
+ * @file QueryTraits.ixx
+ * @brief Traits for easing access to ecs::entity::Query-related information from types.
+ */
 module;
 
 #include <tuple>
@@ -5,7 +9,8 @@ module;
 
 export module helios.ecs.entity.Query:QueryTraits;
 
-import helios.ecs.entity.types;
+import :QueryTypes;
+
 
 import helios.ecs.entity.EntityManager;
 import helios.ecs.entity.EntityAccessSet;
@@ -27,6 +32,22 @@ export namespace helios::ecs::entity::traits {
     struct QuerySelector{};
 
     template<
+        typename THandle,
+        typename TReadSet,
+        typename TWriteSet
+    >
+    requires (std::tuple_size_v<typename entity::EntityAccessSet<TReadSet, TWriteSet>::AccessHandles> == 1)
+    && (std::same_as<THandle, std::tuple_element_t<0, typename ecs::entity::EntityAccessSet<TReadSet, TWriteSet>::AccessHandles>>)
+    struct QuerySelector<THandle, TReadSet, TWriteSet> {
+            using type =  entity::PartialQuery<
+                entity::EntityManager<THandle>,
+            typename TReadSet::ComponentList,
+            typename TWriteSet::ComponentList,
+            std::tuple<>, std::tuple<>>;
+        };
+
+
+    template<
         typename TReadSet,
         typename TWriteSet
     >
@@ -46,11 +67,11 @@ export namespace helios::ecs::entity::traits {
 
 
     template<typename THandle, template <typename> typename... TReadComponents, template <typename> typename... TWriteComponents>
-    struct QuerySelector<THandle, types::Read<TReadComponents...>, types::Write<TWriteComponents...>>{
+    struct QuerySelector<THandle, Read<TReadComponents...>, Write<TWriteComponents...>>{
         using type = PartialQuery<
                 EntityManager<THandle>,
-                typename Read<TReadComponents<THandle>...>::ComponentList,
-                typename Write<TWriteComponents<THandle>...>::ComponentList,
+                typename ReadSet<TReadComponents<THandle>...>::ComponentList,
+                typename WriteSet<TWriteComponents<THandle>...>::ComponentList,
                 std::tuple<>, std::tuple<>
             >;
     };
