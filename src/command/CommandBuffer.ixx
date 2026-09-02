@@ -8,12 +8,13 @@ module;
 #include <cassert>
 #include <exception>
 #include <memory>
+#include <variant>
 
 export module helios.ecs.command.CommandBuffer;
 
 import helios.core.common.traits;
 
-import helios.ecs.common;
+import helios.ecs.common.container;
 
 import helios.ecs.command.concepts;
 import helios.ecs.command.types;
@@ -28,7 +29,9 @@ class CommandBuffer {
 
     using EcsDataContainer = ecs::common::container::EcsDataContainer;
     using CommandBufferTypeId = ecs::command::types::CommandBufferTypeId;
-    using EcsDataContainerArgumentResolver = ecs::common::container::EcsDataContainerArgumentResolver;
+
+    template<typename TEntityMutationSink>
+    using EcsDataContainerArgumentResolver = ecs::common::container::EcsDataContainerArgumentResolver<TEntityMutationSink>;
 
 private:
     /**
@@ -67,8 +70,11 @@ private:
 
         template <std::size_t... Idx>
         auto invokeFlush(EcsDataContainer& typeMap, std::index_sequence<Idx...> /*unused*/) {
+
+            std::tuple<> emptyTuple{};
+            EcsDataContainerArgumentResolver resolver{typeMap, emptyTuple};
             return cmdBuffer_.flush(
-                EcsDataContainerArgumentResolver::resolve<typename Traits::template ArgumentType<Idx>>(typeMap)...
+                resolver.resolve<Idx, typename Traits::template ArgumentType<Idx>>(typeMap)...
             );
         }
 
