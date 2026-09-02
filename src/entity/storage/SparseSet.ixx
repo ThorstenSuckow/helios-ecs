@@ -264,7 +264,7 @@ public:
      * @return Type id of this sparse-set component type.
      */
     ComponentTypeId<TComponent> componentTypeId() {
-        return ComponentTypeId<typename TComponent::Handle_type>::template id<TComponent>();
+        return ComponentTypeId<typename TComponent::HandleType>::template id<TComponent>();
     };
 
     /**
@@ -547,8 +547,7 @@ public:
      */
     void finalizeMutations() noexcept override {
         if (invalidatedMaxEntityId_ != Tombstone) {
-            maxEntityId_ =
-                denseToSparse_.empty() ? Tombstone : *std::ranges::max_element(denseToSparse_);
+            maxEntityId_ = denseToSparse_.empty() ? Tombstone : *std::ranges::max_element(denseToSparse_);
             invalidatedMaxEntityId_ = Tombstone;
         }
     }
