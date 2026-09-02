@@ -27,7 +27,7 @@ struct HandleToManager;
 template <typename THandle, typename THead, typename... TTail>
 struct HandleToManager<THandle, THead, TTail...> {
     static constexpr size_t value = [] {
-        if constexpr (std::is_same_v<typename THead::Handle_type, THandle>) {
+        if constexpr (std::is_same_v<typename THead::HandleType, THandle>) {
             return size_t{0};
         } else {
             return size_t{1} + HandleToManager<THandle, TTail...>::value;
@@ -38,7 +38,7 @@ struct HandleToManager<THandle, THead, TTail...> {
 template <typename THandle, typename THead>
 struct HandleToManager<THandle, THead> {
     static_assert(
-        std::is_same_v<typename THead::Handle_type, THandle>, "No EntityManager found for the given handle type."
+        std::is_same_v<typename THead::HandleType, THandle>, "No EntityManager found for the given handle type."
     );
     static constexpr size_t value = 0;
 };
