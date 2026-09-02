@@ -59,7 +59,6 @@ private:
     }
 
 public:
-    using Handle_type = HandleType;
 
     using ComponentTypeId_type = ComponentTypeId<HandleType>;
 
@@ -198,17 +197,15 @@ public:
      * @param  buffer  Target command buffer to enqueue into.
      */
     template <typename TBuffer>
-        requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
+    requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
     void deferSetActive(TBuffer& buffer) {
         buffer.template add<commands::AddComponentCommand<Active<typename TEntityManager::HandleType>>>(entityHandle_);
-        buffer.template add<commands::RemoveComponentCommand<Active<typename TEntityManager::HandleType>>>(
+        buffer.template add<commands::RemoveComponentCommand<Inactive<typename TEntityManager::HandleType>>>(
             entityHandle_
         );
         buffer.template add<
             commands::AddComponentCommand<DirtyComponentSpec<Active<typename TEntityManager::HandleType>>>
         >(entityHandle_);
-
-        trackDirty<Active<typename TEntityManager::HandleType>>();
     }
 
     /**
@@ -222,7 +219,7 @@ public:
      * @param  buffer  Target command buffer to enqueue into.
      */
     template <typename TBuffer>
-        requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
+    requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
     void deferSetInactive(TBuffer& buffer) {
         buffer.template add<commands::AddComponentCommand<Inactive<typename TEntityManager::HandleType>>>(
             entityHandle_
@@ -233,8 +230,12 @@ public:
         buffer.template add<
             commands::AddComponentCommand<DirtyComponentSpec<Inactive<typename TEntityManager::HandleType>>>
         >(entityHandle_);
+    }
 
-        trackDirty<Inactive<typename TEntityManager::HandleType>>();
+    template<typename TComponent, typename TBuffer>
+    requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
+    void deferMarkDirty(TBuffer& buffer) {
+        buffer.template add<commands::AddComponentCommand<DirtyComponentSpec<TComponent>>>(entityHandle_);
     }
 
     /**
