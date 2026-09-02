@@ -6,8 +6,11 @@ module;
 
 #include <cassert>
 #include <memory>
+#include <variant>
 
 export module helios.ecs.manager.Manager;
+
+import helios.ecs.entity.traits;
 
 import helios.core.common.traits;
 
@@ -16,6 +19,9 @@ import helios.ecs.common.container;
 
 import helios.ecs.manager.types;
 import helios.ecs.manager.concepts;
+
+import helios.ecs.command.EntityMutationCommandSink;
+import helios.ecs.command.EntityMutationCommandBuffer;
 
 import helios.ecs.command.concepts;
 import helios.ecs.command.traits;
@@ -33,7 +39,15 @@ class Manager {
     using CommandBuffer = ecs::command::CommandBuffer;
     using NullCommandBuffer = ecs::command::NullCommandBuffer;
     using EcsDataContainer = ecs::common::container::EcsDataContainer;
-    using EcsDataContainerArgumentResolver = ecs::common::container::EcsDataContainerArgumentResolver;
+
+    template <typename THandle, typename ... TWriteComponents>
+    using EntityMutationCommandSink = ecs::command::EntityMutationCommandSink<THandle, TWriteComponents...>;
+
+    template <typename THandle>
+    using EntityMutationCommandBuffer = ecs::command::EntityMutationCommandBuffer<THandle>;
+    template<typename TMutationSink>
+    using EcsDataContainerArgumentResolver = ecs::common::container::EcsDataContainerArgumentResolver<TMutationSink>;
+
     using EcsDataContainerFunctionInvoker = ecs::common::container::EcsDataContainerFunctionInvoker;
 
 private:
@@ -45,6 +59,8 @@ private:
         virtual ~Concept() = default;
         virtual bool executeCommands(EcsDataContainer& dataContainer) noexcept = 0;
         virtual bool init(EcsDataContainer& dataContainer) noexcept = 0;
+        virtual bool flush(EcsDataContainer& dataContainer) noexcept = 0;
+
         virtual void reset() noexcept = 0;
 
         virtual command::CommandBuffer* commandBuffer() noexcept = 0;
@@ -71,10 +87,24 @@ private:
         );
         using ConcreteCommandBufferType = CommandBufferInfo::Type;
 
+        using QueryInfo = ecs::entity::traits::QueryFromArguments<typename ExecuteFunctionSignature::ArgumentTypes>;
+        using ConcreteQueryTypes = QueryInfo::list;
+        using CommandSinkTypes = core::common::traits::ListToTuple<typename command::traits::EntityMutationCommandSinksFromQueries<ConcreteQueryTypes>::list>::tuple;
+        CommandSinkTypes entityMutationSinkTuple_{};
+
+        using EntityMutationCommandBufferTypes = command::traits::EntityMutationCommandBuffersFromHandles<typename QueryInfo::handles>::tuple ;
+        EntityMutationCommandBufferTypes entityMutationCommandBufferTuple_{};
+
+        template<std::size_t TIdx>
+        auto& entityMutationCommandBuffer() {
+            return std::get<TIdx>(entityMutationCommandBufferTuple_);
+        }
+
+
         TConcreteManager manager_;
         CommandBuffer commandBuffer_{ConcreteCommandBufferType{}};
 
-        static bool hasCommandBuffer() noexcept {
+        static bool constexpr hasCommandBuffer() noexcept {
             return !std::same_as<NullCommandBuffer, ConcreteCommandBufferType>;
         }
 
@@ -90,20 +120,54 @@ private:
             return &commandBuffer_;
         }
 
+        bool flush(EcsDataContainer& ecsDataContainer) noexcept override {
+
+            // each sink is associated with one command buffer to make sure mutations can be run in parallel later on
+            constexpr std::size_t SinkCount = std::tuple_size_v<decltype(entityMutationSinkTuple_)>;
+            ([&]<std::size_t... Idx>(std::index_sequence<Idx...>) {
+
+                ([&]() {
+                    auto& sink = std::get<Idx>(entityMutationSinkTuple_);
+                    using SinkType = std::remove_cvref_t<decltype(sink)>;
+
+                    if constexpr (!std::same_as<SinkType, std::monostate>) {
+                        auto& mutationCommandBuffer = entityMutationCommandBuffer<Idx>();
+                        sink.drain([&mutationCommandBuffer](auto&& cmd) {
+                            using CmdType = std::remove_cvref_t<decltype(cmd)>;
+                            mutationCommandBuffer.template add<CmdType>(std::move(cmd));
+                        });
+                        mutationCommandBuffer.flush(ecsDataContainer);
+                    }
+                }(), ...);
+
+            }(std::make_index_sequence<SinkCount>{}));
+
+            if constexpr (hasCommandBuffer()) {
+                return commandBuffer_.flush(ecsDataContainer);
+            }
+            return true;
+        }
+
         bool executeCommands(EcsDataContainer& ecsDataContainer) noexcept override {
 
             EcsDataContainerFunctionInvoker::invoke<&TConcreteManager::executeCommands>(
                 manager_,
                 ecsDataContainer,
+                entityMutationSinkTuple_,
                 ecsDataContainer,
                 *static_cast<ConcreteCommandBufferType*>(commandBuffer_.underlying())
             );
+
+
             return true;
         }
 
         bool init(EcsDataContainer& ecsDataContainer) noexcept override {
 
-            EcsDataContainerFunctionInvoker::invoke<&TConcreteManager::init>(manager_, ecsDataContainer);
+            EcsDataContainerFunctionInvoker::invoke<&TConcreteManager::init>(
+                manager_, ecsDataContainer,
+                entityMutationSinkTuple_
+            );
 
             return true;
         }
@@ -201,10 +265,14 @@ public:
      * @return A span of pointers to the owned command buffers, or an empty span if the manager does not
      * own any command buffers.
      */
-    command::CommandBuffer* commandBuffer() noexcept {
+   /* command::CommandBuffer* commandBuffer() noexcept {
         assert(pimpl_ && "Manager not initialized");
         return pimpl_->commandBuffer();
-    }
+    }*/
+
+     void flush(EcsDataContainer& ecsDataContainer) noexcept {
+         pimpl_->flush(ecsDataContainer);
+     }
 
     /**
      * @copydoc underlying()
