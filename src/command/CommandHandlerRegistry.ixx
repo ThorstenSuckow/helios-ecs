@@ -13,12 +13,13 @@ module;
 export module helios.ecs.command.CommandHandlerRegistry;
 
 import helios.ecs.command.types;
+import helios.ecs.command.commands;
 import helios.ecs.manager.types;
 
 export namespace helios::ecs::command {
 
 /**
- * @brief Maps command and command-group types to manager handlers.
+ * @brief Maps command types to manager handlers.
  */
 class CommandHandlerRegistry {
 
@@ -33,7 +34,6 @@ class CommandHandlerRegistry {
     using ManagerTypeId = manager::types::ManagerTypeId;
 
     std::vector<CommandHandlerRef> commandToHandlerRef_;
-    std::vector<CommandHandlerRef> commandGroupToHandlerRef_;
 
 public:
     CommandHandlerRegistry() = default;
@@ -72,52 +72,16 @@ public:
             return;
         }
 
-        commandToHandlerRef_[idx] = CommandHandlerRef{std::addressof(manager), +[](void* managerPtr, void* cmdPtr) {
-                                                          auto& concreteManager = *static_cast<TManager*>(managerPtr);
-                                                          auto& concreteCmd = *static_cast<TCommandType*>(cmdPtr);
-                                                          return concreteManager.submit(std::move(concreteCmd));
-                                                      }};
+        commandToHandlerRef_[idx] = CommandHandlerRef{
+        std::addressof(manager),
+        +[](void* managerPtr, void* cmdPtr) {
+              auto& concreteManager = *static_cast<TManager*>(managerPtr);
+              auto& concreteCmd = *static_cast<TCommandType*>(cmdPtr);
+              return concreteManager.submit(std::move(concreteCmd));
+          }};
     }
 
-    /**
-     * @brief Registers a handler for a full command group.
-     * @tparam TCommandGroupType Command group tag type.
-     * @tparam TManager Manager type handling commands in that group.
-     * @param manager Manager instance owning the group handler.
-     */
-    template <typename TCommandGroupType, typename TManager>
-    void registerHandlerForCommandGroup(TManager& manager) {
 
-        /*static_assert(requires(TManager& x, TCommandGroupType&& c) {
-            { x.submit(std::move(c)) } -> std::same_as<bool>;
-        });*/
-
-        const auto idx = types::CommandGroupTypeId::id<TCommandGroupType>().value();
-
-        if (commandGroupToHandlerRef_.size() <= idx) {
-            commandGroupToHandlerRef_.resize(idx + 1);
-        }
-
-        if (commandGroupToHandlerRef_[idx]) {
-#if HELIOS_DEBUG
-            auto id = ManagerTypeId::id<TManager>();
-            assert(
-                commandGroupToHandlerRef_[idx].manager == std::addressof(manager) &&
-                "Handler already registered for this command group for a different owner"
-            );
-#endif
-            return;
-        }
-
-        /*commandGroupToHandlerRef_[idx] = CommandHandlerRef{
-            std::addressof(manager),
-            +[](void* managerPtr, void* cmdPtr) {
-                auto& concreteManager = *static_cast<TManager*>(managerPtr);
-                auto& concreteCmd = *static_cast<TCommandGroupType*>(cmdPtr);
-                return concreteManager.submit(std::move(concreteCmd));
-            }
-        };*/
-    }
 
     /**
      * @brief Convenience helper to register multiple command types for one manager.
@@ -131,7 +95,7 @@ public:
     }
 
     /**
-     * @brief Returns whether a handler exists for the command or its command group.
+     * @brief Returns whether a handler exists for the command.
      * @tparam TCommandType Command type to query.
      */
     template <typename TCommandType>
@@ -139,13 +103,6 @@ public:
         const auto idx = types::CommandTypeId::id<TCommandType>().value();
         if (idx < commandToHandlerRef_.size() && commandToHandlerRef_[idx]) {
             return true;
-        }
-
-        if constexpr (requires { TCommandType::CommandGroupType; }) {
-            const auto groupIdx = types::CommandGroupTypeId::id<typename TCommandType::CommandGroupType>().value();
-            if (groupIdx < commandGroupToHandlerRef_.size() && commandGroupToHandlerRef_[groupIdx]) {
-                return true;
-            }
         }
 
         return false;
@@ -164,16 +121,6 @@ public:
             const auto& entry = commandToHandlerRef_[idx];
             if (entry) {
                 return std::addressof(entry);
-            }
-        }
-
-        if constexpr (requires { typename TCommandType::CommandGroupType; }) {
-            const auto groupIdx = types::CommandGroupTypeId::id<typename TCommandType::CommandGroupType>().value();
-            if (groupIdx < commandToHandlerRef_.size()) {
-                const auto& entry = commandGroupToHandlerRef_[groupIdx];
-                if (entry) {
-                    return std::addressof(entry);
-                }
             }
         }
 

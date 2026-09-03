@@ -11,11 +11,11 @@ module;
 export module helios.ecs.command.EntityMutationCommandBuffer;
 
 import helios.ecs.command.CommandBuffer;
-import helios.ecs.command.CommandHandlerRegistry;
 import helios.ecs.command.CommandBufferRegistry;
 
 import helios.ecs.common.container;
 
+import helios.ecs.entity.EntityMutationManager;
 
 import helios.ecs.common.types;
 import helios.ecs.common.concepts;
@@ -60,14 +60,9 @@ class EntityMutationCommandBuffer {
          * @note Must not be called from concurrently running tasks.
          *
          */
-        void flush(CommandHandlerRegistry& commandHandlerRegistry) noexcept {
+        void flush(ecs::entity::EntityMutationManager<THandle>& entityMutationManager) noexcept {
 
-            if (commandHandlerRegistry.template has<TCommandType>()) {
-                for (auto& cmd : commands_) {
-                    commandHandlerRegistry.template submitBatch<TCommandType>(std::move(cmd));
-                }
-            }
-
+            entityMutationManager.template submitBatch<TCommandType>(std::move(commands_));
             clear();
         }
 
