@@ -14,7 +14,6 @@ import helios.ecs.common.types;
 import helios.ecs.command.CommandHandlerRegistry;
 
 import helios.ecs.common.concepts;
-import helios.ecs.manager.ManagerRegistry;
 
 export namespace helios::ecs::command {
 
