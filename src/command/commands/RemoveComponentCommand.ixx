@@ -22,9 +22,7 @@ struct RemoveComponentCommand {
 
     using HandleType = TComponent::HandleType;
 
-    using Component_type = TComponent;
-
-    using CommandGroupType = command::types::CommandGroup<RemoveComponentCommand, HandleType>;
+    using ComponentType = TComponent;
 
     HandleType handle;
 

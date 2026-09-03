@@ -22,9 +22,7 @@ struct AddComponentCommand {
 
     using HandleType = TComponent::HandleType;
 
-    using Component_type = TComponent;
-
-    using CommandGroupType = command::types::CommandGroup<AddComponentCommand, HandleType>;
+    using ComponentType = TComponent;
 
     HandleType handle;
 
@@ -50,6 +48,8 @@ struct AddComponentCommand {
         requires std::constructible_from<TComponent, TArgs...>
     explicit AddComponentCommand(HandleType handle, TArgs&&... args)
         : handle(handle), component(std::forward<TArgs>(args)...) {}
+
+
 };
 
 }; // namespace helios::ecs::commands

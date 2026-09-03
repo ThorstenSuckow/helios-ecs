@@ -222,7 +222,7 @@ class SparseSet : public SparseSetBase {
     }
 
 public:
-    using Component_type = TComponent;
+    using ComponentType = TComponent;
 
     /**
      * @brief Default constructor creating an empty sparse set.
