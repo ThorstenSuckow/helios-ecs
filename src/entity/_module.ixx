@@ -8,6 +8,5 @@ export import helios.ecs.entity.EntityAccessSet;
 export import helios.ecs.entity.EntityManager;
 export import helios.ecs.entity.EntityMutationManager;
 export import helios.ecs.entity.Entity;
-export import helios.ecs.entity.View;
 export import helios.ecs.entity.EntityWorld;
 export import helios.ecs.entity.EntityProxy;
