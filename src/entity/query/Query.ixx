@@ -380,14 +380,15 @@ public:
          * @return A tuple containing the component if it's not active, otherwise an empty tuple.
          */
         template<typename TComponent>
-        auto extractReadComponent(EntityId entityId, const SparseSet<TComponent>* set) const {
+        auto extractReadComponent(EntityId entityId, const auto& mutableComponentTuples, const SparseSet<TComponent>* set) const {
             using ComponentType = TComponent;
 
             if constexpr (IsActiveComponent_v<ComponentType>) {
                 return std::tuple{}; // Active components are not included in the returned tuple.
             } else if constexpr (core::common::traits::IsInList<ComponentType, TWriteComponents...>::value) {
                 // will be returned extractMutabelComponent
-                return std::tuple{};
+                auto* mutableComponent = std::get<TComponent*>(mutableComponentTuples);
+                return std::make_tuple(mutableComponent);
             }
             else if constexpr (core::common::traits::IsInList<ComponentType, typename ReadSet::ComponentList>::value) {
                 return std::make_tuple(set->get(entityId));
@@ -427,17 +428,6 @@ public:
             EntityId entityId = *current_;
             auto handle = view_->em_->handle(entityId);
 
-
-
-            auto readTuples = std::apply(
-                [this, entityId](auto*... sets) {
-                    return std::tuple_cat(
-                        extractReadComponent(entityId, sets)...
-                    );
-                },
-                view_->readSet_
-            );
-
             auto mutableTuples = std::apply(
                 [this, entityId](auto*... sets) {
                     return std::tuple_cat(
@@ -445,6 +435,15 @@ public:
                     );
                 },
                 view_->mutableSet_
+            );
+
+            auto readMutateTuples = std::apply(
+                [this, &mutableTuples, entityId](auto*... sets) {
+                    return std::tuple_cat(
+                        extractReadComponent(entityId, mutableTuples, sets)...
+                    );
+                },
+                view_->readSet_
             );
 
             return std::tuple_cat(
@@ -456,7 +455,7 @@ public:
 
                 // tuple_cat is required to make sure ActiveComponent is not included
                 // since this is treated as meta information we are not interested in
-                std::tuple_cat(readTuples, mutableTuples),
+                std::tuple_cat(readMutateTuples),
 
                 std::apply(
                     [entityId](auto*... sets) {
