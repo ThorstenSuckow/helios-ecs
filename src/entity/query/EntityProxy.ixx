@@ -6,7 +6,7 @@ module;
 
 #include <vector>
 
-export module helios.ecs.entity.EntityProxy;
+export module helios.ecs.entity.query.EntityProxy;
 
 import helios.ecs.entity.EntityManager;
 import helios.ecs.entity.Entity;
@@ -16,10 +16,10 @@ import helios.core.common.traits;
 import helios.ecs.command.commands;
 import helios.ecs.component.components;
 
-import helios.ecs.entity.EntityMutationBuffer;
+import helios.ecs.entity.mutation.EntityMutationBuffer;
 
 
-export namespace helios::ecs::entity {
+export namespace helios::ecs::entity::query {
 
     template<typename THandle, typename ... TWriteComponents>
     class EntityProxy {
@@ -27,7 +27,7 @@ export namespace helios::ecs::entity {
 
         THandle handle_;
 
-        using EntityMutationBuffer = EntityMutationBuffer<THandle, TWriteComponents...>;
+        using EntityMutationBuffer = mutation::EntityMutationBuffer<THandle, TWriteComponents...>;
 
         EntityMutationBuffer* buffer_;
     public:

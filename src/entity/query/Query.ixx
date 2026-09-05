@@ -10,7 +10,7 @@ module;
 #include <tuple>
 #include <vector>
 
-export module helios.ecs.entity.Query;
+export module helios.ecs.entity.query.Query;
 
 import :QueryTraits;
 export import :QueryTypes;
@@ -21,7 +21,8 @@ import helios.ecs.entity.storage.SparseSet;
 import helios.ecs.entity.EntityManager;
 import helios.ecs.entity.Entity;
 import helios.ecs.entity.EntityAccessSet;
-import helios.ecs.entity.EntityProxy;
+
+import helios.ecs.entity.query.EntityProxy;
 
 import helios.ecs.common.concepts;
 import helios.ecs.common.types;
@@ -29,17 +30,17 @@ import helios.ecs.common.types;
 import helios.core.common.types;
 import helios.core.common.traits;
 
-import helios.ecs.entity.EntityMutationBuffer;
+import helios.ecs.entity.mutation.EntityMutationBuffer;
 
 using namespace helios::ecs::common::types;
 using namespace helios::ecs::components;
 using namespace helios::ecs::entity::storage;
 using namespace helios::ecs::common::concepts::traits;
 
-export namespace helios::ecs::entity {
+export namespace helios::ecs::entity::query {
 
 
-template<typename TReadSet, typename TWriteSet, typename TFilter = Filter<AnyDirty<>>>
+template<typename TReadSet, typename TWriteSet, typename TFilter = query::Filter<query::AnyDirty<>>>
 using Query = typename traits::QueryBuilder<TReadSet, TWriteSet, TFilter>::type;
 
 
@@ -49,7 +50,7 @@ requires core::common::traits::IsSubset<
     >::value
 class PartialQuery<TEntityManager, core::common::types::TypeList<TReadComponents...>, core::common::types::TypeList<TWriteComponents...>, TFilter,  std::tuple<TOptional...>> {
 
-    using EntityMutationBuffer = ecs::entity::EntityMutationBuffer<
+    using EntityMutationBuffer = mutation::EntityMutationBuffer<
         typename TEntityManager::HandleType, TWriteComponents...
     >;
 

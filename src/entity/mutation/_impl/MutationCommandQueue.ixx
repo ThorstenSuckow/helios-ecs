@@ -4,14 +4,14 @@ module;
 #include <vector>
 #include <memory>
 
-export module helios.ecs.entity.EntityMutationManager:MutationCommandQueue;
+export module helios.ecs.entity.mutation.EntityMutationManager:MutationCommandQueue;
 
 import helios.ecs.entity.storage.SparseSet;
 import helios.ecs.command.commands;
 import helios.ecs.component.components;
 import helios.ecs.entity.EntityManager;
 
-export namespace helios::ecs::entity {
+export namespace helios::ecs::entity::mutation {
 
     template<typename THandle>
     class MutationCommandQueue {

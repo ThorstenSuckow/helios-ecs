@@ -12,13 +12,14 @@ export module helios.ecs.common.InvocationContext;
 
 import helios.core.common;
 
-import helios.ecs.entity.NullQuery;
-import helios.ecs.entity.EntityMutationManager;
+import helios.ecs.entity.query.NullQuery;
+import helios.ecs.entity.mutation.EntityMutationManager;
 import helios.ecs.entity.EntityManager;
 
 
 import helios.ecs.command.traits;
-import helios.ecs.entity.traits;
+import helios.ecs.entity.query.traits;
+import helios.ecs.entity.mutation.traits;
 import helios.ecs.common.container;
 import helios.ecs.command;
 import helios.ecs.component;
@@ -47,10 +48,10 @@ export namespace helios::ecs::common {
 
         command::CommandBuffer commandBuffer_{ConcreteCommandBufferType{}};
 
-        using QueryInfo = ecs::entity::traits::QueryFromArguments<typename InvocationFunctionTraits::ArgumentTypes>;
+        using QueryInfo = ecs::entity::query::traits::QueryFromArguments<typename InvocationFunctionTraits::ArgumentTypes>;
         using ConcreteQueryTypes = QueryInfo::list;
         using EntityMutationBufferTypes = core::common::traits::ListToTuple<
-            typename entity::traits::EntityMutationBufferFromQueries<ConcreteQueryTypes>::list
+            typename entity::mutation::traits::EntityMutationBufferFromQueries<ConcreteQueryTypes>::list
         >::tuple;
 
         EntityMutationBufferTypes entityMutationBuffers_{};
@@ -72,7 +73,7 @@ export namespace helios::ecs::common {
 
                 ([&]() {
                     using TQuery = TQueries;
-                    if constexpr (!std::same_as<TQuery, ecs::entity::NullQuery>) {
+                    if constexpr (!std::same_as<TQuery, ecs::entity::query::NullQuery>) {
                         using HandleType = typename TQuery::HandleType;
                         using ReadSet = core::common::traits::ConcatList<
                             typename TQuery::ReadSet::ComponentList,
@@ -81,7 +82,7 @@ export namespace helios::ecs::common {
                             >::list
                         >;
 
-                        auto& manager = ecsDataContainer.get<ecs::entity::EntityMutationManager<HandleType>>();
+                        auto& manager = ecsDataContainer.get<ecs::entity::mutation::EntityMutationManager<HandleType>>();
 
                         auto walkComponents = [&]<typename ... TComponents>(core::common::types::TypeList<TComponents...>) {
                             manager.template commitMutations<TComponents...>(
@@ -112,7 +113,7 @@ export namespace helios::ecs::common {
 
                     if constexpr (!std::same_as<BufferType, std::monostate>) {
                         auto& entityMutationManager = ecsDataContainer.get<
-                            ecs::entity::EntityMutationManager<typename BufferType::HandleType>
+                            ecs::entity::mutation::EntityMutationManager<typename BufferType::HandleType>
                         >();
                         buffer.flush(entityMutationManager);
                     }

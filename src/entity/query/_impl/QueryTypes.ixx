@@ -4,11 +4,11 @@
  */
 module;
 
-export module helios.ecs.entity.Query:QueryTypes;
+export module helios.ecs.entity.query.Query:QueryTypes;
 
 import helios.core.common.types;
 
-export namespace helios::ecs::entity {
+export namespace helios::ecs::entity::query {
     /**
      * @brief Allows for shorthanding Queries via Query<Handle, Read<Component>, White<Component>>.>
      * for components that are parametrized only by a handle.

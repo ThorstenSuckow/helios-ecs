@@ -1,14 +1,14 @@
 /**
  * @file NullQuery.ixx
- * @brief NullQuery as null-type for ecs::entity::Query
+ * @brief NullQuery as null-type for ecs::entity::query::Query
  */
 module;
 
-export module helios.ecs.entity.NullQuery;
+export module helios.ecs.entity.query.NullQuery;
 
 import helios.ecs.entity.EntityAccessSet;
 
-export namespace helios::ecs::entity {
+export namespace helios::ecs::entity::query {
 
     struct NullQuery {
 

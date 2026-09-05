@@ -18,10 +18,10 @@ import helios.core.common.types;
 import helios.ecs.component.components;
 
 import helios.ecs.entity.EntityManager;
-import helios.ecs.entity.EntityMutationManager;
-import helios.ecs.entity.EntityMutationBuffer;
-import helios.ecs.entity.traits;
-import helios.ecs.entity.NullQuery;
+import helios.ecs.entity.mutation.EntityMutationManager;
+import helios.ecs.entity.mutation.EntityMutationBuffer;
+import helios.ecs.entity.mutation.traits;
+import helios.ecs.entity.query.NullQuery;
 
 import helios.ecs.command.CommandBuffer;
 
@@ -50,7 +50,7 @@ class System {
     using EcsDataContainerArgumentResolver = ecs::common::container::EcsDataContainerArgumentResolver<TMutationBufferTuple>;
 
     template <typename THandle, typename ... TWriteComponents>
-    using EntityMutationBuffer = ecs::entity::EntityMutationBuffer<THandle, TWriteComponents...>;
+    using EntityMutationBuffer = ecs::entity::mutation::EntityMutationBuffer<THandle, TWriteComponents...>;
 
 private:
     /**

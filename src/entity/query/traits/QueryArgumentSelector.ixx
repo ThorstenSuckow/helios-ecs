@@ -8,14 +8,14 @@ module;
 #include <tuple>
 #include <variant>
 
-export module helios.ecs.entity.traits:QueryArgumentSelector;
+export module helios.ecs.entity.query.traits:QueryArgumentSelector;
 
 import helios.ecs.entity.concepts;
 import helios.core.common.traits;
 import helios.core.common.types;
-import helios.ecs.entity.NullQuery;
+import helios.ecs.entity.query.NullQuery;
 
-export namespace helios::ecs::entity::traits {
+export namespace helios::ecs::entity::query::traits {
 
     template <typename... TArgs>
     struct QueryArgumentSelector;

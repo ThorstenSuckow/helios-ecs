@@ -7,13 +7,13 @@ module;
 #include <tuple>
 #include <vector>
 
-export module helios.ecs.entity.EntityMutationBuffer;
+export module helios.ecs.entity.mutation.EntityMutationBuffer;
 
-import helios.ecs.entity.EntityMutationManager;
+import helios.ecs.entity.mutation.EntityMutationManager;
 import helios.ecs.command.commands;
 import helios.ecs.component.components;
 
-export namespace helios::ecs::entity {
+export namespace helios::ecs::entity::mutation {
 
     template<typename THandle, typename ... TWriteComponents>
     requires (std::same_as<THandle, typename TWriteComponents::HandleType> && ...)

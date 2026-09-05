@@ -1,13 +1,13 @@
 /**
  * @file QueryTraits.ixx
- * @brief Traits for easing access to ecs::entity::Query-related information from types.
+ * @brief Traits for easing access to ecs::entity::query::Query-related information from types.
  */
 module;
 
 #include <tuple>
 
 
-export module helios.ecs.entity.Query:QueryTraits;
+export module helios.ecs.entity.query.Query:QueryTraits;
 
 import :QueryTypes;
 
@@ -18,7 +18,7 @@ import helios.ecs.component.components;
 import helios.ecs.entity.EntityManager;
 import helios.ecs.entity.EntityAccessSet;
 
-export namespace helios::ecs::entity {
+export namespace helios::ecs::entity::query {
 template <
     typename TEntityManager,
     typename TReadComponents,
@@ -51,7 +51,7 @@ export namespace helios::ecs::entity::traits {
            typename TReadSet::ComponentList
        >;
 
-        using type =  entity::PartialQuery<
+        using type =  entity::query::PartialQuery<
             entity::EntityManager<THandle>,
             ReadComponents,
             typename TWriteSet::ComponentList,

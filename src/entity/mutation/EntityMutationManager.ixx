@@ -10,7 +10,7 @@ module;
 #include <exception>
 #include <optional>
 
-export module helios.ecs.entity.EntityMutationManager;
+export module helios.ecs.entity.mutation.EntityMutationManager;
 
 import :MutationCommandQueue;
 
@@ -43,7 +43,7 @@ using namespace helios::ecs::command;
 using namespace helios::core::log;
 
 #define HELIOS_LOG_SCOPE "helios::ecs::entity::EntityMutationManager"
-export namespace helios::ecs::entity {
+export namespace helios::ecs::entity::mutation {
 
 /**
  * @brief Receives submitted ECS mutation commands and applies them during flush.

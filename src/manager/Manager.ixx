@@ -10,7 +10,7 @@ module;
 
 export module helios.ecs.manager.Manager;
 
-import helios.ecs.entity.traits;
+import helios.ecs.entity.mutation.traits;
 
 import helios.core.common.traits;
 
@@ -21,8 +21,8 @@ import helios.ecs.common.container;
 import helios.ecs.manager.types;
 import helios.ecs.manager.concepts;
 
-import helios.ecs.entity.EntityMutationBuffer;
-import helios.ecs.entity.EntityMutationManager;
+import helios.ecs.entity.mutation.EntityMutationBuffer;
+import helios.ecs.entity.mutation.EntityMutationManager;
 
 import helios.ecs.command.concepts;
 import helios.ecs.command.traits;
@@ -42,7 +42,7 @@ class Manager {
     using EcsDataContainer = ecs::common::container::EcsDataContainer;
 
     template <typename THandle, typename ... TWriteComponents>
-    using EntityMutationBuffer = ecs::entity::EntityMutationBuffer<THandle, TWriteComponents...>;
+    using EntityMutationBuffer = ecs::entity::mutation::EntityMutationBuffer<THandle, TWriteComponents...>;
 
     template<typename TMutationSink>
     using EcsDataContainerArgumentResolver = ecs::common::container::EcsDataContainerArgumentResolver<TMutationSink>;

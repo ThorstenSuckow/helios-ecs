@@ -7,17 +7,17 @@ module;
 #include <optional>
 #include <vector>
 
-export module helios.ecs.entity.traits:EntityMutationBufferTraits;
+export module helios.ecs.entity.mutation.traits:EntityMutationBufferTraits;
 
 import helios.core.common.traits;
 import helios.core.common.concepts;
 import helios.core.common.types;
 
-import helios.ecs.entity.EntityMutationBuffer;
+import helios.ecs.entity.mutation.EntityMutationBuffer;
 
 
 
-export namespace helios::ecs::entity::traits {
+export namespace helios::ecs::entity::mutation::traits {
 
     template<typename THandle, typename TWriteComponents>
     struct EntityMutationBufferFromList;
@@ -28,7 +28,7 @@ export namespace helios::ecs::entity::traits {
         using type = std::conditional_t<
             sizeof...(TWriteComponents) == 0,
             std::monostate,
-            ecs::entity::EntityMutationBuffer<THandle, TWriteComponents...>
+            ecs::entity::mutation::EntityMutationBuffer<THandle, TWriteComponents...>
         >;
 
     };
