@@ -12,7 +12,7 @@ export namespace helios::ecs::manager::concepts {
 
 template <class TManager>
 concept IsManagerLike = requires {
-    &std::remove_cvref_t<TManager>::executeCommands;
+    &std::remove_cvref_t<TManager>::commit;
     &std::remove_cvref_t<TManager>::reset;
 };
 } // namespace helios::ecs::manager::concepts
