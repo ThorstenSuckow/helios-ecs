@@ -13,7 +13,6 @@ export module helios.ecs.common.container:EcsDataContainer;
 import helios.core.common.container;
 import helios.core.common.traits;
 import helios.ecs.command.concepts;
-import helios.ecs.entity.Query;
 import helios.ecs.entity.EntityManager;
 import helios.ecs.entity.EntityAccessSet;
 import helios.ecs.entity.concepts;
