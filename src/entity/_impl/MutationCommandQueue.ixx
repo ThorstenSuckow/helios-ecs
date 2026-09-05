@@ -29,11 +29,12 @@ export namespace helios::ecs::entity {
         class Concept {
         public:
             virtual ~Concept() = default;
-            virtual void executeCommands(const EntityManager& entityManager) noexcept =0;
+            virtual void commit(const EntityManager& entityManager) noexcept =0;
             virtual void addAddCommand(void* addCommand) noexcept = 0;
             virtual void addRemoveCommand(void* removeCommand) noexcept = 0;
             virtual void addAddCommands(void* addCommands) noexcept = 0;
             virtual void addRemoveCommands(void* removeCommands) noexcept = 0;
+            [[nodiscard]] virtual bool empty() const noexcept = 0;
         };
 
         template<typename TComponent>
@@ -46,6 +47,9 @@ export namespace helios::ecs::entity {
         public:
             explicit Model(SparseSet<TComponent>* sparseSet) : sparseSet_(sparseSet) {}
 
+            [[nodiscard]] bool empty() const noexcept override {
+                return addCommands_.empty() && removeCommands_.empty();
+            }
             void addAddCommand(void* addCommand) noexcept override {
                 auto& cmd = *static_cast<AddComponentCommand<TComponent>*>(addCommand);
                 addCommands_.push_back(std::move(cmd));
@@ -78,7 +82,12 @@ export namespace helios::ecs::entity {
                 }
             }
 
-            void executeCommands(const EntityManager& entityManager) noexcept override {
+            void commit(const EntityManager& entityManager) noexcept override {
+
+                if (empty()) {
+                    return;
+                }
+
                 for (auto& cmd : addCommands_) {
                     if (!entityManager.isValid(cmd.handle)) {
                         continue;
@@ -130,8 +139,12 @@ export namespace helios::ecs::entity {
             model_->addRemoveCommands(static_cast<void*>(std::addressof(commands)));
         }
 
-        void executeCommands(const EntityManager& entityManager) noexcept {
-            model_->executeCommands(entityManager);
+        void commit(const EntityManager& entityManager) noexcept {
+            model_->commit(entityManager);
+        }
+
+        [[nodiscard]] bool empty() const noexcept {
+            return model_->empty();
         }
     };
 }
