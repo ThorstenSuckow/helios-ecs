@@ -9,6 +9,7 @@ module;
 #include <ranges>
 #include <tuple>
 #include <vector>
+#include <cassert>
 
 export module helios.ecs.entity.query.Query;
 
@@ -45,9 +46,6 @@ using Query = typename traits::QueryBuilder<TReadSet, TWriteSet, TFilter>::type;
 
 
 template <typename TEntityManager, typename... TReadComponents, typename ... TWriteComponents, typename TFilter,  typename... TOptional>
-requires core::common::traits::IsSubset<
-    core::common::types::TypeList<TWriteComponents...>, core::common::types::TypeList<TReadComponents...>
-    >::value
 class PartialQuery<TEntityManager, core::common::types::TypeList<TReadComponents...>, core::common::types::TypeList<TWriteComponents...>, TFilter,  std::tuple<TOptional...>> {
 
     using EntityMutationBuffer = mutation::EntityMutationBuffer<
@@ -60,13 +58,26 @@ private:
     TEntityManager* em_;
 
 
+    std::tuple<const SparseSet<TReadComponents>*...> readSet_;
+
     /**
-     * @brief Pointers to the SparseSets of the included components.
+     * @brief Mutable components, present in both read and write sets.
      */
-    std::tuple<const SparseSet<TReadComponents>*...> includeSets_;
+    template<typename T>
+    using SparseSetPtr = SparseSet<T>*;
+    using MutableComponentsList = typename core::common::traits::IntersectionList<
+        core::common::types::TypeList<TReadComponents...>, core::common::types::TypeList<TWriteComponents...>
+    >::list;
+    using MutableComponents = core::common::traits::WrapElements<SparseSetPtr, MutableComponentsList>::list;
+    using MutableComponentsTuple = typename core::common::traits::ListToTuple<MutableComponents>::tuple;
+    MutableComponentsTuple mutableSet_;
 
-    std::tuple<SparseSet<TWriteComponents>*...> writeSets_;
-
+    /**
+     * @brief Add components, present in write sets only.
+     */
+    using AddComponentsList = core::common::traits::ExclusionList<
+        core::common::types::TypeList<TWriteComponents...>, core::common::types::TypeList<TReadComponents...>
+    >::list;
 
     /**
      * @brief Optional components, might return nullptr. Are not considered by whereAnyDirty().
@@ -129,8 +140,12 @@ public:
 
     using ReadSet = entity::ReadSet<TReadComponents...>;
 
-
     using WriteSet = entity::WriteSet<TWriteComponents...>;
+
+    using MutableSet = entity::WriteSet<MutableComponentsList>;
+
+    using AddSet = entity::WriteSet<AddComponentsList>;
+
     using DirtySet = DirtySetTraits::readSet;
 
     /**
@@ -140,8 +155,12 @@ public:
      */
     explicit PartialQuery(TEntityManager* em, EntityMutationBuffer* entityMutationBuffer = nullptr)
         : em_(em),
-        includeSets_(std::make_tuple(em_->template sparseSet<TReadComponents>()...)),
-        writeSets_(std::make_tuple(em_->template sparseSet<TWriteComponents>()...)),
+        readSet_(std::make_tuple(em_->template sparseSet<TReadComponents>()...)),
+        mutableSet_(
+            [em]<typename ... TMutableComponent>(core::common::types::TypeList<TMutableComponent...>) {
+                return std::make_tuple(em->template sparseSet<TMutableComponent>()...);
+            }(typename MutableSet::ComponentList{})
+        ),
         entityMutationBuffer_(entityMutationBuffer) ,
         anyDirtySets_(
             [em]<typename ... TDirty>(core::common::types::TypeList<TDirty...>){
@@ -172,8 +191,8 @@ public:
         EntityMutationBuffer* entityMutationBuffer = nullptr
     ) :
         em_(em),
-        includeSets_(std::move(includeSets)),
-        writeSets_(std::move(writeSets)),
+        readSet_(std::move(includeSets)),
+        mutableSet_(std::move(writeSets)),
         excludeChecks_(std::move(excludeChecks)),
         entityMutationBuffer_(entityMutationBuffer),
 
@@ -223,7 +242,7 @@ public:
      * @return boolean
      */
     [[nodiscard]] bool empty() {
-        auto* leadSet = std::get<0>(includeSets_);
+        auto* leadSet = std::get<0>(readSet_);
         if (leadSet == nullptr) {
             return true;
         }
@@ -361,22 +380,35 @@ public:
          * @return A tuple containing the component if it's not active, otherwise an empty tuple.
          */
         template<typename TComponent>
-        auto includeComponent(EntityId entityId, const SparseSet<TComponent>* set) const {
+        auto extractReadComponent(EntityId entityId, const SparseSet<TComponent>* set) const {
             using ComponentType = TComponent;
 
             if constexpr (IsActiveComponent_v<ComponentType>) {
-
                 return std::tuple{}; // Active components are not included in the returned tuple.
-
             } else if constexpr (core::common::traits::IsInList<ComponentType, TWriteComponents...>::value) {
-
-                auto* writeSet = std::get<SparseSet<TComponent>*>(view_->writeSets_);
-                return std::make_tuple(writeSet->get(entityId));
-
-            } else {
+                // will be returned extractMutabelComponent
+                return std::tuple{};
+            }
+            else if constexpr (core::common::traits::IsInList<ComponentType, typename ReadSet::ComponentList>::value) {
                 return std::make_tuple(set->get(entityId));
+            } else {
+                assert(false && "component type not found in the query");
+                return std::tuple{};
             }
         }
+
+        template<typename TComponent>
+        auto extractMutableComponent(EntityId entityId, SparseSet<TComponent>* set) const {
+            using ComponentType = TComponent;
+
+            if constexpr (core::common::traits::IsInList<ComponentType, typename MutableSet::ComponentList>::value) {
+                return std::make_tuple(set->get(entityId));
+            } else {
+                assert(false && "component type not found in the query");
+                return std::tuple{};
+            }
+        }
+
 
         /**
          * @brief Dereference operator.
@@ -395,20 +427,36 @@ public:
             EntityId entityId = *current_;
             auto handle = view_->em_->handle(entityId);
 
+
+
+            auto readTuples = std::apply(
+                [this, entityId](auto*... sets) {
+                    return std::tuple_cat(
+                        extractReadComponent(entityId, sets)...
+                    );
+                },
+                view_->readSet_
+            );
+
+            auto mutableTuples = std::apply(
+                [this, entityId](auto*... sets) {
+                    return std::tuple_cat(
+                        extractMutableComponent(entityId, sets)...
+                    );
+                },
+                view_->mutableSet_
+            );
+
             return std::tuple_cat(
-                std::make_tuple(EntityProxy<typename TEntityManager::HandleType, TWriteComponents...>(
-                    handle, view_->entityMutationBuffer_)),
+
+                std::make_tuple(
+                    EntityProxy<typename TEntityManager::HandleType, MutableSet, AddSet>(
+                        handle, view_->entityMutationBuffer_, mutableTuples
+                    )),
 
                 // tuple_cat is required to make sure ActiveComponent is not included
                 // since this is treated as meta information we are not interested in
-                std::apply(
-                    [this, entityId](auto*... sets) {
-                        return std::tuple_cat(
-                            includeComponent(entityId, sets)...
-                        );
-                    },
-                    view_->includeSets_
-                ),
+                std::tuple_cat(readTuples, mutableTuples),
 
                 std::apply(
                     [entityId](auto*... sets) {
