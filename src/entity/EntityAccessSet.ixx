@@ -26,6 +26,9 @@ struct ReadSet {
         core::common::types::TypeList<typename TReadComponents::HandleType...>>::list;
 };
 
+template<typename ... TReadComponents>
+struct ReadSet<core::common::types::TypeList<TReadComponents...>> : ReadSet<TReadComponents...>{};
+
 /**
  * @brief Template for providing HandleList_type containing unique handles used for write access of component data.
  * @tparam TWriteComponents
@@ -36,6 +39,9 @@ struct WriteSet {
     using ComponentList = core::common::types::TypeList<TWriteComponents...>;
     using HandleList = core::common::traits::UniqueList<core::common::types::TypeList<>, core::common::types::TypeList<typename TWriteComponents::HandleType...>>::list;
 };
+
+template <typename... TWriteComponents>
+struct WriteSet<core::common::types::TypeList<TWriteComponents...>> : WriteSet<TWriteComponents...>{};
 
 template <typename TRead, typename TWrite>
 struct EntityAccessSet;
