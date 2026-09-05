@@ -9,8 +9,6 @@ export import helios.ecs.command.CommandBufferRegistry;
 export import helios.ecs.command.CommandHandlerRegistry;
 export import helios.ecs.command.NullCommandBuffer;
 export import helios.ecs.command.TypedCommandBuffer;
-export import helios.ecs.command.EntityMutationCommandBuffer;
-export import helios.ecs.command.EntityMutationCommandSink;
 
 export import helios.ecs.command.commands;
 export import helios.ecs.command.concepts;

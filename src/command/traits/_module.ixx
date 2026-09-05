@@ -5,4 +5,3 @@
 export module helios.ecs.command.traits;
 
 export import :CommandBufferSelector;
-export import :EntityMutationCommandTraits;
