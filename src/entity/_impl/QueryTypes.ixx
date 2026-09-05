@@ -4,9 +4,9 @@
  */
 module;
 
-
-
 export module helios.ecs.entity.Query:QueryTypes;
+
+import helios.core.common.types;
 
 export namespace helios::ecs::entity {
     /**
@@ -19,4 +19,35 @@ export namespace helios::ecs::entity {
 
     template<template <typename> typename... T>
     struct Write{};
+
+    struct IsActive{};
+
+    struct IsInactive{};
+
+    template<typename ... TDirty>
+    struct AnyDirty {
+        using list = core::common::types::TypeList<TDirty...>;
+    };
+
+    template<typename ... TFilters>
+    struct Filter{};
+
+    template<typename ... TDirty>
+    struct Filter<AnyDirty<TDirty...>> {
+        static constexpr bool onlyActive = false;
+        using dirtyList = core::common::types::TypeList<TDirty...>;
+    };
+
+    template<>
+    struct Filter<IsActive> {
+        static constexpr bool onlyActive = true;
+        using dirtyList = core::common::types::TypeList<>;
+    };
+
+
+    template<typename ... TDirty>
+    struct Filter<IsActive, AnyDirty<TDirty...>> {
+        static constexpr bool onlyActive = true;
+        using dirtyList = core::common::types::TypeList<TDirty...>;
+    };
 }
