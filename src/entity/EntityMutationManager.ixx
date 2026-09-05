@@ -18,8 +18,6 @@ import helios.ecs.common.types;
 import helios.ecs.common.container;
 import helios.ecs.entity.EntityManager;
 
-import helios.core.thread.JobSystem;
-
 import helios.ecs.command.types;
 import helios.ecs.command.commands;
 
@@ -38,7 +36,6 @@ import helios.ecs.common.types;
 import helios.ecs.entity.storage.SparseSet;
 
 using namespace helios::ecs::components;
-using namespace helios::core::thread;
 using namespace helios::ecs;
 using namespace helios::ecs::common::types;
 using namespace helios::ecs::common::concepts::traits;
@@ -53,7 +50,7 @@ export namespace helios::ecs::entity {
  *
  * Acts as the write-back stage for `EntityMutationCommandBuffer`: commands
  * are submitted directly via `submit()` or `submitBatch()` and buffered per
- * command type. On `executeCommands()` each queue applies its
+ * command type. On `commit()` each queue applies its
  * mutations to the entity manager.
  *
  * @tparam THandle Entity handle type identifying the target ECS registry.
@@ -167,16 +164,27 @@ public:
      *
      * @param entityManager Entity manager to which the mutations are applied.
      */
-    bool executeCommands(const EntityManager& entityManager) noexcept {
-
+    bool commit(const EntityManager& entityManager) noexcept {
         for (auto idx : registeredQueueIndices_) {
-            queueRegistry_[idx]->executeCommands(entityManager);
+            queueRegistry_[idx]->commit(entityManager);
         }
-
         return true;
     }
 
+    template<typename ... TComponents>
+    bool commitMutations(const EntityManager& entityManager) {
 
+        ([&]() {
+            const auto queueTypeId = QueueTypeId::template id<TComponents>();
+            const auto idx = queueTypeId.value();
+
+            if (idx < queueRegistry_.size() && queueRegistry_[idx] && !queueRegistry_[idx]->empty()) {
+                queueRegistry_[idx]->commit(entityManager);
+            }
+        }(), ...);
+
+        return true;
+    }
 
     void reset() { /* intentionally noop */ }
 };

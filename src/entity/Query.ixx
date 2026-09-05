@@ -29,7 +29,7 @@ import helios.ecs.common.types;
 import helios.core.common.types;
 import helios.core.common.traits;
 
-import helios.ecs.command.EntityMutationCommandSink;
+import helios.ecs.entity.EntityMutationBuffer;
 
 using namespace helios::ecs::common::types;
 using namespace helios::ecs::components;
@@ -39,19 +39,21 @@ using namespace helios::ecs::common::concepts::traits;
 export namespace helios::ecs::entity {
 
 
-template<typename ... TArgs>
-using Query = typename traits::QuerySelector<TArgs...>::type;
+template<typename TReadSet, typename TWriteSet, typename TFilter = Filter<AnyDirty<>>>
+using Query = typename traits::QueryBuilder<TReadSet, TWriteSet, TFilter>::type;
 
 
-template <typename TEntityManager, typename... TReadComponents, typename ... TWriteComponents, typename... TDirty, typename... TOptional>
+template <typename TEntityManager, typename... TReadComponents, typename ... TWriteComponents, typename TFilter,  typename... TOptional>
 requires core::common::traits::IsSubset<
     core::common::types::TypeList<TWriteComponents...>, core::common::types::TypeList<TReadComponents...>
     >::value
-class PartialQuery<TEntityManager, core::common::types::TypeList<TReadComponents...>, core::common::types::TypeList<TWriteComponents...>, std::tuple<TDirty...>, std::tuple<TOptional...>> {
+class PartialQuery<TEntityManager, core::common::types::TypeList<TReadComponents...>, core::common::types::TypeList<TWriteComponents...>, TFilter,  std::tuple<TOptional...>> {
 
-    using EntityMutationCommandSink = ecs::command::EntityMutationCommandSink<
+    using EntityMutationBuffer = ecs::entity::EntityMutationBuffer<
         typename TEntityManager::HandleType, TWriteComponents...
     >;
+
+    using DirtySetTraits = traits::DirtySetTrait<typename TFilter::dirtyList>;
 
 private:
     TEntityManager* em_;
@@ -73,7 +75,7 @@ private:
     /**
      * @brief Pointers to the SparseSets of the dirty component sets.
      */
-    std::tuple<SparseSet<DirtyComponentSpec<TDirty>>*...> anyDirtySets_;
+    DirtySetTraits::tuple anyDirtySets_;
 
     /**
      * @brief List of exclusion predicates.
@@ -82,10 +84,6 @@ private:
      */
     std::vector<std::function<bool(EntityId)>> excludeChecks_;
 
-    /**
-     * @brief Flag to filter only entities with Active component.
-     */
-    bool filterActiveOnly_ = false;
 
     /**
      * @brief Required SparseSets sorted by `componentCount` ascending.
@@ -104,7 +102,7 @@ private:
      */
     EntityId maxEntityId_ = 0;
 
-    EntityMutationCommandSink* entityMutationCommandSink_{};
+    EntityMutationBuffer* entityMutationBuffer_{};
 
     /**
      * @brief Populates `sortedRequires_` and computes `maxEntityId_`.
@@ -114,6 +112,7 @@ private:
      * smallest set leads iteration.
      */
     void initializeRequiredSets() {
+
         (sortedRequires_.push_back(em_->template sparseSet<TReadComponents>()), ...);
 
         maxEntityId_ = std::ranges::min(std::views::transform(sortedRequires_, [](const auto* set) {
@@ -126,20 +125,30 @@ private:
 public:
 
     using HandleType = typename TEntityManager::HandleType;
+
     using ReadSet = entity::ReadSet<TReadComponents...>;
+
+
     using WriteSet = entity::WriteSet<TWriteComponents...>;
+    using DirtySet = DirtySetTraits::readSet;
 
     /**
      * @brief Constructs the view and retrieves the necessary component sets.
      *
      * @param em Pointer to the EntityManager to retrieve sets and construct Entities.
      */
-    explicit PartialQuery(TEntityManager* em, EntityMutationCommandSink* entityMutationCommandSink = nullptr)
-        requires(sizeof...(TOptional) == 0 && sizeof...(TDirty) == 0)
+    explicit PartialQuery(TEntityManager* em, EntityMutationBuffer* entityMutationBuffer = nullptr)
         : em_(em),
         includeSets_(std::make_tuple(em_->template sparseSet<TReadComponents>()...)),
         writeSets_(std::make_tuple(em_->template sparseSet<TWriteComponents>()...)),
-        entityMutationCommandSink_(entityMutationCommandSink) {
+        entityMutationBuffer_(entityMutationBuffer) ,
+        anyDirtySets_(
+            [em]<typename ... TDirty>(core::common::types::TypeList<TDirty...>){
+                return std::make_tuple(em->template sparseSet<DirtyComponentSpec<TDirty>>()...);
+            }(typename TFilter::dirtyList{})
+        )
+
+    {
         // Retrieve pointers to the specific component sets immediately.
 
         initializeRequiredSets();
@@ -159,81 +168,24 @@ public:
         std::tuple<const SparseSet<TReadComponents>*...> includeSets,
         std::tuple<SparseSet<TWriteComponents>*...> writeSets,
         std::vector<std::function<bool(EntityId)>> excludeChecks,
-        const bool filterActiveOnly,
-        EntityMutationCommandSink* entityMutationCommandSink = nullptr
+        EntityMutationBuffer* entityMutationBuffer = nullptr
     ) :
         em_(em),
         includeSets_(std::move(includeSets)),
         writeSets_(std::move(writeSets)),
         excludeChecks_(std::move(excludeChecks)),
-        filterActiveOnly_(filterActiveOnly),
-        entityMutationCommandSink_(entityMutationCommandSink),
+        entityMutationBuffer_(entityMutationBuffer),
 
         optionalSets_(std::make_tuple(em_->template sparseSet<TOptional>()...)),
-        anyDirtySets_(std::make_tuple(em_->template sparseSet<DirtyComponentSpec<TDirty>>()...)) {
+        anyDirtySets_(
+            [em]<typename ... TDirty>(core::common::types::TypeList<TDirty...>){
+                return std::make_tuple(em->template sparseSet<DirtyComponentSpec<TDirty>>()...);
+            }(typename TFilter::dirtyList{})
+        ) {
 
         initializeRequiredSets();
     }
 
-    /**
-     * @brief Adds optional component types to the current view.
-     *
-     * @details Optional components do not participate in entity filtering.
-     * For each optional type, iteration yields either a component pointer or
-     * `nullptr` if the entity does not own that component.
-     *
-     * This method is intended to be called once with all optional types:
-     *
-     * ```cpp
-     * for (auto [e, transform, velocity, maybeHealth, maybeShield] : world
-     *     .view<EntityManager, TransformComponent, VelocityComponent>()
-     *     .withOptional<HealthComponent, ShieldComponent>()) {
-     *     // maybeHealth / maybeShield may be nullptr
-     * }
-     * ```
-     *
-     * @tparam TNewOptional Optional component types to expose in iteration.
-     *
-     * @return A new `PartialQuery` with unchanged required components and
-     *         the provided optional component types.
-     */
-    template <typename... TNewOptional>
-    auto withOptional()
-        requires(sizeof...(TOptional) == 0)
-    {
-        return PartialQuery<
-            TEntityManager,
-            std::tuple<TReadComponents...>,
-            std::tuple<TWriteComponents...>,
-            std::tuple<TDirty...>,
-            std::tuple<TNewOptional...>
-        >(em_, includeSets_, writeSets_, excludeChecks_, filterActiveOnly_, anyDirtySets_, entityMutationCommandSink_);
-    }
-
-    /**
-     * @brief Filters to only include entities with changed components.
-     *
-     * @return Reference to this Query for method chaining.
-     */
-    template <typename... TNewDirty>
-    auto whereAnyDirty()
-        requires(sizeof...(TOptional) == 0 && sizeof...(TDirty) == 0)
-        && (core::common::traits::IsInList<TNewDirty, TReadComponents...>::value && ...)
-    {
-        return PartialQuery<
-            TEntityManager,
-            core::common::types::TypeList<TReadComponents...>,
-            core::common::types::TypeList<TWriteComponents...>,
-            std::tuple<TNewDirty...>,
-            std::tuple<>>(
-            em_,
-            includeSets_,
-            writeSets_,
-            excludeChecks_,
-            filterActiveOnly_,
-            entityMutationCommandSink_
-        );
-    }
 
     /**
      * @brief Excludes entities that have a specific component.
@@ -275,32 +227,6 @@ public:
             return true;
         }
         return begin() == end();
-    }
-
-    /**
-     * @brief Filters to only include entities with an active component.
-     *
-     * @return Reference to this Query for method chaining.
-     */
-    auto withActive()
-        requires(sizeof...(TOptional) == 0 && sizeof...(TDirty) == 0)
-    {
-        using ActiveComponent = Active<typename TEntityManager::HandleType>;
-
-        return PartialQuery<
-            TEntityManager,
-            core::common::types::TypeList<ActiveComponent, TReadComponents...>,
-            core::common::types::TypeList<TWriteComponents...>,
-            std::tuple<>,
-            std::tuple<>
-        >(
-                em_,
-                std::tuple_cat(std::make_tuple(em_->template sparseSet<ActiveComponent>()), includeSets_),
-                writeSets_,
-                excludeChecks_,
-                true,
-                entityMutationCommandSink_
-            );
     }
 
     /**
@@ -361,7 +287,7 @@ public:
             EntityId entityId = *current_;
 
             // dirty check
-            if constexpr (sizeof...(TDirty) > 0) {
+            if constexpr (DirtySet::size > 0) {
                 const bool hasAnyDirtyIncludes = std::apply(
                     [entityId](auto*... sets) {
                         return ((sets && entityId <= sets->maxEntityId() && sets->contains(entityId)) || ...);
@@ -470,7 +396,7 @@ public:
 
             return std::tuple_cat(
                 std::make_tuple(EntityProxy<typename TEntityManager::HandleType, TWriteComponents...>(
-                    handle, view_->entityMutationCommandSink_)),
+                    handle, view_->entityMutationBuffer_)),
 
                 // tuple_cat is required to make sure ActiveComponent is not included
                 // since this is treated as meta information we are not interested in
@@ -529,11 +455,13 @@ public:
         }
 
         // dirty check. If dirty checks are required, but empty, there is no result set
-        if constexpr (sizeof...(TDirty) > 0) {
-            const bool dirtyIncludesEmpty =
-                std::apply([](auto*... sets) { return ((sets && sets->componentCount() == 0) && ...); }, anyDirtySets_);
+        if constexpr (DirtySet::size > 0) {
+            const bool areDirtyIncludesEmpty =
+                std::apply([](auto*... sets) {
+                    return ((sets && sets->componentCount() == 0) && ...);
+                }, anyDirtySets_);
 
-            if (dirtyIncludesEmpty) {
+            if (areDirtyIncludesEmpty) {
                 return end();
             }
         }
