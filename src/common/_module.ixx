@@ -5,6 +5,7 @@
 export module helios.ecs.common;
 
 export import helios.ecs.common.InvocationContext;
+export import helios.ecs.common.ConflictAnalyzer;
 
 export import helios.ecs.common.concepts;
 export import helios.ecs.common.types;
