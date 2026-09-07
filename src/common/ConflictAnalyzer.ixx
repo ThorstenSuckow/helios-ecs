@@ -26,9 +26,9 @@ export namespace helios::ecs::common::ConflictAnalyzer {
         using ReadSetB = TReadSetB::ComponentList;
         using WriteSetB = TWriteSetB::ComponentList;
 
-        using WriteWrite = core::common::traits::IntersectionList<WriteSetA, WriteSetB>::List;
-        using ReadWrite = core::common::traits::IntersectionList<ReadSetA, WriteSetB>::List;
-        using WriteRead = core::common::traits::IntersectionList<WriteSetA, ReadSetB>::List;
+        using WriteWrite = core::common::traits::IntersectionList<WriteSetA, WriteSetB>::list;
+        using ReadWrite = core::common::traits::IntersectionList<ReadSetA, WriteSetB>::list;
+        using WriteRead = core::common::traits::IntersectionList<WriteSetA, ReadSetB>::list;
 
         static constexpr bool value =
             WriteWrite::size > 0 || ReadWrite::size > 0 || WriteRead::size > 0;
