@@ -8,7 +8,7 @@ module;
 #include <cstddef>
 #include <vector>
 
-export module helios.ecs.entity.EntityManager:EntityRegistry;
+export module helios.ecs.entity.EntityRegistry;
 
 import helios.ecs.common.types;
 

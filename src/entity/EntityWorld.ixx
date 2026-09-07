@@ -20,7 +20,7 @@ import helios.ecs.common.types;
 
 import helios.ecs.common;
 import helios.ecs.entity.storage;
-import :TypedHandleWorld;
+import helios.ecs.entity.TypedHandleWorld;
 
 export namespace helios::ecs::entity {
 

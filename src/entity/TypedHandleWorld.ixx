@@ -10,7 +10,7 @@ module;
 #include <type_traits>
 #include <utility>
 
-export module helios.ecs.entity.EntityWorld:TypedHandleWorld;
+export module helios.ecs.entity.TypedHandleWorld;
 
 import helios.ecs.entity.Entity;
 import helios.ecs.entity.EntityManager;

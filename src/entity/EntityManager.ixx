@@ -20,7 +20,7 @@ import helios.ecs.entity.Entity;
 
 import helios.ecs.entity.storage.SparseSet;
 
-import :EntityRegistry;
+import helios.ecs.entity.EntityRegistry;
 
 import helios.ecs.common.types;
 import helios.ecs.component;

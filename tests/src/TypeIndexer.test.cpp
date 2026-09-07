@@ -7,6 +7,7 @@ import helios.core;
 
 using namespace helios::ecs;
 using namespace helios::core;
+using namespace helios::core::common::types;
 
 namespace {
 

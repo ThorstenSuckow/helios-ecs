@@ -5,6 +5,7 @@ import helios.ecs;
 
 using namespace helios::ecs;
 using namespace helios::ecs::common::types;
+using namespace helios::ecs::entity;
 
 
 namespace {
@@ -16,32 +17,32 @@ namespace {
 
     template<typename TMOwnerHandle>
     struct PositionComponent {
-        using Handle_type = TMOwnerHandle;
+        using HandleType = TMOwnerHandle;
     };
 
     template<typename TMOwnerHandle>
     struct VelocityComponent {
-        using Handle_type = TMOwnerHandle;
+        using HandleType = TMOwnerHandle;
     };
 
 
     struct Foo {
 
-        using EntityAccessSet = EntityAccessSet<
-            Read<
+        using EntityAccessSet1 = EntityAccessSet<
+            ReadSet<
                 PositionComponent<GameObjectHandle>,
                 VelocityComponent<ParticleHandle>,
                 VelocityComponent<GameObjectHandle>
             >,
-            Write<VelocityComponent<GameObjectHandle>>
+            WriteSet<VelocityComponent<GameObjectHandle>>
         >;
 
         using EntityAccessSet2 = EntityAccessSet<
-            Read<PositionComponent<GameObjectHandle>>,
-            Write<VelocityComponent<GameObjectHandle>>
+            ReadSet<PositionComponent<GameObjectHandle>>,
+            WriteSet<VelocityComponent<GameObjectHandle>>
         >;
 
-        EntityAccessSet entityAccessSet;
+        EntityAccessSet1 entityAccessSet;
         EntityAccessSet2 entityAccessSet2;
     };
 };
@@ -50,19 +51,19 @@ TEST(EntityAccessSet, Components) {
 
     EXPECT_TRUE((
         std::same_as<
-            helios::ecs::common::types::Read<
+            ReadSet<
                 PositionComponent<GameObjectHandle>,VelocityComponent<ParticleHandle>,VelocityComponent<GameObjectHandle>
             >,
-            Foo::EntityAccessSet::ReadComponentSet
+            Foo::EntityAccessSet1::ReadComponentSet
         >
     ));
 
     EXPECT_TRUE((
         std::same_as<
-            helios::ecs::common::types::Write<
+            WriteSet<
                 VelocityComponent<GameObjectHandle>
             >,
-            Foo::EntityAccessSet::WriteComponentSet
+            Foo::EntityAccessSet1::WriteComponentSet
         >
     ));
 }
@@ -70,9 +71,9 @@ TEST(EntityAccessSet, Components) {
 
 TEST(EntityAccessSet, tuples) {
 
-    EXPECT_EQ(2, (std::tuple_size_v<typename Foo::EntityAccessSet::ReadHandles>));
-    EXPECT_EQ(1, (std::tuple_size_v<typename Foo::EntityAccessSet::WriteHandles>));
-    EXPECT_EQ(2, (std::tuple_size_v<typename Foo::EntityAccessSet::AccessHandles>));
+    EXPECT_EQ(2, (std::tuple_size_v<typename Foo::EntityAccessSet1::ReadHandles>));
+    EXPECT_EQ(1, (std::tuple_size_v<typename Foo::EntityAccessSet1::WriteHandles>));
+    EXPECT_EQ(2, (std::tuple_size_v<typename Foo::EntityAccessSet1::AccessHandles>));
 
     EXPECT_EQ(1, (std::tuple_size_v<typename Foo::EntityAccessSet2::AccessHandles>));
 
@@ -81,14 +82,14 @@ TEST(EntityAccessSet, tuples) {
     EXPECT_TRUE((
         std::same_as<
             GameObjectHandle,
-            std::tuple_element_t<0, typename Foo::EntityAccessSet::ReadHandles>
+            std::tuple_element_t<0, typename Foo::EntityAccessSet1::ReadHandles>
         >
     ));
 
     EXPECT_TRUE((
         std::same_as<
             ParticleHandle,
-            std::tuple_element_t<1, typename Foo::EntityAccessSet::ReadHandles>
+            std::tuple_element_t<1, typename Foo::EntityAccessSet1::ReadHandles>
         >
     ));
 
@@ -96,7 +97,7 @@ TEST(EntityAccessSet, tuples) {
     EXPECT_TRUE((
        std::same_as<
            GameObjectHandle,
-           std::tuple_element_t<0, typename Foo::EntityAccessSet::WriteHandles>
+           std::tuple_element_t<0, typename Foo::EntityAccessSet1::WriteHandles>
        >
    ));
 
@@ -105,14 +106,14 @@ TEST(EntityAccessSet, tuples) {
     EXPECT_TRUE((
         std::same_as<
             GameObjectHandle,
-            std::tuple_element_t<0, typename Foo::EntityAccessSet::AccessHandles>
+            std::tuple_element_t<0, typename Foo::EntityAccessSet1::AccessHandles>
             >
     ));
 
     EXPECT_TRUE((
         std::same_as<
             ParticleHandle,
-            std::tuple_element_t<1, typename Foo::EntityAccessSet::AccessHandles>
+            std::tuple_element_t<1, typename Foo::EntityAccessSet1::AccessHandles>
         >
     ));
 
