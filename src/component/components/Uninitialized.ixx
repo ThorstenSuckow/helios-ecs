@@ -13,7 +13,6 @@ export namespace helios::ecs::components {
  *
  * @tparam THandle Entity handle type associated with the owning world.
  */
-template <typename THandle>
 struct Uninitialized {};
 
 } // namespace helios::ecs::components

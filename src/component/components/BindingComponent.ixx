@@ -32,9 +32,6 @@ public:
      * @param targetEntity Referenced target entity.
      */
     template <typename TTargetEntity>
-        requires requires(const TTargetEntity& targetEntity) {
-            { targetEntity.handle() } -> std::same_as<TTargetHandle>;
-        }
     explicit BindingComponent(const TTargetEntity targetEntity) : targetHandle_(targetEntity.handle()){};
 
     /**
