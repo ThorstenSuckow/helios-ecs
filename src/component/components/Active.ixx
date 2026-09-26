@@ -13,10 +13,7 @@ export namespace helios::ecs::components {
  *
  * @tparam THandle The entity handle type used for domain-specific typing.
  */
-template <typename THandle>
 struct Active {
-
-    using HandleType = THandle;
 };
 
 } // namespace helios::ecs::components
