@@ -7,13 +7,14 @@ import helios.ecs;
 using namespace helios::ecs;
 using namespace helios::ecs::common::types;
 using namespace helios::ecs::components;
+using namespace helios::ecs::entity;
 
 // Wrapped in an anonymous namespace so these test-local helper types get
 // internal linkage. Without this, other test TUs that declare identically
 // named helpers (e.g. `MyComponent`, `TestDomainTag`) at global scope would
 // share the same mangled names for template instantiations, causing the
 // linker to fold differing definitions together (an ODR violation) and
-// corrupting `SparseSet`/`View` iteration at runtime.
+// corrupting `SparseSet`/`Query` iteration at runtime.
 namespace {
 
 struct TestDomainTag {};
@@ -29,7 +30,7 @@ class MyComponent {
 
     public:
 
-    using Handle_type = TOwnerHandle;
+    using HandleType = TOwnerHandle;
 
     int value = 0;
     bool remove = true;
@@ -45,7 +46,7 @@ class MyComponent {
 } // namespace
 
 
-TEST(View, find) {
+TEST(Query, find) {
 
     TestEntityManager em{};
 
@@ -59,10 +60,10 @@ TEST(View, find) {
     auto* cmp = em.emplace<MyComponent<TestHandle>>(handle, 10);
     EXPECT_TRUE(em.has<MyComponent<TestHandle>>(handle));
 
-    auto view = View<TestEntityManager, MyComponent<TestHandle>>(&em);
+    auto query = Query<TestEntityManager, MyComponent<TestHandle>>(&em);
 
     int i = 0;
-    for (auto [entity, component] : view.whereAnyDirty<MyComponent<TestHandle>>()) {
+    for (auto [entity, component] : query.whereAnyDirty<MyComponent<TestHandle>>()) {
         i++;
     }
     EXPECT_EQ(i, 0);
@@ -71,7 +72,7 @@ TEST(View, find) {
     em.emplace<DirtyComponentSpec<MyComponent<TestHandle>>>(handle);
 
     i = 0;
-    for (auto [entity, component] : view.whereAnyDirty<MyComponent<TestHandle>>()) {
+    for (auto [entity, component] : query.whereAnyDirty<MyComponent<TestHandle>>()) {
         i++;
     }
     EXPECT_EQ(i, 1);
@@ -79,7 +80,7 @@ TEST(View, find) {
     em.clearDirtySet<MyComponent<TestHandle>>();
 
     i = 0;
-    for (auto [entity, component] : view.whereAnyDirty<MyComponent<TestHandle>>()) {
+    for (auto [entity, component] : query.whereAnyDirty<MyComponent<TestHandle>>()) {
         i++;
     }
     EXPECT_EQ(i, 0);
