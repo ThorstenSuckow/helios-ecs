@@ -41,24 +41,31 @@ using namespace helios::ecs::common::concepts::traits;
 export namespace helios::ecs::entity::query {
 
 
-template<typename TReadSet, typename TWriteSet, typename TFilter = query::Filter<query::AnyDirty<>>>
-using Query = typename traits::QueryBuilder<TReadSet, TWriteSet, TFilter>::type;
+template<typename THandle, typename TReadSet, typename TWriteSet = WriteSet<>, typename TFilter = query::Filter<query::AnyDirty<>>>
+using Query = typename traits::QueryBuilder<THandle, TReadSet, TWriteSet, TFilter>::type;
 
 
 template <typename TEntityManager, typename... TReadComponents, typename ... TWriteComponents, typename TFilter,  typename... TOptional>
 class PartialQuery<TEntityManager, core::common::types::TypeList<TReadComponents...>, core::common::types::TypeList<TWriteComponents...>, TFilter,  std::tuple<TOptional...>> {
 
+
+public:
+    using HandleType = typename TEntityManager::HandleType;
+
+private:
     using EntityMutationBuffer = mutation::EntityMutationBuffer<
         typename TEntityManager::HandleType, TWriteComponents...
     >;
 
-    using DirtySetTraits = traits::DirtySetTrait<typename TFilter::dirtyList>;
+    using DirtySetTraits = traits::DirtySetTrait<typename TEntityManager::HandleType, typename TFilter::dirtyList>;
 
-private:
     TEntityManager* em_;
 
 
-    std::tuple<const SparseSet<TReadComponents>*...> readSet_;
+    std::tuple<const SparseSet<HandleType, TReadComponents>*...> readSet_;
+
+    template<typename T>
+    using SparseSet = SparseSet<HandleType, T>;
 
     /**
      * @brief Mutable components, present in both read and write sets.
@@ -135,8 +142,6 @@ private:
     };
 
 public:
-
-    using HandleType = typename TEntityManager::HandleType;
 
     using ReadSet = entity::ReadSet<TReadComponents...>;
 

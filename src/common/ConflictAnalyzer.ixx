@@ -4,6 +4,8 @@
  */
 module;
 
+#include <concepts>
+
 export module helios.ecs.common.ConflictAnalyzer;
 
 import helios.core.common.traits;
@@ -17,8 +19,10 @@ export namespace helios::ecs::common::ConflictAnalyzer {
     template<typename ... TAccessSets>
     struct HasConflict;
 
-    template<typename TReadSetA, typename TWriteSetA, typename TReadSetB, typename TWriteSetB>
-    struct HasConflict<ecs::entity::EntityAccessSet<TReadSetA, TWriteSetA>, ecs::entity::EntityAccessSet<TReadSetB, TWriteSetB>> {
+    template<typename THandleA, typename TReadSetA, typename TWriteSetA, typename THandleB, typename TReadSetB, typename TWriteSetB>
+    struct HasConflict<
+        ecs::entity::EntityAccessSet<THandleA, TReadSetA, TWriteSetA>,
+        ecs::entity::EntityAccessSet<THandleB, TReadSetB, TWriteSetB>> {
 
         using ReadSetA = TReadSetA::ComponentList;
         using WriteSetA = TWriteSetA::ComponentList;
@@ -26,12 +30,15 @@ export namespace helios::ecs::common::ConflictAnalyzer {
         using ReadSetB = TReadSetB::ComponentList;
         using WriteSetB = TWriteSetB::ComponentList;
 
-        using WriteWrite = core::common::traits::IntersectionList<WriteSetA, WriteSetB>::list;
-        using ReadWrite = core::common::traits::IntersectionList<ReadSetA, WriteSetB>::list;
-        using WriteRead = core::common::traits::IntersectionList<WriteSetA, ReadSetB>::list;
+        using WriteWriteConflict = core::common::traits::IntersectionList<WriteSetA, WriteSetB>::list;
+        using ReadWriteConflict = core::common::traits::IntersectionList<ReadSetA, WriteSetB>::list;
+        using WriteReadConflict = core::common::traits::IntersectionList<WriteSetA, ReadSetB>::list;
 
         static constexpr bool value =
-            WriteWrite::size > 0 || ReadWrite::size > 0 || WriteRead::size > 0;
+            std::same_as<THandleA, THandleB> &&
+                (WriteWriteConflict::size > 0 ||
+                ReadWriteConflict::size > 0 ||
+                WriteReadConflict::size > 0);
     };
 
 

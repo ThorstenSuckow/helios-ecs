@@ -67,10 +67,7 @@ struct EcsDataContainerArgumentResolver {
             return std::get<index>(tuple);
         } else if constexpr(ecs::entity::concepts::IsQuery<Type>) {
 
-            using EntityManager =  ecs::entity::EntityManager<
-                std::tuple_element_t<0,
-                typename ecs::entity::EntityAccessSet<typename Type::ReadSet, typename Type::WriteSet>::AccessHandles
-            >>;
+            using EntityManager =  ecs::entity::EntityManager<typename Type::HandleType>;
 
             using MutationSinkType = std::tuple_element_t<TArgIdx, TMutationSinkTuple>;
 

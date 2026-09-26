@@ -13,6 +13,8 @@ using namespace helios::ecs::entity::storage;
 // in other test TUs (ODR safety for template instantiations).
 namespace {
 
+    struct HandleType {};
+
 class TestEntity {
 
 public:
@@ -32,7 +34,7 @@ public:
 } // namespace
 
 TEST(SparseSetTest, emplace) {
-    SparseSet<TestEntity> storage;
+    SparseSet<HandleType, TestEntity> storage;
 
     EXPECT_FALSE(storage.contains(EntityId{1}));
 
@@ -49,7 +51,7 @@ TEST(SparseSetTest, emplace) {
 }
 
 TEST(SparseSetTest, get) {
-    SparseSet<TestEntity> storage;
+    SparseSet<HandleType, TestEntity> storage;
 
     auto* ent = storage.emplace(EntityId{1}, TestEntity{10});
 
@@ -60,7 +62,7 @@ TEST(SparseSetTest, get) {
 
 
 TEST(SparseSetTest, remove) {
-    SparseSet<TestEntity> storage;
+    SparseSet<HandleType, TestEntity> storage;
 
     EXPECT_NE(storage.emplace(EntityId{1}, TestEntity{10}), nullptr);
     EXPECT_NE(storage.emplace(EntityId{2}, TestEntity{20}), nullptr);

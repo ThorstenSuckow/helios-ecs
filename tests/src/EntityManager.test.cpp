@@ -38,10 +38,7 @@ class MyComponent {
 
     public:
 
-    using HandleType = TestHandle;
-
     int value = 0;
-
 
 };
 

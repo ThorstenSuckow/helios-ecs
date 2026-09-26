@@ -18,41 +18,40 @@ namespace {
 
     struct ParticleHandle{};
 
-    template<typename TMOwnerHandle>
     struct PositionComponent {
-        using HandleType = TMOwnerHandle;
     };
 
-    template<typename TMOwnerHandle>
     struct VelocityComponent {
-        using HandleType = TMOwnerHandle;
     };
 
 
     struct Foo {
 
         using EntityAccessSet1 = EntityAccessSet<
+            GameObjectHandle,
             ReadSet<
-                PositionComponent<GameObjectHandle>,
-                VelocityComponent<ParticleHandle>,
-                VelocityComponent<GameObjectHandle>
+                PositionComponent,
+                VelocityComponent
             >,
-            WriteSet<VelocityComponent<GameObjectHandle>>
+            WriteSet<VelocityComponent>
         >;
 
         using EntityAccessSet2 = EntityAccessSet<
-            ReadSet<PositionComponent<GameObjectHandle>>,
-            WriteSet<VelocityComponent<GameObjectHandle>>
+            GameObjectHandle,
+            ReadSet<PositionComponent>,
+            WriteSet<VelocityComponent>
         >;
 
-        using EntityAccessSet3= EntityAccessSet<
-            ReadSet<PositionComponent<GameObjectHandle>>,
+        using EntityAccessSet3 = EntityAccessSet<
+            ParticleHandle,
+            ReadSet<PositionComponent>,
             WriteSet<>
         >;
 
         using EntityAccessSet4 = EntityAccessSet<
-            ReadSet<PositionComponent<GameObjectHandle>>,
-            WriteSet<VelocityComponent<ParticleHandle>>
+            GameObjectHandle,
+            ReadSet<PositionComponent>,
+            WriteSet<VelocityComponent>
         >;
 
     };
@@ -76,6 +75,5 @@ TEST(ConflictTest, Components) {
             TypeList<Foo::EntityAccessSet1, Foo::EntityAccessSet3, Foo::EntityAccessSet4>
             >::value;
     EXPECT_TRUE(value3);
-
 
 }

@@ -29,13 +29,13 @@ concept IsComponentDirtyTrackable = requires(TComponent& component, const TValue
 };
 
 /**
- * @brief Type trait – `true` for `Active<Thandle>` specialisations.
+ * @brief Type trait – `true` for `Active` specialisations.
  */
 template <typename T>
 struct IsActiveComponent : std::false_type {};
 
-template <typename THandle>
-struct IsActiveComponent<Active<THandle>> : std::true_type {};
+template <>
+struct IsActiveComponent<Active> : std::true_type {};
 
 /**
  * @brief Convenience variable template for `IsActiveComponent`.
@@ -64,8 +64,8 @@ inline constexpr bool IsDirtyComponentSpec_v = IsDirtyComponentSpec<std::remove_
 template <typename T>
 struct IsAddComponentCommand : std::false_type {};
 
-template <typename TComponent>
-struct IsAddComponentCommand<commands::AddComponentCommand<TComponent>> : std::true_type {};
+template <typename THandle, typename TComponent>
+struct IsAddComponentCommand<commands::AddComponentCommand<THandle, TComponent>> : std::true_type {};
 
 /**
  * @brief Convenience variable template for `IsAddComponentCommand`.
@@ -79,8 +79,8 @@ inline constexpr bool IsAddComponentCommand_v = IsAddComponentCommand<std::remov
 template <typename T>
 struct IsRemoveComponentCommand : std::false_type {};
 
-template <typename TComponent>
-struct IsRemoveComponentCommand<commands::RemoveComponentCommand<TComponent>> : std::true_type {};
+template <typename THandle, typename TComponent>
+struct IsRemoveComponentCommand<commands::RemoveComponentCommand<THandle, TComponent>> : std::true_type {};
 
 /**
  * @brief Convenience variable template for `IsRemoveComponentCommand`.

@@ -66,12 +66,12 @@ class EntityMutationManager {
     using EntityManager = ecs::entity::EntityManager<THandle>;
 
     template<typename TComponent>
-    using SparseSet = ecs::entity::storage::SparseSet<TComponent>;
+    using SparseSet = ecs::entity::storage::SparseSet<THandle, TComponent>;
 
     template<typename TComponent>
-    using AddComponentCommand = ecs::commands::AddComponentCommand<TComponent>;
+    using AddComponentCommand = ecs::commands::AddComponentCommand<THandle, TComponent>;
     template<typename TComponent>
-    using RemoveComponentCommand = ecs::commands::RemoveComponentCommand<TComponent>;
+    using RemoveComponentCommand = ecs::commands::RemoveComponentCommand<THandle, TComponent>;
 
     using CommandQueue = MutationCommandQueue<THandle>;
 

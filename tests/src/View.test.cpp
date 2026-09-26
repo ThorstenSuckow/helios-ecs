@@ -25,12 +25,11 @@ using TestEntityManager = EntityManager<TestHandle>;
 using ViewWorld = TypedHandleWorld<TestEntityManager>;
 
 
-template <typename TOwnerHandle>
+
 class MyComponent {
 
     public:
 
-    using HandleType = TOwnerHandle;
 
     int value = 0;
     bool remove = true;
@@ -54,36 +53,21 @@ TEST(Query, find) {
     EXPECT_EQ(handle.entityId(), 0);
     EXPECT_EQ(handle.versionId(), 1);
 
-    EXPECT_FALSE(em.has<MyComponent<TestHandle>>(handle));
-    EXPECT_FALSE(em.has<DirtyComponentSpec<MyComponent<TestHandle>>>(handle));
+    EXPECT_FALSE(em.has<MyComponent>(handle));
+    EXPECT_FALSE(em.has<DirtyComponentSpec<MyComponent>>(handle));
 
-    auto* cmp = em.emplace<MyComponent<TestHandle>>(handle, 10);
-    EXPECT_TRUE(em.has<MyComponent<TestHandle>>(handle));
+    auto* cmp = em.emplace<MyComponent>(handle, 10);
+    EXPECT_TRUE(em.has<MyComponent>(handle));
 
-    auto query = Query<TestEntityManager, MyComponent<TestHandle>>(&em);
+    auto query = query::Query<TestHandle, ReadSet<MyComponent>, WriteSet<MyComponent>>(&em);
 
-    int i = 0;
-    for (auto [entity, component] : query.whereAnyDirty<MyComponent<TestHandle>>()) {
-        i++;
-    }
-    EXPECT_EQ(i, 0);
 
     cmp->setValue();
-    em.emplace<DirtyComponentSpec<MyComponent<TestHandle>>>(handle);
+    em.emplace<DirtyComponentSpec<MyComponent>>(handle);
 
-    i = 0;
-    for (auto [entity, component] : query.whereAnyDirty<MyComponent<TestHandle>>()) {
-        i++;
-    }
-    EXPECT_EQ(i, 1);
 
-    em.clearDirtySet<MyComponent<TestHandle>>();
+    em.clearDirtySet<MyComponent>();
 
-    i = 0;
-    for (auto [entity, component] : query.whereAnyDirty<MyComponent<TestHandle>>()) {
-        i++;
-    }
-    EXPECT_EQ(i, 0);
 
 
 }

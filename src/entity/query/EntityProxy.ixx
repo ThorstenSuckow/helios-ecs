@@ -84,7 +84,7 @@ export namespace helios::ecs::entity::query {
             }
             tracked_[position] = true;
 
-            using CmdCompType = commands::AddComponentCommand<components::DirtyComponentSpec<std::remove_cvref_t<TComponent>>>;
+            using CmdCompType = commands::AddComponentCommand<THandle, components::DirtyComponentSpec<std::remove_cvref_t<TComponent>>>;
             buffer_->add(CmdCompType{handle_});
             
             return mutableComponent<TComponent>();
@@ -101,7 +101,7 @@ export namespace helios::ecs::entity::query {
             }
             added_[position] = true;
 
-            using CmdCompType = commands::AddComponentCommand<TComponent>;
+            using CmdCompType = commands::AddComponentCommand<THandle, TComponent>;
 
             buffer_->add(CmdCompType{handle_, std::forward<TArgs>(args)...});
         }

@@ -16,18 +16,17 @@ import helios.ecs.component.components;
 export namespace helios::ecs::entity::mutation {
 
     template<typename THandle, typename ... TWriteComponents>
-    requires (std::same_as<THandle, typename TWriteComponents::HandleType> && ...)
     class EntityMutationBuffer {
 
         using EntityMutationManager = EntityMutationManager<THandle>;
 
         std::tuple<
-            std::vector<commands::AddComponentCommand<TWriteComponents>>...,
-            std::vector<commands::AddComponentCommand<components::DirtyComponentSpec<TWriteComponents>>>...
+            std::vector<commands::AddComponentCommand<THandle, TWriteComponents>>...,
+            std::vector<commands::AddComponentCommand<THandle, components::DirtyComponentSpec<TWriteComponents>>>...
         > addComponents_{};
 
         std::tuple<
-            std::vector<commands::RemoveComponentCommand<TWriteComponents>>
+            std::vector<commands::RemoveComponentCommand<THandle, TWriteComponents>>
             ...
         > removeComponents_{};
 
@@ -45,16 +44,16 @@ export namespace helios::ecs::entity::mutation {
 
         using HandleType = THandle;
 
-        template<template <typename> typename TCommand, typename TInner>
-        void add(TCommand<TInner>&& cmd) {
+        template<template <typename, typename> typename TCommand, typename TInner>
+        void add(TCommand<THandle, TInner>&& cmd) {
 
-            using CommandType = std::remove_cvref_t<TCommand<TInner>>;
+            using CommandType = std::remove_cvref_t<TCommand<THandle, TInner>>;
 
-            if constexpr (std::same_as<commands::AddComponentCommand<TInner>, CommandType>) {
+            if constexpr (std::same_as<commands::AddComponentCommand<HandleType, TInner>, CommandType>) {
                 auto& vec = std::get<std::vector<CommandType>>(addComponents_);
                 vec.push_back(std::move(cmd));
 
-            } else if constexpr (std::same_as<commands::RemoveComponentCommand<TInner>, CommandType>) {
+            } else if constexpr (std::same_as<commands::RemoveComponentCommand<HandleType, TInner>, CommandType>) {
                 auto& vec = std::get<std::vector<CommandType>>(removeComponents_);
                 vec.push_back(std::move(cmd));
             } else {

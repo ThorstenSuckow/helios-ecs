@@ -32,22 +32,17 @@ class PartialQuery;
 
 export namespace helios::ecs::entity::traits {
 
-    template<typename TReadSet, typename TWriteSet>
-    using QueryHandle = std::tuple_element_t<0, typename ecs::entity::EntityAccessSet<TReadSet, TWriteSet>::AccessHandles>;
-
     template<
         typename THandle,
         typename TReadSet,
         typename TWriteSet,
         typename TFilter
    >
-   requires (std::tuple_size_v<typename entity::EntityAccessSet<TReadSet, TWriteSet>::AccessHandles> == 1)
-   && (std::same_as<THandle, QueryHandle<TReadSet, TWriteSet>>)
-   struct QueryBuilderImpl {
+   struct QueryBuilder {
 
         using ReadComponents = std::conditional_t<
            TFilter::onlyActive,
-           typename TReadSet::ComponentList::template Prepend<ecs::components::Active<THandle>>,
+           typename TReadSet::ComponentList::template Prepend<ecs::components::Active>,
            typename TReadSet::ComponentList
        >;
 
@@ -60,25 +55,13 @@ export namespace helios::ecs::entity::traits {
         >;
     };
 
-    template<typename ... T>
-    struct QueryBuilder;
 
-    template<
-        typename TReadSet,
-        typename TWriteSet,
-        typename TFilter
-   >
-   struct QueryBuilder<TReadSet, TWriteSet, TFilter> : QueryBuilderImpl<
-        QueryHandle<TReadSet, TWriteSet>, TReadSet, TWriteSet, TFilter
-    > {};
-
-
-    template<typename T>
+    template<typename THandle, typename T>
     struct DirtySetTrait;
 
-    template<typename ... TComponents>
-    struct DirtySetTrait<core::common::types::TypeList<TComponents...>> {
-        using tuple = std::tuple<ecs::entity::storage::SparseSet<ecs::components::DirtyComponentSpec<TComponents>>*...>;
+    template<typename THandle, typename ... TComponents>
+    struct DirtySetTrait<THandle, core::common::types::TypeList<TComponents...>> {
+        using tuple = std::tuple<ecs::entity::storage::SparseSet<THandle, ecs::components::DirtyComponentSpec<TComponents>>*...>;
         using readSet = ReadSet<TComponents...>;
     };
 
