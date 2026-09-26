@@ -17,10 +17,10 @@ export namespace helios::ecs::commands {
  *
  * @tparam TComponent Component type to attach. Must expose `HandleType`.
  */
-template <typename TComponent>
+template <typename THandle, typename TComponent>
 struct AddComponentCommand {
 
-    using HandleType = TComponent::HandleType;
+    using HandleType = THandle;
 
     using ComponentType = TComponent;
 
