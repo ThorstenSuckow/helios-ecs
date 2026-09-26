@@ -234,7 +234,7 @@ public:
      * @return SparseSet<THandle> or nullptr if not available.
      */
     template <typename THandle, typename TComponent>
-    [[nodiscard]] entity::storage::SparseSet<TComponent>* sparseSet() {
+    [[nodiscard]] entity::storage::SparseSet<THandle, TComponent>* sparseSet() {
         auto& em = entityManager<THandle>();
         return em.template sparseSet<TComponent>();
     }

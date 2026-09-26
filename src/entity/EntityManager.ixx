@@ -46,6 +46,8 @@ enum class SortCriteria { MaxEntityId, ComponentCount };
 template <typename THandle>
 class EntityManager {
 
+    using ComponentTypeId = ComponentTypeId<THandle>;
+
 public:
     /**
      * @brief Registry type used by this manager.
@@ -53,11 +55,6 @@ public:
     using EntityRegistryType = EntityRegistry<THandle>;
 
     using HandleType = THandle;
-
-    /**
-     * @brief Component type-id provider bound to `HandleType`.
-     */
-    using ComponentTypeIdType = ComponentTypeId<HandleType>;
 
     /**
      * @brief Non-copyable: copying an EntityManager is explicitly disabled.
@@ -191,23 +188,23 @@ public:
     /**
      * @brief Retrieves a component for the given entity.
      *
-     * @tparam T The component type to retrieve.
+     * @tparam TComponent The component type to retrieve.
      *
      * @param handle The entity whose component to retrieve.
      *
      * @return Pointer to the component, or `nullptr` if the entity is invalid
      *         or does not have the requested component.
      */
-    template <typename T>
-    [[nodiscard]] T* get(const HandleType handle) const {
-        if (!has<T>(handle)) {
+    template <typename TComponent>
+    [[nodiscard]] TComponent* get(const HandleType handle) const {
+        if (!has<TComponent>(handle)) {
             return nullptr;
         }
 
         const auto entityId = handle.entityId();
-        const auto typeId = ComponentTypeIdType::template id<T>().value();
+        const auto typeId = ComponentTypeId::template id<TComponent>().value();
 
-        auto* sparseSet = static_cast<SparseSet<T>*>(components_[typeId].get());
+        auto* sparseSet = static_cast<SparseSet<THandle, TComponent>*>(components_[typeId].get());
 
         return sparseSet->get(entityId);
     }
@@ -215,32 +212,32 @@ public:
     /**
      * @brief Returns the SparseSet for a component type.
      *
-     * @tparam T The component type.
+     * @tparam TComponent The component type.
      *
      * @return Const Pointer to the SparseSet, or `nullptr` if the type has no storage.
      */
-    template <typename T>
-    [[nodiscard]] const SparseSet<T>* sparseSet() const noexcept {
+    template <typename TComponent>
+    [[nodiscard]] const SparseSet<THandle, TComponent>* sparseSet() const noexcept {
 
-        const auto typeId = ComponentTypeIdType::template id<T>().value();
+        const auto typeId = ComponentTypeId::template id<TComponent>().value();
 
         if (typeId >= components_.size() || !components_[typeId]) {
             return nullptr;
         }
 
-        return static_cast<SparseSet<T>*>(components_[typeId].get());
+        return static_cast<SparseSet<THandle, TComponent>*>(components_[typeId].get());
     }
 
     /**
      * @brief Returns the SparseSet for a component type (const).
      *
-     * @tparam T The component type.
+     * @tparam TComponent The component type.
      *
      * @return Pointer to the SparseSet, or `nullptr` if the type has no storage.
      */
-    template <typename T>
-    [[nodiscard]] SparseSet<T>* sparseSet() {
-        return const_cast<SparseSet<T>*>(std::as_const(*this).template sparseSet<T>());
+    template <typename TComponent>
+    [[nodiscard]] SparseSet<THandle, TComponent>* sparseSet() {
+        return const_cast<SparseSet<THandle, TComponent>*>(std::as_const(*this).template sparseSet<TComponent>());
     }
 
     /**
@@ -250,12 +247,12 @@ public:
      *
      * @return The associated sparse set, or nullptr if not found.
      */
-    [[nodiscard]] SparseSetBase* sparseSet(ComponentTypeIdType typeId) noexcept {
+    [[nodiscard]] SparseSetBase* sparseSet(ComponentTypeId typeId) noexcept {
 
         return const_cast<SparseSetBase*>(std::as_const(*this).sparseSet(typeId));
     }
 
-    [[nodiscard]] SparseSetBase* sparseSet(ComponentTypeIdType typeId) const noexcept {
+    [[nodiscard]] SparseSetBase* sparseSet(ComponentTypeId typeId) const noexcept {
 
         const auto idx = typeId.value();
 
@@ -269,20 +266,20 @@ public:
     /**
      * @brief Checks whether an entity has a specific component.
      *
-     * @tparam T The component type to check for.
+     * @tparam TComponent The component type to check for.
      *
      * @param handle The entity to query.
      *
      * @return `true` if the entity has the component, `false` if the handle
      *         is invalid or the component is not attached.
      */
-    template <typename T>
+    template <typename TComponent>
     [[nodiscard]] bool has(const HandleType handle) const {
         if (!registry_.isValid(handle)) {
             return false;
         }
 
-        const auto typeId = ComponentTypeIdType::template id<T>().value();
+        const auto typeId = ComponentTypeId::template id<TComponent>().value();
 
         if (typeId < components_.size() && components_[typeId]) {
             return components_[typeId]->contains(handle.entityId());
@@ -299,7 +296,7 @@ public:
      *
      * @return `true` if the entity has the component, `false` otherwise.
      */
-    [[nodiscard]] bool has(const HandleType handle, const ComponentTypeIdType typeId) const {
+    [[nodiscard]] bool has(const HandleType handle, const ComponentTypeId typeId) const {
         if (!registry_.isValid(handle)) {
             return false;
         }
@@ -323,19 +320,19 @@ public:
      * @return Non-owning pointer to the (potentially newly created) `SparseSet`.
      */
     template <typename TComponent>
-    [[nodiscard]] SparseSet<TComponent>* ensureSparseSet() {
+    [[nodiscard]] SparseSet<THandle, TComponent>* ensureSparseSet() {
 
-        const auto typeId = ComponentTypeIdType::template id<TComponent>().value();
+        const auto typeId = ComponentTypeId::template id<TComponent>().value();
 
         if (typeId >= components_.size()) {
             components_.resize(typeId + 1);
         }
 
         if (!components_[typeId]) {
-            components_[typeId] = std::make_unique<SparseSet<TComponent>>(capacity_);
+            components_[typeId] = std::make_unique<SparseSet<THandle, TComponent>>(capacity_);
         }
 
-        return static_cast<SparseSet<TComponent>*>(components_[typeId].get());
+        return static_cast<SparseSet<THandle, TComponent>*>(components_[typeId].get());
     }
 
     /**
@@ -346,7 +343,7 @@ public:
      * arguments. Returns `nullptr` if the component already exists or if the
      * handle was invalid.
      *
-     * @tparam T The component type to emplace.
+     * @tparam TComponent The component type to emplace.
      * @tparam Args Constructor argument types.
      *
      * @param handle The entity to attach the component to.
@@ -355,8 +352,8 @@ public:
      * @return Pointer to the newly created component, or `nullptr` if the
      *         handle is invalid.
      */
-    template <typename T, typename... Args>
-    T* emplace(const HandleType handle, Args&&... args) {
+    template <typename TComponent, typename... Args>
+    TComponent* emplace(const HandleType handle, Args&&... args) {
 
         if (!registry_.isValid(handle)) {
             return nullptr;
@@ -364,9 +361,9 @@ public:
 
         const auto entityId = handle.entityId();
 
-        const auto typeId = ComponentTypeIdType::template id<T>().value();
+        const auto typeId = ComponentTypeId::template id<TComponent>().value();
 
-        auto* sparseSet = ensureSparseSet<T>();
+        auto* sparseSet = ensureSparseSet<TComponent>();
 
         if (sparseSet->contains(entityId)) {
             return nullptr;
@@ -378,7 +375,7 @@ public:
     /**
      * @brief Returns existing component or creates a new one.
      *
-     * @tparam T The component type.
+     * @tparam TComponent The component type.
      * @tparam Args Constructor argument types.
      *
      * @param handle The entity.
@@ -387,17 +384,17 @@ public:
      * @return Pointer to the existing or newly created component,
      *         or `nullptr` if the handle is invalid.
      */
-    template <typename T, typename... Args>
-    T* emplaceOrGet(const HandleType handle, Args&&... args) {
+    template <typename TComponent, typename... Args>
+    TComponent* emplaceOrGet(const HandleType handle, Args&&... args) {
 
         if (!registry_.isValid(handle)) {
             return nullptr;
         }
 
-        auto* raw = emplace<T>(handle, std::forward<Args>(args)...);
+        auto* raw = emplace<TComponent>(handle, std::forward<Args>(args)...);
 
         if (!raw) {
-            return get<T>(handle);
+            return get<TComponent>(handle);
         }
 
         return raw;
@@ -409,7 +406,7 @@ public:
      * Unlike `destroy()`, this only removes a single component type while
      * keeping the entity and other components intact.
      *
-     * @tparam T The component type to remove.
+     * @tparam TComponent The component type to remove.
      *
      * @param handle The entity whose component to remove.
      *
@@ -419,14 +416,14 @@ public:
      * @see destroy
      * @see SparseSet::remove
      */
-    template <typename T>
+    template <typename TComponent>
     [[nodiscard]] bool remove(const HandleType& handle) {
 
-        if (!has<T>(handle)) {
+        if (!has<TComponent>(handle)) {
             return false;
         }
 
-        const auto typeId = ComponentTypeIdType::template id<T>();
+        const auto typeId = ComponentTypeId::template id<TComponent>();
 
         return components_[typeId.value()]->remove(handle.entityId());
     }
@@ -441,7 +438,7 @@ public:
     template <typename TComponent>
     [[nodiscard]] bool managesDirty() {
 
-        auto typeId = ComponentTypeIdType::template id<DirtyComponentSpec<TComponent>>().value();
+        auto typeId = ComponentTypeId::template id<DirtyComponentSpec<TComponent>>().value();
 
         return typeId < components_.size() && components_[typeId];
     }
@@ -453,7 +450,7 @@ public:
      */
     template <typename TComponent>
     void trackDirty() {
-        auto typeId = ComponentTypeIdType::template id<DirtyComponentSpec<TComponent>>().value();
+        auto typeId = ComponentTypeId::template id<DirtyComponentSpec<TComponent>>().value();
 
         if (typeId >= components_.size()) {
             components_.resize(typeId + 1);
@@ -462,7 +459,7 @@ public:
         // not calling ensureSparseSet() since we need to make sure registeredDirtySets
         // is pushed once with typeId
         if (!components_[typeId]) {
-            components_[typeId] = std::make_unique<SparseSet<DirtyComponentSpec<TComponent>>>(capacity_);
+            components_[typeId] = std::make_unique<SparseSet<THandle, DirtyComponentSpec<TComponent>>>(capacity_);
             registeredDirtySets_.push_back(typeId);
         }
 #if HELIOS_DEBUG
@@ -497,17 +494,17 @@ public:
     }
 
     /**
-     * @brief Checks if the `SparseSet` for `DirtyComponentSpec<T>` exists and clears it.
+     * @brief Checks if the `SparseSet` for `DirtyComponentSpec<TComponent>` exists and clears it.
      *
      * Accepts a variadic list of component types; all matching dirty sets are cleared.
      *
-     * @tparam T Component types whose dirty sets should be cleared.
+     * @tparam TComponent Component types whose dirty sets should be cleared.
      */
-    template <typename... T>
+    template <typename... TComponent>
     void clearDirtySet() {
         (
             [this] {
-                const auto typeId = ComponentTypeIdType::template id<DirtyComponentSpec<T>>().value();
+                const auto typeId = ComponentTypeId::template id<DirtyComponentSpec<TComponent>>().value();
                 if (typeId < components_.size() && components_[typeId]) {
                     components_[typeId]->clear();
                 }
@@ -534,7 +531,7 @@ public:
 
         for (core::common::types::TypeId_t i = 0; i < components_.size(); i++) {
             if (components_[i] && components_[i]->contains(handle.entityId())) {
-                std::forward<TFunc>(func)(ComponentTypeIdType{i});
+                std::forward<TFunc>(func)(ComponentTypeId{i});
             }
         }
     }
@@ -556,7 +553,7 @@ public:
             return false;
         }
 
-        forEachComponentTypeId(source, [&](const ComponentTypeIdType typeId) {
+        forEachComponentTypeId(source, [&](const ComponentTypeId typeId) {
             if (!has(target, typeId)) {
 
                 std::ignore = components_[typeId.value()]->copy(source.entityId(), target.entityId());
@@ -588,7 +585,7 @@ public:
 
         bool allReset = true;
         bool called = false;
-        forEachComponentTypeId(targetHandle, [&](const ComponentTypeIdType typeId) {
+        forEachComponentTypeId(targetHandle, [&](const ComponentTypeId typeId) {
             const auto idx = typeId.value();
             if (!source.has(sourceHandle, typeId)) {
                 sparseSet(typeId)->remove(targetHandle.entityId());
@@ -626,7 +623,7 @@ public:
         auto targetHandle = create();
         bool called = false;
         bool allCopied = true;
-        sourceEntityManager.forEachComponentTypeId(sourceHandle, [&](const ComponentTypeIdType typeId) {
+        sourceEntityManager.forEachComponentTypeId(sourceHandle, [&](const ComponentTypeId typeId) {
             const auto idx = typeId.value();
             const auto* source = sourceEntityManager.sparseSet(typeId);
             if (idx >= components_.size()) {
@@ -658,7 +655,7 @@ public:
      *
      * @return Raw pointer to the component, or `nullptr` if not found.
      */
-    [[nodiscard]] void* get(const HandleType handle, const ComponentTypeIdType typeId) const {
+    [[nodiscard]] void* get(const HandleType handle, const ComponentTypeId typeId) const {
         if (!has(handle, typeId)) {
             return nullptr;
         }
@@ -740,7 +737,7 @@ public:
      *
      * @param typeId Component type id.
      */
-    void finalizeMutations(const ComponentTypeIdType typeId) {
+    void finalizeMutations(const ComponentTypeId typeId) {
         assert(components_[typeId.value()] && "Component-group not existing.");
         components_[typeId.value()]->finalizeMutations();
     }

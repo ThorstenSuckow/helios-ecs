@@ -7,6 +7,7 @@ module;
 #include <cassert>
 #include <type_traits>
 #include <utility>
+#include <mach/thread_info.h>
 
 export module helios.ecs.entity.Entity;
 
@@ -47,24 +48,24 @@ private:
     /**
      * @brief Marks the specified component as dirty and registers the dirty set with the EntityManager.
      *
-     * @tparam T The component type to mark as dirty.
+     * @tparam TComponent The component type to mark as dirty.
      */
-    template <typename T>
+    template <typename TComponent>
     void markDirty() {
-        if (!entityManager_->template managesDirty<T>()) {
-            bool mg = entityManager_->template managesDirty<T>();
+        if (!entityManager_->template managesDirty<TComponent>()) {
+            bool mg = entityManager_->template managesDirty<TComponent>();
             assert(mg && "Cannot mark component as dirty, not tracked by EntityManager.");
         }
-        getOrAdd<DirtyComponentSpec<T>>();
+        getOrAdd<DirtyComponentSpec<TComponent>>();
     }
+
+    using ComponentTypeId = ComponentTypeId<HandleType>;
 
 public:
 
-    using ComponentTypeId_type = ComponentTypeId<HandleType>;
+    using ActiveComponent_type = Active;
 
-    using ActiveComponent_type = Active<HandleType>;
-
-    using InactiveComponent_type = Inactive<HandleType>;
+    using InactiveComponent_type = Inactive;
 
     /**
      * @brief Constructs a Entity wrapper.
@@ -122,35 +123,23 @@ public:
     /**
      * @brief Constructs and attaches a component to this entity.
      *
-     * @tparam T The component type to add.
+     * @tparam TComponent The component type to add.
      * @tparam Args Constructor argument types.
      *
      * @param args Arguments forwarded to the component constructor.
      *
      * @return Reference to the newly created component.
      */
-    template <typename T, typename... Args>
-    T& add(Args&&... args) {
+    template <typename TComponent, typename... Args>
+    TComponent& add(Args&&... args) {
 
-        auto typeId = ComponentTypeId_type::template id<T>();
+        auto typeId = ComponentTypeId::template id<TComponent>();
 
-        auto* cmp = entityManager_->template emplace<T>(entityHandle_, std::forward<Args>(args)...);
-
-        return *cmp;
-    }
-
-    template <
-        template<typename> typename T,
-        typename... Args
-    >
-    T<HandleType>& add(Args&&... args) {
-
-        auto typeId = ComponentTypeId_type::template id<T<HandleType>>();
-
-        auto* cmp = entityManager_->template emplace<T<HandleType>>(entityHandle_, std::forward<Args>(args)...);
+        auto* cmp = entityManager_->template emplace<TComponent>(entityHandle_, std::forward<Args>(args)...);
 
         return *cmp;
     }
+
 
     /**
      * @brief Enqueues a deferred add-component command into `buffer`.
@@ -167,7 +156,7 @@ public:
     template <typename TComponent, typename TBuffer, typename... Args>
         requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
     void deferAdd(TBuffer& buffer, Args&&... args) {
-        buffer.template add<commands::AddComponentCommand<TComponent>>(entityHandle_, std::forward<Args>(args)...);
+        buffer.template add<commands::AddComponentCommand<HandleType, TComponent>>(entityHandle_, std::forward<Args>(args)...);
     }
 
     /**
@@ -183,7 +172,7 @@ public:
     template <typename TComponent, typename TBuffer>
         requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
     void deferRemove(TBuffer& buffer) {
-        buffer.template add<commands::RemoveComponentCommand<TComponent>>(entityHandle_);
+        buffer.template add<commands::RemoveComponentCommand<HandleType, TComponent>>(entityHandle_);
     }
 
     /**
@@ -199,12 +188,12 @@ public:
     template <typename TBuffer>
     requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
     void deferSetActive(TBuffer& buffer) {
-        buffer.template add<commands::AddComponentCommand<Active<typename TEntityManager::HandleType>>>(entityHandle_);
-        buffer.template add<commands::RemoveComponentCommand<Inactive<typename TEntityManager::HandleType>>>(
+        buffer.template add<commands::AddComponentCommand<HandleType, Active>>(entityHandle_);
+        buffer.template add<commands::RemoveComponentCommand<HandleType, Inactive>>(
             entityHandle_
         );
         buffer.template add<
-            commands::AddComponentCommand<DirtyComponentSpec<Active<typename TEntityManager::HandleType>>>
+            commands::AddComponentCommand<HandleType, DirtyComponentSpec<Active>>
         >(entityHandle_);
     }
 
@@ -221,56 +210,56 @@ public:
     template <typename TBuffer>
     requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
     void deferSetInactive(TBuffer& buffer) {
-        buffer.template add<commands::AddComponentCommand<Inactive<typename TEntityManager::HandleType>>>(
+        buffer.template add<commands::AddComponentCommand<HandleType, Inactive>>(
             entityHandle_
         );
-        buffer.template add<commands::RemoveComponentCommand<Active<typename TEntityManager::HandleType>>>(
+        buffer.template add<commands::RemoveComponentCommand<HandleType, Active>>(
             entityHandle_
         );
         buffer.template add<
-            commands::AddComponentCommand<DirtyComponentSpec<Inactive<typename TEntityManager::HandleType>>>
+            commands::AddComponentCommand<HandleType, DirtyComponentSpec<Inactive>>
         >(entityHandle_);
     }
 
     template<typename TComponent, typename TBuffer>
     requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
     void deferMarkDirty(TBuffer& buffer) {
-        buffer.template add<commands::AddComponentCommand<DirtyComponentSpec<TComponent>>>(entityHandle_);
+        buffer.template add<commands::AddComponentCommand<HandleType, DirtyComponentSpec<TComponent>>>(entityHandle_);
     }
 
     /**
      * @brief Returns existing component or creates a new one.
      *
-     * @tparam T The component type.
+     * @tparam TComponent The component type.
      * @tparam Args Constructor argument types.
      *
      * @param args Arguments forwarded to the constructor if creating.
      *
      * @return Reference to the existing or newly created component.
      */
-    template <typename T, typename... Args>
-    T& getOrAdd(Args&&... args) {
-        if (entityManager_->template has<T>(entityHandle_)) {
-            return *entityManager_->template get<T>(entityHandle_);
+    template <typename TComponent, typename... Args>
+    TComponent& getOrAdd(Args&&... args) {
+        if (entityManager_->template has<TComponent>(entityHandle_)) {
+            return *entityManager_->template get<TComponent>(entityHandle_);
         }
-        return add<T>(std::forward<Args>(args)...);
+        return add<TComponent>(std::forward<Args>(args)...);
     }
 
     /**
      * @brief Tracks the specified component which will be added if not already existing.
      *
-     * @tparam T The component type to track.
+     * @tparam TComponent The component type to track.
      * @tparam Args Constructor argument types.
      * @param args Arguments forwarded to the component constructor.
      * @return Reference to the tracked component.
      *
      * @see markDirty
      */
-    template <typename T, typename... Args>
-    T& trackDirty(Args&&... args) {
-        entityManager_->template trackDirty<T>();
-        markDirty<T>();
-        return getOrAdd<T>(std::forward<Args>(args)...);
+    template <typename TComponent, typename... Args>
+    TComponent& trackDirty(Args&&... args) {
+        entityManager_->template trackDirty<TComponent>();
+        markDirty<TComponent>();
+        return getOrAdd<TComponent>(std::forward<Args>(args)...);
     }
 
     /**
@@ -310,13 +299,13 @@ public:
     /**
      * @brief Removes a component from this entity.
      *
-     * @tparam T The component type to remove.
+     * @tparam TComponent The component type to remove.
      *
      * @return True if the component was removed, false if not present.
      */
-    template <typename T>
+    template <typename TComponent>
     bool remove() {
-        return entityManager_->template remove<T>(entityHandle_);
+        return entityManager_->template remove<TComponent>(entityHandle_);
     }
 
     /**
@@ -326,40 +315,31 @@ public:
      *
      * @return Raw void pointer to the component, or nullptr if not found.
      */
-    void* raw(const ComponentTypeId_type typeId) {
+    void* raw(const ComponentTypeId typeId) {
         return entityManager_->raw(entityHandle_, typeId);
     }
 
-    template <template <typename> typename TComponent>
-    TComponent<HandleType>* get() {
-        return entityManager_->template get<TComponent<HandleType>>(entityHandle_);
+
+    template <typename TComponent>
+    TComponent* get() {
+        return entityManager_->template get<TComponent>(entityHandle_);
     }
 
-    template <template <typename> typename TComponent>
-    const TComponent<HandleType>* get() const {
-        return entityManager_->template get<TComponent<HandleType>>(entityHandle_);
-    }
-
-    template <typename T>
-    T* get() {
-        return entityManager_->template get<T>(entityHandle_);
-    }
-
-    template <typename T>
-    const T* get() const {
-        return entityManager_->template get<T>(entityHandle_);
+    template <typename TComponent>
+    const TComponent* get() const {
+        return entityManager_->template get<TComponent>(entityHandle_);
     }
 
     /**
      * @brief Checks if this entity has a specific component type.
      *
-     * @tparam T The component type to check.
+     * @tparam TComponent The component type to check.
      *
      * @return True if the component is attached, false otherwise.
      */
-    template <typename T>
+    template <typename TComponent>
     [[nodiscard]] bool has() const noexcept {
-        return entityManager_->template has<T>(entityHandle_);
+        return entityManager_->template has<TComponent>(entityHandle_);
     }
 
     /**
@@ -369,7 +349,7 @@ public:
      *
      * @return True if the component is attached, false otherwise.
      */
-    bool has(ComponentTypeId_type typeId) const noexcept {
+    bool has(ComponentTypeId typeId) const noexcept {
         return entityManager_->has(entityHandle_, typeId);
     }
 

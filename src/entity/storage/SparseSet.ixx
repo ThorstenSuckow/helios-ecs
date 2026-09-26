@@ -170,7 +170,7 @@ constexpr auto Tombstone = EntityTombstone;
  *
  * @tparam T Stored value type.
  */
-template <typename TComponent>
+template <typename THandle, typename TComponent>
 class SparseSet : public SparseSetBase {
     /**
      * @brief Maps EntityId to dense storage index.
@@ -263,8 +263,8 @@ public:
      *
      * @return Type id of this sparse-set component type.
      */
-    ComponentTypeId<TComponent> componentTypeId() {
-        return ComponentTypeId<typename TComponent::HandleType>::template id<TComponent>();
+    ComponentTypeId<THandle> componentTypeId() {
+        return ComponentTypeId<THandle>::template id<TComponent>();
     };
 
     /**
@@ -355,7 +355,7 @@ public:
      * @copydoc SparseSetBase::makeEmpty
      */
     [[nodiscard]] std::unique_ptr<SparseSetBase> makeEmpty() const override {
-        return std::make_unique<SparseSet<TComponent>>();
+        return std::make_unique<SparseSet<THandle, TComponent>>();
     }
 
     /**
@@ -379,7 +379,7 @@ public:
             assert(false && "cannot copy the component, is this intentional?");
             return false;
         } else {
-            auto& target = static_cast<SparseSet<TComponent>&>(targetSparseSet);
+            auto& target = static_cast<SparseSet<THandle, TComponent>&>(targetSparseSet);
 
             const TComponent& sourceCmp = *get(sourceId);
 
@@ -398,7 +398,7 @@ public:
             return false;
         } else {
 
-            auto& source = static_cast<SparseSet<TComponent>&>(sourceSparseSet);
+            auto& source = static_cast<SparseSet<THandle, TComponent>&>(sourceSparseSet);
 
             auto* sourceCmp = source.get(sourceId);
             if (sourceCmp == nullptr) {
