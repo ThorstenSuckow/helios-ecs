@@ -9,18 +9,15 @@ export namespace helios::ecs::components {
 /**
  * @brief Generic component that stores a handle reference to another entity.
  *
- * @tparam TOwnerHandle Handle type of the entity owning this component.
  * @tparam TTargetHandle Handle type of the referenced target entity.
  * @tparam TDomainTag Optional tag type for domain-specific specialization.
  */
-template <typename TOwnerHandle, typename TTargetHandle, typename TDomainTag>
+template <typename TTargetHandle, typename TDomainTag>
 class BindingComponent {
 
     TTargetHandle targetHandle_{};
 
 public:
-    using HandleType = TOwnerHandle;
-
     /**
      * @brief Creates a binding from an explicit target handle.
      *
@@ -31,11 +28,13 @@ public:
     /**
      * @brief Creates a binding from a target entity instance.
      *
-     * @tparam TTargetEntity Entity type exposing `HandleType` and `handle()`.
+     * @tparam TTargetEntity Entity type exposing `handle()`.
      * @param targetEntity Referenced target entity.
      */
     template <typename TTargetEntity>
-        requires std::same_as<TTargetHandle, typename TTargetEntity::HandleType>
+        requires requires(const TTargetEntity& targetEntity) {
+            { targetEntity.handle() } -> std::same_as<TTargetHandle>;
+        }
     explicit BindingComponent(const TTargetEntity targetEntity) : targetHandle_(targetEntity.handle()){};
 
     /**
