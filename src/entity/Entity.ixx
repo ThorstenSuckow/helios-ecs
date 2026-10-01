@@ -135,7 +135,7 @@ public:
 
         auto typeId = ComponentTypeId::template id<TComponent>();
 
-        auto* cmp = entityManager_->template emplace<TComponent>(entityHandle_, std::forward<Args>(args)...);
+        auto* cmp = entityManager_->template ensureAndEmplace<TComponent>(entityHandle_, std::forward<Args>(args)...);
 
         return *cmp;
     }
