@@ -350,7 +350,7 @@ public:
      * @param args Arguments forwarded to the component constructor.
      *
      * @return Pointer to the newly created component, or `nullptr` if the
-     *         handle is invalid.
+     *         handle is invalid or the underlying SparseSet is missing.
      */
     template <typename TComponent, typename... Args>
     TComponent* emplace(const HandleType handle, Args&&... args) {
@@ -363,13 +363,28 @@ public:
 
         const auto typeId = ComponentTypeId::template id<TComponent>().value();
 
-        auto* sparseSet = ensureSparseSet<TComponent>();
+        if (typeId >= components_.size() || !components_[typeId]) {
+            assert(false && "SparseSet for component missing");
+            return nullptr;
+        }
+
+        auto* sparseSet = static_cast<SparseSet<THandle, TComponent>*>(components_[typeId].get());
 
         if (sparseSet->contains(entityId)) {
             return nullptr;
         }
 
         return sparseSet->emplace(entityId, std::forward<Args>(args)...);
+    }
+
+    template <typename TComponent, typename... Args>
+    TComponent* ensureAndEmplace(const HandleType handle, Args&&... args) {
+
+        if (ensureSparseSet<TComponent>()) {
+            return emplace<TComponent>(handle, std::forward<Args>(args)...);
+        }
+
+        return nullptr;
     }
 
     /**
@@ -719,18 +734,6 @@ public:
         std::unreachable();
     }
 
-    /**
-     * @brief Finalizes any outstanding mutations of the managed data containers.
-     *
-     * @warning This method is not thread safe.
-     */
-    void finalizeMutations() {
-        for (const auto& set : components_) {
-            if (set) {
-                set->finalizeMutations();
-            }
-        }
-    }
 
     /**
      * @brief Finalizes pending mutation metadata for one component type.
