@@ -12,6 +12,7 @@ export import helios.ecs.component;
 export import helios.ecs.manager;
 export import helios.ecs.system;
 export import helios.ecs.entity;
+export import helios.ecs.scheduling;
 
 export import helios.ecs.EntityRef;
 export import helios.ecs.EntitySpanRef;

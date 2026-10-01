@@ -6,5 +6,5 @@
 export module helios.ecs.system.concepts;
 
 export import :SystemConcepts;
-export import :IsSerialSystemGroupContext;
+export import :IsSequentialSystemGroupContext;
 ;
