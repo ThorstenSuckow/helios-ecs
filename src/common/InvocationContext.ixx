@@ -7,13 +7,13 @@ module;
 #include <cstddef>
 #include <tuple>
 #include <variant>
+#include <cassert>
 
 export module helios.ecs.common.InvocationContext;
 
 import helios.core.common;
 
 import helios.ecs.entity.query.NullQuery;
-import helios.ecs.entity.mutation.EntityMutationManager;
 import helios.ecs.entity.EntityManager;
 
 
@@ -54,76 +54,8 @@ export namespace helios::ecs::common {
             typename entity::mutation::traits::EntityMutationBufferFromQueries<ConcreteQueryTypes>::list
         >::tuple;
 
-        EntityMutationBufferTypes entityMutationBuffers_{};
-
         template<std::size_t TIdx>
         using InvocationFunctionArgType = typename InvocationFunctionTraits::template ArgumentType<TIdx>;
-
-    public:
-
-
-        [[nodiscard]] EntityMutationBufferTypes& entityMutationBuffers() noexcept {
-            return entityMutationBuffers_;
-        };
-
-
-        [[nodiscard]] bool syncRequiredStructuralState(EcsDataContainer& ecsDataContainer) {
-
-            auto walkQueries = [&]<typename ... TQueries>(core::common::types::TypeList<TQueries...>) {
-
-                ([&]() {
-                    using TQuery = TQueries;
-                    if constexpr (!std::same_as<TQuery, ecs::entity::query::NullQuery>) {
-                        using HandleType = typename TQuery::HandleType;
-                        using ReadSet = core::common::traits::ConcatList<
-                            typename TQuery::ReadSet::ComponentList,
-                            typename core::common::traits::WrapElements<
-                                ecs::components::DirtyComponentSpec, typename TQuery::DirtySet::ComponentList
-                            >::list
-                        >;
-
-                        auto& manager = ecsDataContainer.get<ecs::entity::mutation::EntityMutationManager<HandleType>>();
-
-                        auto walkComponents = [&]<typename ... TComponents>(core::common::types::TypeList<TComponents...>) {
-                            manager.template commitMutations<TComponents...>(
-                                ecsDataContainer.get<ecs::entity::EntityManager<HandleType>>()
-                            );
-                        };
-                        walkComponents(typename ReadSet::list{});
-                    }
-                }(), ...);
-
-            };
-
-            walkQueries(typename QueryInfo::list{});
-
-            return true;
-        }
-
-
-        bool publishEntityMutations(EcsDataContainer& ecsDataContainer) noexcept {
-
-            // each sink is associated with one command buffer to make sure mutations can be run in parallel later on
-            constexpr std::size_t BufferCount = std::tuple_size_v<decltype(entityMutationBuffers_)>;
-            ([&]<std::size_t... Idx>(std::index_sequence<Idx...>) {
-
-                ([&]() {
-                    auto& buffer = std::get<Idx>(entityMutationBuffers_);
-                    using BufferType = std::remove_cvref_t<decltype(buffer)>;
-
-                    if constexpr (!std::same_as<BufferType, std::monostate>) {
-                        auto& entityMutationManager = ecsDataContainer.get<
-                            ecs::entity::mutation::EntityMutationManager<typename BufferType::HandleType>
-                        >();
-                        buffer.flush(entityMutationManager);
-                    }
-                }(), ...);
-
-            }(std::make_index_sequence<BufferCount>{}));
-
-            return true;
-        }
-
     };
 
 } // namespace helios::ecs::common

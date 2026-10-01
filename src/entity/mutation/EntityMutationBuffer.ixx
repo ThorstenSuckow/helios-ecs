@@ -9,7 +9,7 @@ module;
 
 export module helios.ecs.entity.mutation.EntityMutationBuffer;
 
-import helios.ecs.entity.mutation.EntityMutationManager;
+import helios.ecs.entity.EntityManager;
 import helios.ecs.command.commands;
 import helios.ecs.component.components;
 
@@ -18,7 +18,7 @@ export namespace helios::ecs::entity::mutation {
     template<typename THandle, typename ... TWriteComponents>
     class EntityMutationBuffer {
 
-        using EntityMutationManager = EntityMutationManager<THandle>;
+        using EntityManager = EntityManager<THandle>;
 
         std::tuple<
             std::vector<commands::AddComponentCommand<THandle, TWriteComponents>>...,
@@ -26,18 +26,41 @@ export namespace helios::ecs::entity::mutation {
         > addComponents_{};
 
         std::tuple<
-            std::vector<commands::RemoveComponentCommand<THandle, TWriteComponents>>
-            ...
+            std::vector<commands::RemoveComponentCommand<THandle, TWriteComponents>>...
         > removeComponents_{};
 
-        template<typename TTuple>
-        void drainImpl(EntityMutationManager& mutationManager, TTuple& tuple ) {
-            std::apply([&mutationManager](auto& ... args) {
-                ([&]() {
-                    mutationManager.submitBatch(std::move(args));
-                    args.clear();
-                }(), ...);
-            }, tuple);
+        void drainCommands(EntityManager& entityManager) {
+            auto& addCommands = addComponents_;
+            auto& removeCommands = removeComponents_;
+
+            auto drain = []<typename TTuple>(TTuple& ttuple, EntityManager& em) {
+
+                std::apply([&em](auto& ... vectors) {
+                    ([&]() {
+                        using VectorType = std::remove_cvref_t<decltype(vectors)>;
+                        using CommandType = typename VectorType::value_type;
+                        using ComponentType = typename CommandType::ComponentType;
+
+                        if constexpr (std::same_as<CommandType, commands::AddComponentCommand<THandle, ComponentType>>) {
+                            for (auto& cmd : vectors) {
+                                em.template emplace<ComponentType>(cmd.handle, std::move(cmd.component));
+                            }
+                        } else if constexpr (std::same_as<CommandType, commands::RemoveComponentCommand<THandle, ComponentType>>) {
+                            for (auto& cmd : vectors) {
+                                em.template remove<ComponentType>(cmd.handle);
+                            }
+                        } else {
+                            static_assert(false, "Unsupported command type for EntityMutationBuffer");
+                        }
+
+                        vectors.clear();
+                    }(), ...);
+
+                }, ttuple);
+            };
+
+            drain(addCommands, entityManager);
+            drain(removeCommands, entityManager);
         }
 
     public:
@@ -62,9 +85,8 @@ export namespace helios::ecs::entity::mutation {
         }
 
 
-        void flush(EntityMutationManager& mutationManager) {
-            drainImpl(mutationManager, addComponents_);
-            drainImpl(mutationManager, removeComponents_);
+        void flush(EntityManager& entityManager) {
+            drainCommands(entityManager);
         }
 
     };
