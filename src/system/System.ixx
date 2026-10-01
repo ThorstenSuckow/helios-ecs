@@ -18,7 +18,6 @@ import helios.core.common.types;
 import helios.ecs.component.components;
 
 import helios.ecs.entity.EntityManager;
-import helios.ecs.entity.mutation.EntityMutationManager;
 import helios.ecs.entity.mutation.EntityMutationBuffer;
 import helios.ecs.entity.mutation.traits;
 import helios.ecs.entity.query.NullQuery;
@@ -60,9 +59,8 @@ private:
     public:
         virtual ~Concept() = default;
 
-        virtual bool sync(EcsDataContainer& ecsDataContainer) noexcept = 0;
+        virtual bool commitMutations(EcsDataContainer& ecsDataContainer) noexcept = 0;
         virtual bool update(EcsDataContainer& ecsDataContainer) noexcept = 0;
-        virtual bool publish(EcsDataContainer& ecsDataContainer) noexcept = 0;
         virtual bool flush(EcsDataContainer& ecsDataContainer) noexcept = 0;
 
         [[nodiscard]] virtual void* underlying() noexcept = 0;
@@ -85,19 +83,21 @@ private:
         /* Invocation Context */
         using UpdateFunction = decltype(updateFunction());
         using InvocationContext = ecs::common::InvocationContext<UpdateFunction>;
+        using EntityMutationBufferTypes = typename InvocationContext::EntityMutationBufferTypes;
         using ConcreteCommandBufferType = typename InvocationContext::ConcreteCommandBufferType;
         using UpdateFunctionTraits = InvocationContext::InvocationFunctionTraits;
         template <std::size_t TIdx>
         using UpdateFuncArgType = typename InvocationContext::template InvocationFunctionArgType<TIdx>;
-        using ProducedFrameResultType = UpdateFunctionTraits::ReturnType;
-        InvocationContext invocationContext_{};
+        using ProducedSystemResultType = UpdateFunctionTraits::ReturnType;
 
-        using StoredFrameResultType =
-        std::conditional_t<std::is_void_v<ProducedFrameResultType>, std::monostate, ProducedFrameResultType>;
+        using StoredSystemResultType =
+        std::conditional_t<std::is_void_v<ProducedSystemResultType>, std::monostate, ProducedSystemResultType>;
 
-        std::optional<StoredFrameResultType> frameResult_;
+        std::optional<StoredSystemResultType> systemResult_;
 
         CommandBuffer commandBuffer_{ConcreteCommandBufferType{}};
+
+        EntityMutationBufferTypes entityMutationBuffers_{};
 
         template <std::size_t... Idx>
         auto invokeUpdate(
@@ -105,7 +105,7 @@ private:
             ConcreteCommandBufferType& concreteCommandBuffer,
             std::index_sequence<Idx...>
         ) {
-            auto resolver =  EcsDataContainerArgumentResolver(ecsDataContainer, invocationContext_.entityMutationBuffers());
+            auto resolver =  EcsDataContainerArgumentResolver(ecsDataContainer, entityMutationBuffers_);
 
             if constexpr (ecs::system::concepts::IsCallableSystem<TConcreteSystem>) {
                 return std::invoke(
@@ -126,14 +126,14 @@ private:
         }
 
         void updateAndStore(EcsDataContainer& ecsDataContainer) {
-            if constexpr (std::is_void_v<ProducedFrameResultType>) {
+            if constexpr (std::is_void_v<ProducedSystemResultType>) {
                 invokeUpdate(
                     ecsDataContainer,
                     *commandBuffer_.tryGet<ConcreteCommandBufferType>(),
                     std::make_index_sequence<UpdateFunctionTraits::NumArgs>{}
                 );
             } else {
-                frameResult_.emplace(invokeUpdate(
+                systemResult_.emplace(invokeUpdate(
                     ecsDataContainer,
                     *commandBuffer_.tryGet<ConcreteCommandBufferType>(),
                     std::make_index_sequence<UpdateFunctionTraits::NumArgs>{}
@@ -146,8 +146,24 @@ private:
     public:
         explicit Model(TConcreteSystem&& sys) : system_(std::move(sys)) {}
 
-        bool sync(EcsDataContainer& ecsDataContainer) noexcept override {
-            invocationContext_.syncRequiredStructuralState(ecsDataContainer);
+        bool commitMutations(EcsDataContainer& ecsDataContainer) noexcept override {
+            constexpr std::size_t BufferCount = std::tuple_size_v<decltype(entityMutationBuffers_)>;
+            ([&]<std::size_t... Idx>(std::index_sequence<Idx...>) {
+
+                ([&]() {
+                    auto& buffer = std::get<Idx>(entityMutationBuffers_);
+                    using BufferType = std::remove_cvref_t<decltype(buffer)>;
+
+                    if constexpr (!std::same_as<BufferType, std::monostate>) {
+                        auto& entityManager = ecsDataContainer.get<
+                            ecs::entity::EntityManager<typename BufferType::HandleType>
+                        >();
+                        buffer.flush(entityManager);
+                    }
+                }(), ...);
+
+            }(std::make_index_sequence<BufferCount>{}));
+
             return true;
         }
 
@@ -156,14 +172,10 @@ private:
             return true;
         }
 
-        bool publish(EcsDataContainer& ecsDataContainer) noexcept override {;
-            return invocationContext_.publishEntityMutations(ecsDataContainer);
-        }
-
         bool flush(EcsDataContainer& ecsDataContainer) noexcept override {
-            if constexpr (!std::is_void_v<ProducedFrameResultType>) {
-                ecsDataContainer.emplace<ProducedFrameResultType>(std::move(*frameResult_));
-                frameResult_.reset();
+            if constexpr (!std::is_void_v<ProducedSystemResultType>) {
+                ecsDataContainer.emplace<ProducedSystemResultType>(std::move(*systemResult_));
+                systemResult_.reset();
             }
 
             if constexpr (hasCommandBuffer()) {
@@ -199,39 +211,20 @@ public:
     System& operator=(System&&) = default;
     System(System&&) noexcept = default;
 
-
-    bool sync(EcsDataContainer& ecsDataContainer) noexcept {
-        assert(pimpl_ && "System not initialized");
-        return pimpl_->sync(ecsDataContainer);
-    }
-
-    bool publish(EcsDataContainer& ecsDataContainer) noexcept {
-        assert(pimpl_ && "System not initialized");
-        return pimpl_->publish(ecsDataContainer);
-    }
-
     bool update(EcsDataContainer& ecsDataContainer) noexcept {
         assert(pimpl_ && "System not initialized");
-        return pimpl_->update(ecsDataContainer);
+        if (!pimpl_->update(ecsDataContainer)) {
+            return false;
+        }
+        if (!pimpl_->commitMutations(ecsDataContainer)) {
+            return false;
+        }
+        return true;
     }
 
     bool flush(EcsDataContainer& ecsDataContainer) noexcept {
         assert(pimpl_ && "System not initialized");
         return pimpl_->flush(ecsDataContainer);
-    }
-
-    bool execute(EcsDataContainer& ecsDataContainer) noexcept {
-        if (!sync(ecsDataContainer)) {
-            return false;
-        }
-        if (!update(ecsDataContainer)) {
-            return false;
-        }
-        if (!publish(ecsDataContainer)) {
-            return false;
-        }
-
-        return true;
     }
 
     [[nodiscard]] const void* underlying() const noexcept {

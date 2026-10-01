@@ -22,7 +22,7 @@ import helios.ecs.manager.types;
 import helios.ecs.manager.concepts;
 
 import helios.ecs.entity.mutation.EntityMutationBuffer;
-import helios.ecs.entity.mutation.EntityMutationManager;
+import helios.ecs.entity.EntityManager;
 
 import helios.ecs.command.concepts;
 import helios.ecs.command.traits;
@@ -61,9 +61,8 @@ private:
 
         virtual void reset() noexcept = 0;
 
-        virtual bool sync(EcsDataContainer& dataContainer) noexcept = 0;
-        virtual bool commit(EcsDataContainer& dataContainer) noexcept = 0;
-        virtual bool publish(EcsDataContainer& dataContainer) noexcept = 0;
+        virtual bool commitMutations(EcsDataContainer& ecsDataContainer) noexcept = 0;
+        virtual bool execute(EcsDataContainer& dataContainer) noexcept = 0;
         virtual bool flush(EcsDataContainer& dataContainer) noexcept = 0;
 
         virtual command::CommandBuffer* commandBuffer() noexcept = 0;
@@ -80,13 +79,14 @@ private:
     template <typename TConcreteManager>
     class Model final : public Concept {
 
-        using CommitFunction = decltype(&TConcreteManager::commit);
+        using CommitFunction = decltype(&TConcreteManager::execute);
         using InvocationContext= ecs::common::InvocationContext<CommitFunction>;
-        InvocationContext invocationContext_{};
+        using EntityMutationBufferTypes = typename InvocationContext::EntityMutationBufferTypes;
         using ConcreteCommandBufferType = typename InvocationContext::ConcreteCommandBufferType;
 
         TConcreteManager manager_;
         CommandBuffer commandBuffer_{ConcreteCommandBufferType{}};
+        EntityMutationBufferTypes entityMutationBuffers_{};
 
         static bool constexpr hasCommandBuffer() noexcept {
             return !std::same_as<NullCommandBuffer, ConcreteCommandBufferType>;
@@ -104,16 +104,33 @@ private:
             return &commandBuffer_;
         }
 
-        bool sync(EcsDataContainer& ecsDataContainer) noexcept override {
-            return invocationContext_.syncRequiredStructuralState(ecsDataContainer);
+        bool commitMutations(EcsDataContainer& ecsDataContainer) noexcept override {
+            constexpr std::size_t BufferCount = std::tuple_size_v<decltype(entityMutationBuffers_)>;
+            ([&]<std::size_t... Idx>(std::index_sequence<Idx...>) {
+
+                ([&]() {
+                    auto& buffer = std::get<Idx>(entityMutationBuffers_);
+                    using BufferType = std::remove_cvref_t<decltype(buffer)>;
+
+                    if constexpr (!std::same_as<BufferType, std::monostate>) {
+                        auto& entityManager = ecsDataContainer.get<
+                            ecs::entity::EntityManager<typename BufferType::HandleType>
+                        >();
+                        buffer.flush(entityManager);
+                    }
+                }(), ...);
+
+            }(std::make_index_sequence<BufferCount>{}));
+
+            return true;
         }
 
-        bool commit(EcsDataContainer& ecsDataContainer) noexcept override {
+        bool execute(EcsDataContainer& ecsDataContainer) noexcept override {
 
-            EcsDataContainerFunctionInvoker::invoke<&TConcreteManager::commit>(
+            EcsDataContainerFunctionInvoker::invoke<&TConcreteManager::execute>(
                 manager_,
                 ecsDataContainer,
-                invocationContext_.entityMutationBuffers(),
+                entityMutationBuffers_,
                 ecsDataContainer,
                 *static_cast<ConcreteCommandBufferType*>(commandBuffer_.underlying())
             );
@@ -121,9 +138,6 @@ private:
             return true;
         }
 
-        bool publish(EcsDataContainer& ecsDataContainer) noexcept override {
-            return invocationContext_.publishEntityMutations(ecsDataContainer);
-        }
 
         bool flush(EcsDataContainer& ecsDataContainer) noexcept override {
             if constexpr (hasCommandBuffer()) {
@@ -136,7 +150,7 @@ private:
         bool init(EcsDataContainer& ecsDataContainer) noexcept override {
             EcsDataContainerFunctionInvoker::invoke<&TConcreteManager::init>(
                 manager_, ecsDataContainer,
-                invocationContext_.entityMutationBuffers()
+                entityMutationBuffers_
             );
 
             return true;
@@ -188,21 +202,6 @@ public:
         return pimpl_->init(dataContainer);
     }
 
-    bool sync(EcsDataContainer& dataContainer) noexcept {
-        assert(pimpl_ && "Manager not initialized");
-        return pimpl_->sync(dataContainer);
-    }
-
-    bool commit(EcsDataContainer& dataContainer) noexcept {
-        assert(pimpl_ && "Manager not initialized");
-        return pimpl_->commit(dataContainer);
-    }
-
-    bool publish(EcsDataContainer& dataContainer) noexcept {
-        assert(pimpl_ && "Manager not initialized");
-        return pimpl_->publish(dataContainer);
-    }
-
     bool flush(EcsDataContainer& ecsDataContainer) noexcept {
         assert(pimpl_ && "Manager not initialized");
         return pimpl_->flush(ecsDataContainer);
@@ -210,13 +209,10 @@ public:
 
     bool execute(EcsDataContainer& ecsDataContainer) noexcept {
         assert(pimpl_ && "Manager not initialized");
-        if (!sync(ecsDataContainer)) {
+        if (!pimpl_->execute(ecsDataContainer)) {
             return false;
         }
-        if (!commit(ecsDataContainer)) {
-            return false;
-        }
-        if (!publish(ecsDataContainer)) {
+        if (!pimpl_-> commitMutations(ecsDataContainer)) {
             return false;
         }
         return true;
