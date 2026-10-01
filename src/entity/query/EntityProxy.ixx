@@ -23,11 +23,11 @@ import helios.ecs.entity.mutation.EntityMutationBuffer;
 
 export namespace helios::ecs::entity::query {
 
-    template<typename THandle, typename TMutableSet, typename TAddSet>
+    template<typename THandle, typename TModSet, typename TStructMutSet>
     class EntityProxy {
 
-        using MutableComponents = TMutableSet::ComponentList;
-        using AddComponents = TAddSet::ComponentList;
+        using ModifiableComponents = TModSet::ComponentList;
+        using StructuralMutationComponents = TStructMutSet::ComponentList;
 
         THandle handle_;
 
@@ -37,7 +37,7 @@ export namespace helios::ecs::entity::query {
         using WriteList = typename core::common::traits::UniqueList<
             core::common::types::TypeList<>,
             typename core::common::traits::ConcatList<
-                typename TMutableSet::ComponentList, typename TAddSet::ComponentList
+                typename TModSet::ComponentList, typename TStructMutSet::ComponentList
             >::list
         >::list;
 
@@ -49,36 +49,36 @@ export namespace helios::ecs::entity::query {
         using EntityMutationBuffer = EntityMutationBufferWrap<THandle, WriteList>::type;
         EntityMutationBuffer* buffer_;
 
-        // MutableComponents
+        // ModifiableComponents
         template<typename T>
         using PtrWrap = T*;
-        using MutableComponentTuple = typename core::common::traits::ListToTuple<
-            typename core::common::traits::WrapElements<PtrWrap, MutableComponents>::list
+        using ModifiableComponentTuple = typename core::common::traits::ListToTuple<
+            typename core::common::traits::WrapElements<PtrWrap, ModifiableComponents>::list
         >::tuple;
-        MutableComponentTuple mutableComponents_;
+        ModifiableComponentTuple mutableComponents_;
 
         template<typename TComponent>
         TComponent* mutableComponent() {
             return std::get<TComponent*>(mutableComponents_);
         }
 
-        std::bitset<TMutableSet::size> tracked_{};
-        std::bitset<TAddSet::size> added_{};
+        std::bitset<TModSet::size> tracked_{};
+        std::bitset<TStructMutSet::size> added_{};
 
     public:
 
-        explicit EntityProxy(THandle handle, EntityMutationBuffer* buffer, MutableComponentTuple mutableComponents)
+        explicit EntityProxy(THandle handle, EntityMutationBuffer* buffer, ModifiableComponentTuple mutableComponents)
         : handle_{handle}, buffer_{buffer}, mutableComponents_ {mutableComponents} {}
 
         THandle handle() {
             return handle_;
         }
-        
+
         template<typename TComponent>
-        requires  (core::common::traits::IsInList<TComponent, MutableComponents>::value)
+        requires  (core::common::traits::IsInList<TComponent, ModifiableComponents>::value)
         TComponent* track() {
 
-            constexpr auto position = core::common::traits::IsInList<TComponent, MutableComponents>::index;
+            constexpr auto position = core::common::traits::IsInList<TComponent, ModifiableComponents>::index;
             if (tracked_.test(position)) {
                 return mutableComponent<TComponent>();;
             }
@@ -89,12 +89,12 @@ export namespace helios::ecs::entity::query {
             
             return mutableComponent<TComponent>();
         }
-        
+
         template<typename TComponent, typename ... TArgs>
-        requires (core::common::traits::IsInList<TComponent, AddComponents>::value)
+        requires (core::common::traits::IsInList<TComponent, StructuralMutationComponents>::value)
         void add(TArgs&&... args) {
 
-            constexpr auto position = core::common::traits::IsInList<TComponent, AddComponents>::index;
+            constexpr auto position = core::common::traits::IsInList<TComponent, StructuralMutationComponents>::index;
             if (added_.test(position)) {
                 assert(false && "Component already added to entity.");
                 return;
