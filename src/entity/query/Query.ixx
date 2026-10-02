@@ -72,17 +72,17 @@ private:
      */
     template<typename T>
     using SparseSetPtr = SparseSet<T>*;
-    using MutableComponentsList = typename core::common::traits::IntersectionList<
+    using ModifiableComponentsList = typename core::common::traits::IntersectionList<
         core::common::types::TypeList<TReadComponents...>, core::common::types::TypeList<TWriteComponents...>
     >::list;
-    using MutableComponents = core::common::traits::WrapElements<SparseSetPtr, MutableComponentsList>::list;
+    using MutableComponents = core::common::traits::WrapElements<SparseSetPtr, ModifiableComponentsList>::list;
     using MutableComponentsTuple = typename core::common::traits::ListToTuple<MutableComponents>::tuple;
     MutableComponentsTuple mutableSet_;
 
     /**
      * @brief Add components, present in write sets only.
      */
-    using AddComponentsList = core::common::traits::ExclusionList<
+    using StructMutableComponentsList = core::common::traits::ExclusionList<
         core::common::types::TypeList<TWriteComponents...>, core::common::types::TypeList<TReadComponents...>
     >::list;
 
@@ -147,9 +147,9 @@ public:
 
     using WriteSet = entity::WriteSet<TWriteComponents...>;
 
-    using MutableSet = entity::WriteSet<MutableComponentsList>;
+    using ModifiableSet = entity::WriteSet<ModifiableComponentsList>;
 
-    using AddSet = entity::WriteSet<AddComponentsList>;
+    using StructMutableSet = entity::WriteSet<StructMutableComponentsList>;
 
     using DirtySet = DirtySetTraits::readSet;
 
@@ -164,7 +164,7 @@ public:
         mutableSet_(
             [em]<typename ... TMutableComponent>(core::common::types::TypeList<TMutableComponent...>) {
                 return std::make_tuple(em->template sparseSet<TMutableComponent>()...);
-            }(typename MutableSet::ComponentList{})
+            }(typename ModifiableSet::ComponentList{})
         ),
         entityMutationBuffer_(entityMutationBuffer) ,
         anyDirtySets_(
@@ -407,7 +407,7 @@ public:
         auto extractMutableComponent(EntityId entityId, SparseSet<TComponent>* set) const {
             using ComponentType = TComponent;
 
-            if constexpr (core::common::traits::IsInList<ComponentType, typename MutableSet::ComponentList>::value) {
+            if constexpr (core::common::traits::IsInList<ComponentType, typename ModifiableSet::ComponentList>::value) {
                 return std::make_tuple(set->get(entityId));
             } else {
                 assert(false && "component type not found in the query");
@@ -454,7 +454,7 @@ public:
             return std::tuple_cat(
 
                 std::make_tuple(
-                    EntityProxy<typename TEntityManager::HandleType, MutableSet, AddSet>(
+                    EntityProxy<typename TEntityManager::HandleType, ModifiableSet, StructMutableSet>(
                         handle, view_->entityMutationBuffer_, mutableTuples
                     )),
 
