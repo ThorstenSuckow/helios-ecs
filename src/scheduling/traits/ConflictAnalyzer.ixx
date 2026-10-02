@@ -1,0 +1,96 @@
+/**
+ * @file ConflictAnalyzer.ixx
+ * @brief Compile-time analyzer for Read/Write Sets.
+ */
+module;
+
+#include <concepts>
+
+export module helios.ecs.scheduling.traits:ConflictAnalyzer;
+
+import :SystemAccessSets;
+
+import helios.core.common.traits;
+import helios.core.common.types;
+
+import helios.ecs.entity.EntityAccessSet;
+
+
+export namespace helios::ecs::scheduling::traits {
+
+    template<typename ... TAccessSets>
+    struct IsConflictPair;
+
+    template<typename THandleA, typename TReadSetA, typename TWriteSetA, typename THandleB, typename TReadSetB, typename TWriteSetB>
+    struct IsConflictPair<
+        ecs::entity::EntityAccessSet<THandleA, TReadSetA, TWriteSetA>,
+        ecs::entity::EntityAccessSet<THandleB, TReadSetB, TWriteSetB>> {
+
+        using ReadSetA = TReadSetA::ComponentList;
+        using WriteSetA = TWriteSetA::ComponentList;
+
+        using ReadSetB = TReadSetB::ComponentList;
+        using WriteSetB = TWriteSetB::ComponentList;
+
+        using WriteWriteConflict = core::common::traits::IntersectionList<WriteSetA, WriteSetB>::list;
+        using ReadWriteConflict = core::common::traits::IntersectionList<ReadSetA, WriteSetB>::list;
+        using WriteReadConflict = core::common::traits::IntersectionList<WriteSetA, ReadSetB>::list;
+
+        static constexpr bool value =
+            std::same_as<THandleA, THandleB> &&
+                (WriteWriteConflict::size > 0 ||
+                ReadWriteConflict::size > 0 ||
+                WriteReadConflict::size > 0);
+    };
+
+
+    template<typename TAccessSet, typename TList>
+    struct HasConflictWithAny;
+
+    template<typename TAccessSet, typename ... TOtherAccessSet>
+    struct HasConflictWithAny<TAccessSet, core::common::types::TypeList<TOtherAccessSet...>> {;
+        static constexpr bool value =
+            (IsConflictPair<TAccessSet, TOtherAccessSet>::value || ...);
+    };
+
+    template<typename TListA, typename TListB>
+    struct HasAnyConflict;
+
+    template<typename ... TAccessSetsA, typename ... TAccessSetsB>
+    struct HasAnyConflict<core::common::types::TypeList<TAccessSetsA...>, core::common::types::TypeList<TAccessSetsB...>> {
+
+        static constexpr bool value =
+            (HasConflictWithAny<
+                TAccessSetsA,
+                core::common::types::TypeList<TAccessSetsB...>
+            >::value || ...);
+    };
+
+    template<typename TSystemA, typename TSystemB>
+    struct SystemsConflict : HasAnyConflict<
+        typename SystemAccessSets<TSystemA>::list,
+        typename SystemAccessSets<TSystemB>::list
+    > {};
+
+
+    template<typename TList>
+    struct HasConflict;
+
+    template<>
+    struct HasConflict<core::common::types::TypeList<>> : std::false_type{};
+
+    template<typename TSystem>
+    struct HasConflict<core::common::types::TypeList<TSystem>> : std::false_type{};
+
+
+    template<typename TSystem, typename ... TRest>
+    struct HasConflict<
+        core::common::types::TypeList<TSystem, TRest...>> {
+
+        static constexpr bool value = (SystemsConflict<TSystem, TRest>::value || ...)
+            || HasConflict<core::common::types::TypeList<TRest...>>::value;
+    };
+
+
+
+}

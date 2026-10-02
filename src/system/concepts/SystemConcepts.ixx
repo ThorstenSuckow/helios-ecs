@@ -18,7 +18,7 @@ export namespace helios::ecs::system::concepts {
  * @tparam T The type to inspect.
  */
 template <class T>
-concept IsEcsSystemLike = requires { &std::remove_cvref_t<T>::update; };
+concept IsTypedSystem = requires { &std::remove_cvref_t<T>::update; };
 
 template <class T>
 concept IsCallableSystem = requires { &std::remove_cvref_t<T>::operator(); };

@@ -200,7 +200,7 @@ private:
 
 public:
     template <typename TConcreteSystem>
-    requires concepts::IsCallableSystem <TConcreteSystem>|| concepts::IsEcsSystemLike<TConcreteSystem>
+    requires concepts::IsCallableSystem <TConcreteSystem>|| concepts::IsTypedSystem<TConcreteSystem>
     explicit System(TConcreteSystem&& system)
         : pimpl_(std::make_unique<Model<std::remove_cvref_t<TConcreteSystem>>>(std::forward<TConcreteSystem>(system))) {}
 

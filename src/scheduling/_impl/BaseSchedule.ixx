@@ -16,13 +16,13 @@ module;
 
 export module helios.ecs.scheduling.Scheduler:BaseSchedule;
 
-import helios.core.common.concepts;
+import helios.core.common;
 import helios.core.thread.JobSystem;
 
-import helios.ecs.common.types;
-import helios.ecs.common.concepts;
-import helios.ecs.common.container;
+import helios.ecs.scheduling.traits;
+import helios.ecs.scheduling.concepts;
 
+import helios.ecs.common;
 import helios.ecs.manager;
 import helios.ecs.system;
 import helios.ecs.command;
@@ -118,7 +118,7 @@ export namespace helios::ecs::scheduling {
          * @brief Registers a system instance for parallel typed systems.
          */
         template<typename TSystem>
-        requires ecs::system::concepts::IsEcsSystemLike<std::remove_cvref_t<TSystem>>
+        requires ecs::system::concepts::IsTypedSystem<std::remove_cvref_t<TSystem>>
         BaseSchedule& registerTypedSystemInstance(TSystem&& system) {
             using SystemType = std::remove_cvref_t<TSystem>;
             systemRegistry_.add<SystemType>(std::move(system));
@@ -129,7 +129,7 @@ export namespace helios::ecs::scheduling {
          * @brief Registers a system described by a `TypedSystemSpec` with this pass.
          *
          * @tparam T A `TypedSystemSpec` specialisation whose `System_type` satisfies
-         *           `IsEcsSystemLike`.
+         *           `IsTypedSystem`.
          * @param spec Spec instance carrying the system type and its construction arguments.
          * @return Reference to this pass.
          */
@@ -200,17 +200,8 @@ export namespace helios::ecs::scheduling {
         // +---------------------------------
         // | Typed/ Lambda Systems
         // +---------------------------------
-        template<typename TSystem, typename ... TArgs>
-        requires ecs::system::concepts::IsEcsSystemLike<TSystem>
-        BaseSchedule& add(TArgs&&... args) {
-            using SystemType = std::remove_cvref_t<TSystem>;
-            registerTypedSystemInstance<SystemType>(SystemType{std::forward<TArgs>(args) ...});
-            systemTypeIdQueue_.push_back({{ecs::system::types::SystemTypeId::template id<SystemType>()}});
-            return *this;
-        }
-
         template<typename TSystem>
-        requires ecs::system::concepts::IsEcsSystemLike<TSystem>
+        requires ecs::system::concepts::IsTypedSystem<TSystem>
         BaseSchedule& add() {
             using SystemType = std::remove_cvref_t<TSystem>;
             registerTypedSystemInstance<SystemType>(SystemType{});
@@ -222,7 +213,7 @@ export namespace helios::ecs::scheduling {
         requires ecs::system::concepts::IsCallableSystem<TFuncSystem>
         BaseSchedule& add(TFuncSystem&& system) {
             using SystemType = std::remove_cvref_t<TFuncSystem>;
-            registerCallOperatorSystem<SystemType>(std::forward<TFuncSystem>(system));
+            registerCallOperatorSystem(std::forward<TFuncSystem>(system));
             systemTypeIdQueue_.push_back({{ecs::system::types::SystemTypeId::template id<SystemType>()}});
             return *this;
         }
@@ -237,10 +228,9 @@ export namespace helios::ecs::scheduling {
          * @return Reference to this pass.
          */
         template<typename ... TSystem>
-        requires (ecs::system::concepts::IsCallableSystem<std::remove_cvref_t<TSystem>> && ...)
-           && (sizeof...(TSystem) >= 2)
+      //  requires concepts::ConflictFreeCallableSystems<TSystem...>
         BaseSchedule& add(TSystem&&... system) {
-            (registerCallOperatorSystem<std::remove_cvref_t<TSystem>>(std::forward<TSystem>(system)), ...);
+            (registerCallOperatorSystem(std::forward<TSystem>(system)), ...);
 
             auto& group = systemTypeIdQueue_.emplace_back();
             group.reserve(sizeof...(TSystem));
@@ -249,27 +239,6 @@ export namespace helios::ecs::scheduling {
             return *this;
         }
 
-        /**
-         * @brief Adds two or more `TypedSystemSpec`-wrapped systems that may execute in parallel.
-         *
-         * @tparam TSystem `TypedSystemSpec` specialisations whose `System_type` satisfies
-         *                 `IsEcsSystemLike`. At least two types are required.
-         * @param system   Spec instances forwarded to `registerTypedSystemSpec()`.
-         * @return Reference to this pass for method chaining.
-         */
-        template<typename ...TSystem>
-        requires (ecs::system::concepts::IsEcsSystemLike<std::remove_cvref_t<TSystem>> && ...)
-                && (sizeof...(TSystem) >= 2)
-        BaseSchedule& add(TSystem&&... system) {
-
-            (registerParallelTypedSystemInstance<TSystem>(std::forward<TSystem>(system)), ...);
-
-            auto& group = systemTypeIdQueue_.emplace_back();
-            group.reserve(sizeof...(TSystem));
-            (group.push_back({{ecs::system::types::SystemTypeId::template id<std::remove_cvref_t<TSystem>>()}}), ...);
-
-            return *this;
-        }
 
         /**
          * @brief Adds TypedSystem-like systems that should be executed parallel.
@@ -279,11 +248,10 @@ export namespace helios::ecs::scheduling {
          * @return Reference to this Pass for method chaining.
          */
         template<typename ...TSystem>
-         requires (ecs::system::concepts::IsEcsSystemLike<TSystem> && ...)
-                 && (sizeof...(TSystem) >= 2)
-         BaseSchedule& add() {
+        requires concepts::ConflictFreeTypedSystems<TSystem...>
+        BaseSchedule& add() {
 
-            (registerTypedSystemInstance<TSystem>(), ...);
+            (registerTypedSystemInstance<TSystem>(std::remove_cvref_t<TSystem>{}), ...);
 
             auto& group = systemTypeIdQueue_.emplace_back();
             group.reserve(sizeof...(TSystem));
@@ -318,15 +286,12 @@ export namespace helios::ecs::scheduling {
             auto& parallelGroup = systemTypeIdQueue_.emplace_back();
             parallelGroup.reserve(sizeof...(TSequentials));
 
-            auto addSystemInstance = [this]
-            <typename TSystem>
-            (auto& serialGroup) {
+            auto addSystemInstance = [this]<typename TSystem>(auto& serialGroup) {
                 registerTypedSystemInstance<TSystem>(TSystem{});
                 serialGroup.push_back({{ecs::system::types::SystemTypeId::template id<TSystem>()}});
             };
 
-            auto registerSystems = [this, &addSystemInstance]
-            <typename ...TSystems>
+            auto registerSystems = [this, &addSystemInstance]<typename ...TSystems>
             (ecs::system::concepts::Sequential<TSystems...>, auto& serialGroup) {
                 serialGroup.reserve(sizeof...(TSystems));
                 (addSystemInstance.template operator()<TSystems>(serialGroup), ...);
