@@ -13,48 +13,48 @@ import helios.core.common.traits;
 
 
 export namespace helios::ecs::entity {
-/**
- * @brief Template for providing HandleList_type containing unique handles used for read access of component data.
- * @tparam TReadComponents
- */
-template <typename... TReadComponents>
-struct ReadSet {
-    static constexpr std::uint32_t size = sizeof...(TReadComponents);
-    using ComponentList = core::common::types::TypeList<TReadComponents...>;
-};
+    /**
+     * @brief Template for providing HandleList_type containing unique handles used for read access of component data.
+     * @tparam TReadComponents
+     */
+    template <typename... TReadComponents>
+    struct ReadSet {
+        static constexpr std::uint32_t size = sizeof...(TReadComponents);
+        using ComponentList = core::common::types::TypeList<TReadComponents...>;
+    };
 
-template<typename ... TReadComponents>
-struct ReadSet<core::common::types::TypeList<TReadComponents...>> : ReadSet<TReadComponents...>{};
+    template<typename ... TReadComponents>
+    struct ReadSet<core::common::types::TypeList<TReadComponents...>> : ReadSet<TReadComponents...>{};
 
-/**
- * @brief Template for providing HandleList_type containing unique handles used for write access of component data.
- * @tparam TWriteComponents
- */
-template <typename... TWriteComponents>
-struct WriteSet {
-    static constexpr std::uint32_t size = sizeof...(TWriteComponents);
-    using ComponentList = core::common::types::TypeList<TWriteComponents...>;
-};
+    /**
+     * @brief Template for providing HandleList_type containing unique handles used for write access of component data.
+     * @tparam TWriteComponents
+     */
+    template <typename... TWriteComponents>
+    struct WriteSet {
+        static constexpr std::uint32_t size = sizeof...(TWriteComponents);
+        using ComponentList = core::common::types::TypeList<TWriteComponents...>;
+    };
 
-template <typename... TWriteComponents>
-struct WriteSet<core::common::types::TypeList<TWriteComponents...>> : WriteSet<TWriteComponents...>{};
+    template <typename... TWriteComponents>
+    struct WriteSet<core::common::types::TypeList<TWriteComponents...>> : WriteSet<TWriteComponents...>{};
 
-template <typename THandle, typename TRead, typename TWrite>
-struct EntityAccessSet;
+    template <typename THandle, typename TRead, typename TWrite>
+    struct EntityAccessSet;
 
-/**
- * @brief EntityAccessSet to definining typemembers that provide static information about read/write access of a system.
- *
- * @tparam TReadComponents Components to read from.
- * @tparam TWriteComponents Components to write to.
- */
-template <typename THandle, typename... TReadComponents, typename... TWriteComponents>
-struct EntityAccessSet<THandle, ReadSet<TReadComponents...>, WriteSet<TWriteComponents...>> {
+    /**
+     * @brief EntityAccessSet to definining typemembers that provide static information about read/write access of a system.
+     *
+     * @tparam TReadComponents Components to read from.
+     * @tparam TWriteComponents Components to write to.
+     */
+    template <typename THandle, typename... TReadComponents, typename... TWriteComponents>
+    struct EntityAccessSet<THandle, ReadSet<TReadComponents...>, WriteSet<TWriteComponents...>> {
 
-    using ReadComponentSet = ReadSet<TReadComponents...>;
-    using WriteComponentSet = WriteSet<TWriteComponents...>;
+        using ReadComponentSet = ReadSet<TReadComponents...>;
+        using WriteComponentSet = WriteSet<TWriteComponents...>;
 
-    using HandleType = THandle;
-};
+        using HandleType = THandle;
+    };
 
-} // namespace helios::ecs::common::types
+} // namespace helios::ecs::entity::traits
