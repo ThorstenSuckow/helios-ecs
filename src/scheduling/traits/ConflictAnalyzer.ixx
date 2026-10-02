@@ -9,9 +9,12 @@ module;
 export module helios.ecs.scheduling.traits:ConflictAnalyzer;
 
 import :SystemAccessSets;
+import :SequentialAccessSets;
 
 import helios.core.common.traits;
 import helios.core.common.types;
+
+import helios.ecs.system.Sequential;
 
 import helios.ecs.entity.EntityAccessSet;
 
@@ -72,25 +75,37 @@ export namespace helios::ecs::scheduling::traits {
         typename SystemAccessSets<TSystemB>::list
     > {};
 
+    template<typename TSequentialA, typename TSequentialB>
+    struct SequentialConflict : HasAnyConflict<
+        typename SequentialAccessSets<TSequentialA>::list,
+        typename SequentialAccessSets<TSequentialB>::list
+    > {};
+
 
     template<typename TList>
     struct HasConflict;
 
+    // system
     template<>
     struct HasConflict<core::common::types::TypeList<>> : std::false_type{};
 
-    template<typename TSystem>
-    struct HasConflict<core::common::types::TypeList<TSystem>> : std::false_type{};
-
-
     template<typename TSystem, typename ... TRest>
-    struct HasConflict<
-        core::common::types::TypeList<TSystem, TRest...>> {
-
+    struct HasConflict<core::common::types::TypeList<TSystem, TRest...>> {
         static constexpr bool value = (SystemsConflict<TSystem, TRest>::value || ...)
             || HasConflict<core::common::types::TypeList<TRest...>>::value;
     };
 
+    //sequential
+    template<typename ... TSystems, typename ... TRest>
+    struct HasConflict<core::common::types::TypeList<system::Sequential<TSystems...>, TRest...>> {
+        using Head = system::Sequential<TSystems...>;
+
+        static constexpr bool value = (
+            SequentialConflict<
+                system::Sequential<TSystems...>, TRest
+            >::value || ...
+        ) || HasConflict<core::common::types::TypeList<TRest...>>::value;
+    };
 
 
 }

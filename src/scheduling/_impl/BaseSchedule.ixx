@@ -280,7 +280,7 @@ export namespace helios::ecs::scheduling {
          * @return Reference to this pass for method chaining.
          */
         template <typename ... TSequentials>
-        requires (sizeof ...(TSequentials) >= 1) && ((ecs::system::concepts::IsSequentialLike<TSequentials>) && ...)
+        requires concepts::ConflictFreeSequentialSystems<TSequentials...>
         BaseSchedule& add() {
 
             auto& parallelGroup = systemTypeIdQueue_.emplace_back();
@@ -292,7 +292,7 @@ export namespace helios::ecs::scheduling {
             };
 
             auto registerSystems = [this, &addSystemInstance]<typename ...TSystems>
-            (ecs::system::concepts::Sequential<TSystems...>, auto& serialGroup) {
+            (ecs::system::Sequential<TSystems...>, auto& serialGroup) {
                 serialGroup.reserve(sizeof...(TSystems));
                 (addSystemInstance.template operator()<TSystems>(serialGroup), ...);
             };
