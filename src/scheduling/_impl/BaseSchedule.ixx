@@ -220,15 +220,9 @@ export namespace helios::ecs::scheduling {
         // +---------------------------------
         // +---------------------------------
 
-        /**
-         * @brief Adds multiple systems to this pass, allowing for parallel execution.
-         *
-         * @tparam TSystem The types of the systems to add.
-         * @param system The system instances to add.
-         * @return Reference to this pass.
-         */
+
         template<typename ... TSystem>
-      //  requires concepts::ConflictFreeCallableSystems<TSystem...>
+        requires concepts::ConflictFreeCallableSystems<TSystem...>
         BaseSchedule& add(TSystem&&... system) {
             (registerCallOperatorSystem(std::forward<TSystem>(system)), ...);
 
@@ -240,13 +234,6 @@ export namespace helios::ecs::scheduling {
         }
 
 
-        /**
-         * @brief Adds TypedSystem-like systems that should be executed parallel.
-         *
-         * @tparam TSystem The types of the systems to add.
-         *
-         * @return Reference to this Pass for method chaining.
-         */
         template<typename ...TSystem>
         requires concepts::ConflictFreeTypedSystems<TSystem...>
         BaseSchedule& add() {
@@ -260,55 +247,45 @@ export namespace helios::ecs::scheduling {
             return *this;
         }
 
-        /**
-         * @brief Adds one or more `Sequential`-wrapped system groups that may execute in parallel.
-         *
-         * Each `Sequential<S1, S2, …>` argument defines an ordered sub-group: its member systems
-         * are registered and run sequentially relative to each other, while distinct `Sequential`
-         * arguments form independent parallel lanes that the scheduler may execute concurrently.
-         *
-         * Example:
-         * ```cpp
-         * pass.add<
-         *     Sequential<PhysicsUpdate, PhysicsCollision>,
-         *     Sequential<AudioUpdate>
-         * >();
-         * ```
-         *
-         * @tparam TSequentials One or more `Sequential<…>` specialisations satisfying `IsSequentialLike`.
-         *                  At least one type is required.
-         * @return Reference to this pass for method chaining.
-         */
+
         template <typename ... TSequentials>
         requires concepts::ConflictFreeSequentialSystems<TSequentials...>
         BaseSchedule& add() {
+            return add<std::remove_cvref_t<TSequentials>{}...>();
+        }
+
+
+        template <typename ... TSequentials>
+        requires concepts::ConflictFreeSequentialSystems<TSequentials...>
+        BaseSchedule& add(TSequentials&& ... sequentials) {
 
             auto& parallelGroup = systemTypeIdQueue_.emplace_back();
             parallelGroup.reserve(sizeof...(TSequentials));
 
-            auto addSystemInstance = [this]<typename TSystem>(auto& serialGroup) {
-                registerTypedSystemInstance<TSystem>(TSystem{});
-                serialGroup.push_back({{ecs::system::types::SystemTypeId::template id<TSystem>()}});
+            auto addSystemInstance = [this]<typename TSystem>(auto& sequential, auto& sequentialGroup) {
+
+                auto& sys = sequential.template systemFor<TSystem>();
+
+                if constexpr(ecs::system::concepts::IsCallableSystem<TSystem>) {
+                    registerCallOperatorSystem(std::forward<TSystem>(sys));
+                } else {
+                    registerTypedSystemInstance<TSystem>(std::move(sys));
+                }
+                sequentialGroup.push_back({{ecs::system::types::SystemTypeId::template id<TSystem>()}});
             };
 
             auto registerSystems = [this, &addSystemInstance]<typename ...TSystems>
-            (ecs::system::Sequential<TSystems...>, auto& serialGroup) {
-                serialGroup.reserve(sizeof...(TSystems));
-                (addSystemInstance.template operator()<TSystems>(serialGroup), ...);
+            (ecs::system::Sequential<TSystems...>& sequential, auto& sequentialGroup) {
+                sequentialGroup.reserve(sizeof...(TSystems));
+                (addSystemInstance.template operator()<TSystems>(sequential, sequentialGroup), ...);
             };
 
-            (registerSystems( std::remove_cvref_t<TSequentials>{}, parallelGroup.emplace_back()), ...);
 
-
+            (registerSystems(sequentials, parallelGroup.emplace_back()), ...);
             return *this;
         }
 
-        /**
-         * @brief  Registers the Managers this pass should flush.
-         *
-         * @tparam T The types of the Managers to flush.
-         * @return Reference to this Pass for method chaining.
-         */
+
         template<typename... T>
         requires (ecs::manager::concepts::IsManagerLike<T> && ...)
         Scheduler& endSchedule() {
