@@ -115,24 +115,7 @@ private:
         );
     }
 
-    template <auto TFunction, typename TMember, std::size_t... Idx, typename... TConcreteTypes>
-    static decltype(auto) invokeImpl(
-        TMember& member,
-        EcsDataContainer& ecsDataContainer,
-        std::index_sequence<Idx...> /*unused*/,
-        TConcreteTypes&... concreteTypes
-    ) {
-        using FunctionSignature = core::common::traits::FunctionSignatureTraits<decltype(TFunction)>;
-        std::tuple<> emptyTuple{};
-        EcsDataContainerArgumentResolver resolver{ecsDataContainer, emptyTuple};
-        return std::invoke(
-            TFunction,
-            member,
-            resolver.template resolve<
-                Idx, typename FunctionSignature::template ArgumentType<Idx>, TConcreteTypes...
-            >(concreteTypes...)...
-        );
-    }
+
 
 public:
     template <auto TFunction, typename TMember, typename TMutationSinkTuple, typename... TConcreteTypes>
