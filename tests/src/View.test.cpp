@@ -53,6 +53,9 @@ TEST(Query, find) {
     EXPECT_EQ(handle.entityId(), 0);
     EXPECT_EQ(handle.versionId(), 1);
 
+    std::ignore = em.ensureSparseSet<MyComponent>();
+    std::ignore = em.ensureSparseSet<DirtyComponentSpec<MyComponent>>();
+
     EXPECT_FALSE(em.has<MyComponent>(handle));
     EXPECT_FALSE(em.has<DirtyComponentSpec<MyComponent>>(handle));
 

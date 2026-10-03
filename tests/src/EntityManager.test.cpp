@@ -62,8 +62,8 @@ TEST(EntityManager, destroy) {
     EXPECT_EQ(handle.entityId(), 0);
     EXPECT_EQ(handle.versionId(), 1);
 
-    em.emplace<MyComponent>(handle, 10);
-    em.emplace<TestEntity>(handle, 10);
+    em.ensureAndEmplace<MyComponent>(handle, 10);
+    em.ensureAndEmplace<TestEntity>(handle, 10);
     EXPECT_TRUE(em.has<MyComponent>(handle));
     EXPECT_TRUE(em.has<TestEntity>(handle));
 
@@ -73,7 +73,7 @@ TEST(EntityManager, destroy) {
     EXPECT_FALSE(em.has<TestEntity>(handle));
 }
 
-TEST(EntityManager, emplace) {
+TEST(EntityManager, ensureAndEmplace) {
 
     TestEntityManager em;
 
@@ -83,7 +83,7 @@ TEST(EntityManager, emplace) {
 
     EXPECT_FALSE(em.has<MyComponent>(handle));
 
-    auto* cmp = em.emplace<MyComponent>(handle, 10);
+    auto* cmp = em.ensureAndEmplace<MyComponent>(handle, 10);
 
     EXPECT_TRUE(em.has<MyComponent>(handle));
     EXPECT_NE(cmp, nullptr);
@@ -105,6 +105,8 @@ TEST(EntityManager, remove) {
     const auto handle = em.create();
     EXPECT_EQ(handle.entityId(), 0);
     EXPECT_EQ(handle.versionId(), 1);
+
+    std::ignore = em.ensureSparseSet<MyComponent>();
 
     EXPECT_FALSE(em.has<MyComponent>(handle));
 
