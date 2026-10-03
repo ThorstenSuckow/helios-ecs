@@ -21,7 +21,7 @@ export namespace helios::ecs::scheduling::concepts {
         !traits::HasConflict<core::common::types::TypeList<std::remove_cvref_t<TSystems>...>>::value;
 
     template<typename ... TSequential>
-    concept ConflictFreeSequentialSystems = (sizeof...(TSequential) >= 2) &&
+    concept ConflictFreeSequentialSystems = (sizeof...(TSequential) >= 1) &&
         (ecs::system::concepts::IsSequentialSystemGroup<std::remove_cvref_t<TSequential>> && ...) &&
         !traits::HasConflict<core::common::types::TypeList<std::remove_cvref_t<TSequential>...>>::value;
 };
