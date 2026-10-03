@@ -46,7 +46,7 @@ export namespace helios::ecs::common {
         );
         using ConcreteCommandBufferType = CommandBufferInfo::Type;
 
-        command::CommandBuffer commandBuffer_{ConcreteCommandBufferType{}};
+
 
         using QueryInfo = ecs::entity::query::traits::QueryFromArguments<typename InvocationFunctionTraits::ArgumentTypes>;
         using ConcreteQueryTypes = QueryInfo::list;
