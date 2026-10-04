@@ -2,29 +2,38 @@ module;
 
 export module helios.ecs.scheduling.traits:QueriesToAccessSet;
 
-import helios.ecs.entity.EntityAccessSet;
+import helios.ecs.entity.query.NullQuery;
+
+import helios.ecs.entity.QueryAccessSet;
 import helios.core.common;
+
 
 export namespace helios::ecs::scheduling::traits {
 
     template<typename TQuery>
     struct QueryToAccessSet {
-
-        using type = entity::EntityAccessSet<
-            typename TQuery::HandleType,
-            typename TQuery::ReadSet,
-            typename TQuery::WriteSet
+        using list = core::common::types::TypeList<
+            entity::QueryAccessSet<
+                typename TQuery::HandleType,
+                typename TQuery::ReadSet,
+                typename TQuery::WriteSet
+            >
         >;
+    };
+
+    template<>
+    struct QueryToAccessSet<entity::query::NullQuery> {
+        using list = core::common::types::TypeList<>;
     };
 
     template<typename TList>
     struct QueriesToAccessSets;
 
-    template<typename ... TQuery>
+    template<typename... TQuery>
     struct QueriesToAccessSets<core::common::types::TypeList<TQuery...>> {
-        using list = core::common::types::TypeList<
-            typename  QueryToAccessSet<TQuery>::type...
-        >;
+        using list = typename core::common::traits::ConcatList<
+            typename QueryToAccessSet<TQuery>::list...
+        >::list;
     };
 
 
