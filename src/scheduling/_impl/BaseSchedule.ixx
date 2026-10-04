@@ -258,6 +258,10 @@ export namespace helios::ecs::scheduling {
         // +---------------------------
         void onScheduleEnd(EcsDataContainer& ecsDataContainer) noexcept {
 
+            if (managerTypeIds_.empty()) {
+                return;
+            }
+
             auto* reg = ecsDataContainer.tryGet<ecs::manager::ManagerRegistry>();
             #if HELIOS_DEBUG
             if (!reg) {
