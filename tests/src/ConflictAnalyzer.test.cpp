@@ -435,5 +435,16 @@ TEST(ConflictAnalyzerTest, SequentialFiveGroupsMixedIsolationWithSingleRealConfl
     EXPECT_TRUE(conflict);
 }
 
+TEST(ConflictAnalyzerTest, SequentialTwoGroupsMultipleSystemsWithSingleRealConflict) {
+    using Group1 = system::Sequential<GameObjectWriteScaleSystem, GameObjectWriteHealthSystem, ParticleWriteScaleSystem>;
+    using Group2 = system::Sequential<ParticleWriteScaleSystem>;
+
+    static constexpr bool conflict = HasConflict<
+        TypeList<Group1, Group2>
+    >::value;
+
+    static_assert(conflict);
+    EXPECT_TRUE(conflict);
+}
 
 
