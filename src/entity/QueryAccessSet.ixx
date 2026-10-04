@@ -1,12 +1,12 @@
 /**
- * @file EntityAccessSet.ixx
+ * @file QueryAccessSet.ixx
  * @brief Traits for providing information about Read/Write sets of underlying systems.
  */
 module;
 
 #include <tuple>
 
-export module helios.ecs.entity.EntityAccessSet;
+export module helios.ecs.entity.QueryAccessSet;
 
 import helios.core.common.types;
 import helios.core.common.traits;
@@ -20,7 +20,7 @@ export namespace helios::ecs::entity {
     template <typename... TReadComponents>
     struct ReadSet {
         static constexpr std::uint32_t size = sizeof...(TReadComponents);
-        using ComponentList = core::common::types::TypeList<TReadComponents...>;
+        using list = core::common::types::TypeList<TReadComponents...>;
     };
 
     template<typename ... TReadComponents>
@@ -33,26 +33,30 @@ export namespace helios::ecs::entity {
     template <typename... TWriteComponents>
     struct WriteSet {
         static constexpr std::uint32_t size = sizeof...(TWriteComponents);
-        using ComponentList = core::common::types::TypeList<TWriteComponents...>;
+        using list = core::common::types::TypeList<TWriteComponents...>;
     };
 
     template <typename... TWriteComponents>
     struct WriteSet<core::common::types::TypeList<TWriteComponents...>> : WriteSet<TWriteComponents...>{};
 
     template <typename THandle, typename TRead, typename TWrite>
-    struct EntityAccessSet;
+    struct QueryAccessSet;
 
     /**
-     * @brief EntityAccessSet to definining typemembers that provide static information about read/write access of a system.
+     * @brief QueryAccessSet to definining typemembers that provide static information about read/write access of a system.
      *
      * @tparam TReadComponents Components to read from.
      * @tparam TWriteComponents Components to write to.
      */
     template <typename THandle, typename... TReadComponents, typename... TWriteComponents>
-    struct EntityAccessSet<THandle, ReadSet<TReadComponents...>, WriteSet<TWriteComponents...>> {
+    struct QueryAccessSet<THandle, ReadSet<TReadComponents...>, WriteSet<TWriteComponents...>> {
 
-        using ReadComponentSet = ReadSet<TReadComponents...>;
-        using WriteComponentSet = WriteSet<TWriteComponents...>;
+        static_assert(
+            !std::same_as<THandle, void>,
+            "QueryAccessSet has void HandleType"
+        );
+        using ReadSet = ReadSet<TReadComponents...>;
+        using WriteSet = WriteSet<TWriteComponents...>;
 
         using HandleType = THandle;
     };

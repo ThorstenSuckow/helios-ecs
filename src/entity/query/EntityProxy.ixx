@@ -26,8 +26,8 @@ export namespace helios::ecs::entity::query {
     template<typename THandle, typename TModSet, typename TStructMutSet>
     class EntityProxy {
 
-        using ModifiableComponents = TModSet::ComponentList;
-        using StructuralMutationComponents = TStructMutSet::ComponentList;
+        using ModifiableComponents = TModSet::list;
+        using StructuralMutationComponents = TStructMutSet::list;
 
         THandle handle_;
 
@@ -37,7 +37,7 @@ export namespace helios::ecs::entity::query {
         using WriteList = typename core::common::traits::UniqueList<
             core::common::types::TypeList<>,
             typename core::common::traits::ConcatList<
-                typename TModSet::ComponentList, typename TStructMutSet::ComponentList
+                typename TModSet::list, typename TStructMutSet::list
             >::list
         >::list;
 

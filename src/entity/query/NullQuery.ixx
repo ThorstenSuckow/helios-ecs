@@ -6,7 +6,7 @@ module;
 
 export module helios.ecs.entity.query.NullQuery;
 
-import helios.ecs.entity.EntityAccessSet;
+import helios.ecs.entity.QueryAccessSet;
 
 export namespace helios::ecs::entity::query {
 

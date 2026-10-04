@@ -25,7 +25,7 @@ namespace {
 
     struct Foo {
 
-        using EntityAccessSet1 = EntityAccessSet<
+        using QueryAccessSet1 = QueryAccessSet<
             GameObjectHandle,
             ReadSet<
                 PositionComponent,
@@ -35,25 +35,25 @@ namespace {
             WriteSet<VelocityComponent>
         >;
 
-        using EntityAccessSet2 = EntityAccessSet<
+        using QueryAccessSet2 = QueryAccessSet<
             ParticleHandle,
             ReadSet<PositionComponent>,
             WriteSet<VelocityComponent>
         >;
 
-        EntityAccessSet1 entityAccessSet;
-        EntityAccessSet2 entityAccessSet2;
+        QueryAccessSet1 entityAccessSet;
+        QueryAccessSet2 entityAccessSet2;
     };
 };
 
-TEST(EntityAccessSet, Components) {
+TEST(QueryAccessSet, Components) {
 
     EXPECT_TRUE((
         std::same_as<
             ReadSet<
                 PositionComponent, VelocityComponent,VelocityComponent
             >,
-            Foo::EntityAccessSet1::ReadComponentSet
+            Foo::QueryAccessSet1::ReadSet
         >
     ));
 
@@ -62,7 +62,7 @@ TEST(EntityAccessSet, Components) {
             WriteSet<
                 VelocityComponent
             >,
-            Foo::EntityAccessSet1::WriteComponentSet
+            Foo::QueryAccessSet1::WriteSet
         >
     ));
 }

@@ -21,7 +21,7 @@ import helios.ecs.component;
 import helios.ecs.entity.storage.SparseSet;
 import helios.ecs.entity.EntityManager;
 import helios.ecs.entity.Entity;
-import helios.ecs.entity.EntityAccessSet;
+import helios.ecs.entity.QueryAccessSet;
 
 import helios.ecs.entity.query.EntityProxy;
 
@@ -164,7 +164,7 @@ public:
         mutableSet_(
             [em]<typename ... TMutableComponent>(core::common::types::TypeList<TMutableComponent...>) {
                 return std::make_tuple(em->template sparseSet<TMutableComponent>()...);
-            }(typename ModifiableSet::ComponentList{})
+            }(typename ModifiableSet::list{})
         ),
         entityMutationBuffer_(entityMutationBuffer) ,
         anyDirtySets_(
@@ -395,7 +395,7 @@ public:
                 auto* mutableComponent = std::get<TComponent*>(mutableComponentTuples);
                 return std::make_tuple(mutableComponent);
             }
-            else if constexpr (core::common::traits::IsInList<ComponentType, typename ReadSet::ComponentList>::value) {
+            else if constexpr (core::common::traits::IsInList<ComponentType, typename ReadSet::list>::value) {
                 return std::make_tuple(set->get(entityId));
             } else {
                 assert(false && "component type not found in the query");
@@ -407,7 +407,7 @@ public:
         auto extractMutableComponent(EntityId entityId, SparseSet<TComponent>* set) const {
             using ComponentType = TComponent;
 
-            if constexpr (core::common::traits::IsInList<ComponentType, typename ModifiableSet::ComponentList>::value) {
+            if constexpr (core::common::traits::IsInList<ComponentType, typename ModifiableSet::list>::value) {
                 return std::make_tuple(set->get(entityId));
             } else {
                 assert(false && "component type not found in the query");

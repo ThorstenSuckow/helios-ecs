@@ -16,7 +16,7 @@ import helios.ecs.entity.storage.SparseSet;
 import helios.ecs.component.components;
 
 import helios.ecs.entity.EntityManager;
-import helios.ecs.entity.EntityAccessSet;
+import helios.ecs.entity.QueryAccessSet;
 
 export namespace helios::ecs::entity::query {
 template <
@@ -42,14 +42,14 @@ export namespace helios::ecs::entity::traits {
 
         using ReadComponents = std::conditional_t<
            TFilter::onlyActive,
-           typename TReadSet::ComponentList::template Prepend<ecs::components::Active>,
-           typename TReadSet::ComponentList
+           typename TReadSet::list::template Prepend<ecs::components::Active>,
+           typename TReadSet::list
        >;
 
         using type =  entity::query::PartialQuery<
             entity::EntityManager<THandle>,
             ReadComponents,
-            typename TWriteSet::ComponentList,
+            typename TWriteSet::list,
             TFilter,
             std::tuple<>
         >;

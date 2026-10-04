@@ -13,7 +13,7 @@ export module helios.ecs.entity.EntityWorld;
 
 import helios.ecs.entity.EntityManager;
 import helios.ecs.entity.Entity;
-import helios.ecs.entity.EntityAccessSet;
+import helios.ecs.entity.QueryAccessSet;
 
 import helios.core.common.traits;
 import helios.ecs.common.types;

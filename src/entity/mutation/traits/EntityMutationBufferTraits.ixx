@@ -43,7 +43,7 @@ export namespace helios::ecs::entity::mutation::traits {
         using list = core::common::types::TypeList<
             typename EntityMutationBufferFromList<
             typename TQueries::HandleType,
-            typename TQueries::WriteSet::ComponentList
+            typename TQueries::WriteSet::list
             >::type...
         >;
     };

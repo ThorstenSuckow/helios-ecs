@@ -16,7 +16,7 @@ import helios.core.common.types;
 
 import helios.ecs.system.Sequential;
 
-import helios.ecs.entity.EntityAccessSet;
+import helios.ecs.entity.QueryAccessSet;
 
 
 export namespace helios::ecs::scheduling::traits {
@@ -26,14 +26,14 @@ export namespace helios::ecs::scheduling::traits {
 
     template<typename THandleA, typename TReadSetA, typename TWriteSetA, typename THandleB, typename TReadSetB, typename TWriteSetB>
     struct IsConflictPair<
-        ecs::entity::EntityAccessSet<THandleA, TReadSetA, TWriteSetA>,
-        ecs::entity::EntityAccessSet<THandleB, TReadSetB, TWriteSetB>> {
+        ecs::entity::QueryAccessSet<THandleA, TReadSetA, TWriteSetA>,
+        ecs::entity::QueryAccessSet<THandleB, TReadSetB, TWriteSetB>> {
 
-        using ReadSetA = TReadSetA::ComponentList;
-        using WriteSetA = TWriteSetA::ComponentList;
+        using ReadSetA = TReadSetA::list;
+        using WriteSetA = TWriteSetA::list;
 
-        using ReadSetB = TReadSetB::ComponentList;
-        using WriteSetB = TWriteSetB::ComponentList;
+        using ReadSetB = TReadSetB::list;
+        using WriteSetB = TWriteSetB::list;
 
         using WriteWriteConflict = core::common::traits::IntersectionList<WriteSetA, WriteSetB>::list;
         using ReadWriteConflict = core::common::traits::IntersectionList<ReadSetA, WriteSetB>::list;

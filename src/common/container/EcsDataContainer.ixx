@@ -14,7 +14,7 @@ import helios.core.common.container;
 import helios.core.common.traits;
 import helios.ecs.command.concepts;
 import helios.ecs.entity.EntityManager;
-import helios.ecs.entity.EntityAccessSet;
+import helios.ecs.entity.QueryAccessSet;
 import helios.ecs.entity.concepts;
 
 namespace helios::ecs::common::container::_detail {
