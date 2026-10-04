@@ -22,8 +22,6 @@ export namespace helios::ecs::entity::query::traits {
 
     template <>
     struct QueryArgumentSelector<> {
-        using Type = void;
-        static constexpr std::size_t Count = 0;
         using list = core::common::types::TypeList<>;
         using handles = core::common::types::TypeList<>;
     };
