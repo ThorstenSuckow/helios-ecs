@@ -22,6 +22,7 @@ import helios.core.thread.JobSystem;
 import helios.ecs.scheduling.traits;
 import helios.ecs.scheduling.concepts;
 
+import helios.ecs.entity;
 import helios.ecs.common;
 import helios.ecs.manager;
 import helios.ecs.system;
@@ -34,56 +35,20 @@ export namespace helios::ecs::scheduling {
 
     class Scheduler;
 
-    /**
-     * @brief Abstract base class for game loop passes.
-     *
-     * @details A Pass represents a logical grouping of systems executed
-     * sequentially within a Phase. Concrete implementations (TypedPass)
-     * add state-based filtering via shouldRun().
-     *
-     * ## Key Features
-     *
-     * - **System Registration:** Systems are added via add<T>()
-     * - **Commit Points:** Control when events/commands are synchronized
-     * - **State Filtering:** Passes can be skipped based on game state
-     *
-     * @see TypedPass
-     * @see Phase
-     * @see System
-     */
-    class BaseSchedule {
 
-        friend class helios::ecs::scheduling::Scheduler;
+    class BaseSchedule {
 
         using EcsDataContainer = ecs::common::container::EcsDataContainer;
         using JobSystem = helios::core::thread::JobSystem;
 
     protected:
-        /**
-         * @brief Registry holding all systems for this pass.
-         */
+
         ecs::system::SystemRegistry systemRegistry_{};
 
-        /**
-         * @brief Ordered queue of system type IDs that drives execution order within this pass.
-         */
         std::vector<std::vector<std::vector<ecs::system::types::SystemTypeId>>> systemTypeIdQueue_;
 
-        /**
-         * @brief List of ManagerTypeIds.
-         */
         std::vector<ecs::manager::types::ManagerTypeId> managerTypeIds_;
 
-        /**
-         * @brief List of ManagerTypeIds for parallel execution.
-         */
-        std::vector<ecs::manager::types::ManagerTypeId> parallelManagerTypeIds_;
-
-        /**
-         * @brief Registers the ManagerTypeIds for the Managers this pass should flush.
-         *
-         * @tparam T The type of the manager to register.
-         */
         template<typename T>
         void registerManagerExecuteCommands(EcsDataContainer& ecsDataContainer) {
 
@@ -114,9 +79,6 @@ export namespace helios::ecs::scheduling {
             return *this;
         }
 
-        /**
-         * @brief Registers a system instance for parallel typed systems.
-         */
         template<typename TSystem>
         requires ecs::system::concepts::IsTypedSystem<std::remove_cvref_t<TSystem>>
         BaseSchedule& registerTypedSystemInstance(TSystem&& system) {
@@ -125,56 +87,7 @@ export namespace helios::ecs::scheduling {
             return *this;
         }
 
-        /**
-         * @brief Registers a system described by a `TypedSystemSpec` with this pass.
-         *
-         * @tparam T A `TypedSystemSpec` specialisation whose `System_type` satisfies
-         *           `IsTypedSystem`.
-         * @param spec Spec instance carrying the system type and its construction arguments.
-         * @return Reference to this pass.
-         */
-        template<typename T>
-        BaseSchedule& registerTypedSystemSpec(T&& spec) {
 
-            using Spec = std::remove_cvref_t<T>;
-            using TSystem = Spec::System_type;
-
-            std::apply([this](auto&... args) {
-                registerTypedSystem<TSystem>(args...);
-            }, spec.args);
-
-            return *this;
-        }
-
-        /**
-         * @brief Called on pass end.
-         * @param ecsDataContainer The ECS data container.
-         */
-        virtual void onScheduleEnd(EcsDataContainer& ecsDataContainer) = 0;
-
-        /**
-         * @brief Updates all systems in this pass.
-         *
-         * @param ecsDataContainer The map of results from the current frame's system executions.
-         * @param jobSystem The job system used for parallel execution of systems.
-         */
-        virtual void update(EcsDataContainer& ecsDataContainer, JobSystem& jobSystem) = 0;
-
-
-        /**
-         * @brief Determines if this pass should execute.
-         *
-         * @param ecsDataContainer
-         *
-         * @return True if the pass should run.
-         */
-        virtual bool shouldRun(EcsDataContainer& ecsDataContainer) const noexcept = 0;
-
-        /**
-         * @brief Returns a span of the ManagerTypeIds this pass is flushing.
-         *
-         * @return A span of ManagerTypeIds.
-         */
         [[nodiscard]] std::span<const ecs::manager::types::ManagerTypeId> managerTypeIds() noexcept {
             return managerTypeIds_;
         }
@@ -182,6 +95,33 @@ export namespace helios::ecs::scheduling {
         EcsDataContainer ecsDataContainer_{};
 
         Scheduler& owner_;
+
+        template<typename TSystem>
+        void ensureRequiredStorage(EcsDataContainer& ecsDataContainer) {
+
+            using SystemType = std::remove_cvref_t<TSystem>;
+
+            auto ensureStorage = [&]<typename TAccessSets>() {
+                core::common::traits::Apply<typename TAccessSets::list>::forEach(
+                [&]<typename TAccessSet> () {
+
+                    using HandleType = typename TAccessSet::HandleType;
+                    using ReadSet = typename TAccessSet::ReadSet::list;
+                    using WriteSet = typename TAccessSet::WriteSet::list;
+
+                    auto& em = ecsDataContainer.get<ecs::entity::EntityManager<HandleType>>();
+                    auto ensure =[&em]<typename TComponent>() {
+                        em.template ensureSparseSet<TComponent>();
+                    };
+                    core::common::traits::Apply<ReadSet>::forEach(ensure);
+                    core::common::traits::Apply<WriteSet>::forEach(ensure);
+                });
+            };
+
+            using AccessSets = traits::SystemAccessSets<SystemType>;
+            ensureStorage.template operator()<AccessSets>();
+
+        }
 
     public:
 
@@ -194,7 +134,7 @@ export namespace helios::ecs::scheduling {
         explicit BaseSchedule(Scheduler& owner)
         : owner_(owner) {}
 
-
+        virtual bool shouldRun(EcsDataContainer& ecsDataContainer) const noexcept = 0;
 
 
         // +---------------------------------
@@ -204,7 +144,15 @@ export namespace helios::ecs::scheduling {
         requires ecs::system::concepts::IsTypedSystem<TSystem>
         BaseSchedule& add() {
             using SystemType = std::remove_cvref_t<TSystem>;
-            registerTypedSystemInstance<SystemType>(SystemType{});
+            return add(SystemType{});
+        }
+
+        template<typename TSystem>
+        requires ecs::system::concepts::IsTypedSystem<TSystem>
+        BaseSchedule& add(TSystem sys) {
+            using SystemType = std::remove_cvref_t<TSystem>;
+            ensureRequiredStorage<SystemType>(ecsDataContainer_);
+            registerTypedSystemInstance<SystemType>(std::move(sys));
             systemTypeIdQueue_.push_back({{ecs::system::types::SystemTypeId::template id<SystemType>()}});
             return *this;
         }
@@ -213,6 +161,9 @@ export namespace helios::ecs::scheduling {
         requires ecs::system::concepts::IsCallableSystem<TFuncSystem>
         BaseSchedule& add(TFuncSystem&& system) {
             using SystemType = std::remove_cvref_t<TFuncSystem>;
+
+            ensureRequiredStorage<SystemType>(ecsDataContainer_);
+
             registerCallOperatorSystem(std::forward<TFuncSystem>(system));
             systemTypeIdQueue_.push_back({{ecs::system::types::SystemTypeId::template id<SystemType>()}});
             return *this;
@@ -224,6 +175,9 @@ export namespace helios::ecs::scheduling {
         template<typename ... TSystem>
         requires concepts::ConflictFreeCallableSystems<TSystem...>
         BaseSchedule& add(TSystem&&... system) {
+
+            (ensureRequiredStorage<TSystem>(ecsDataContainer_), ...);
+
             (registerCallOperatorSystem(std::forward<TSystem>(system)), ...);
 
             auto& group = systemTypeIdQueue_.emplace_back();
@@ -238,6 +192,8 @@ export namespace helios::ecs::scheduling {
         requires concepts::ConflictFreeTypedSystems<TSystem...>
         BaseSchedule& add() {
 
+            (ensureRequiredStorage<TSystem>(ecsDataContainer_), ...);
+
             (registerTypedSystemInstance<TSystem>(std::remove_cvref_t<TSystem>{}), ...);
 
             auto& group = systemTypeIdQueue_.emplace_back();
@@ -251,7 +207,7 @@ export namespace helios::ecs::scheduling {
         template <typename ... TSequentials>
         requires concepts::ConflictFreeSequentialSystems<TSequentials...>
         BaseSchedule& add() {
-            return add<std::remove_cvref_t<TSequentials>{}...>();
+            return add(std::remove_cvref_t<TSequentials>{}...);
         }
 
 
@@ -263,6 +219,8 @@ export namespace helios::ecs::scheduling {
             parallelGroup.reserve(sizeof...(TSequentials));
 
             auto addSystemInstance = [this]<typename TSystem>(auto& sequential, auto& sequentialGroup) {
+
+                ensureRequiredStorage<TSystem>(ecsDataContainer_);
 
                 auto& sys = sequential.template systemFor<TSystem>();
 
@@ -294,6 +252,71 @@ export namespace helios::ecs::scheduling {
 
             return owner_;
         }
+
+        // +---------------------------
+        // | Runtime
+        // +---------------------------
+        void onScheduleEnd(EcsDataContainer& ecsDataContainer) noexcept {
+
+            auto* reg = ecsDataContainer.tryGet<ecs::manager::ManagerRegistry>();
+            #if HELIOS_DEBUG
+            if (!reg) {
+                assert(reg && "ManagerRegistry not found in EcsDataContainer");
+            }
+            #endif
+            for (const auto typeId : managerTypeIds_) {
+                auto* manager = reg->item(typeId);
+            #if HELIOS_DEBUG
+                if (!manager) {
+                    assert(manager && "Manager not found in registry");
+                }
+            #endif
+
+                manager->execute(ecsDataContainer);
+                manager->flush(ecsDataContainer);
+            }
+        }
+
+        void update(EcsDataContainer& ecsDataContainer, JobSystem& jobSystem) {
+
+
+            for (auto& parallelSystems : systemTypeIdQueue_) {
+
+                // parallelSystems with only one entry are treated serial
+                if (parallelSystems.size() == 1) {
+                    for (const auto& serialSystem : parallelSystems[0]) {
+                        auto* system = systemRegistry_.item(serialSystem);
+                        // update, commit mutations
+                        system->update(ecsDataContainer);
+                        // produce system results, flush any underlying flushable objects
+                        system->flush(ecsDataContainer);
+                    }
+                    continue;
+                }
+
+                // parallelSystems > 1 will be queued with the JobSystems
+                jobSystem.runAndWait(
+                    parallelSystems.size(),
+                    [&] (const std::size_t i) {
+                        // a parallel system owns more ore more serial systems
+                        for (const auto& serialSystem : parallelSystems[i]) {
+                            auto* system = systemRegistry_.item(serialSystem);
+                            system->update(ecsDataContainer);
+                        }
+                });
+
+                // once parallel systems where updates, flush their command buffers
+                for (const auto& parallelSystem : parallelSystems) {
+                    for (const auto& serialSystem : parallelSystem) {
+                        auto* system = systemRegistry_.item(serialSystem);
+                        system->flush(ecsDataContainer);
+                    }
+                }
+
+            }
+
+        }
+
 
     };
 
