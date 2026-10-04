@@ -76,9 +76,7 @@ export namespace helios::ecs::scheduling {
          */
         template<typename TFunc>
         auto& beginSchedule(TFunc&& func) {
-
             using Predicate = std::remove_cvref_t<TFunc>;
-
             auto entry = std::make_unique<Schedule<Predicate>>(
                 *this,
                 ecsDataContainer_,
@@ -86,7 +84,18 @@ export namespace helios::ecs::scheduling {
             );
             auto* raw = entry.get();
             schedules_.emplace_back(std::move(entry));
+            return *raw;
+        }
 
+        auto& beginSchedule() {
+            auto l = []()->bool{return true;};
+            auto entry = std::make_unique<Schedule<decltype(l)>>(
+                *this,
+                ecsDataContainer_, l
+
+            );
+            auto* raw = entry.get();
+            schedules_.emplace_back(std::move(entry));
             return *raw;
         }
 
