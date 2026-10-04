@@ -8,6 +8,6 @@ export module helios.ecs.scheduling;
 export import helios.ecs.scheduling.traits;
 export import helios.ecs.scheduling.concepts;
 
-export import helios.ecs.scheduling.Scheduler;
+export import helios.ecs.scheduling.Scheduler;;
 
 

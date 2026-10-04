@@ -6,10 +6,10 @@ module;
 
 #include <memory>
 #include <vector>
+#include <deque>
 
 export module helios.ecs.scheduling.Scheduler;
 
-import :BaseSchedule;
 import :Schedule;
 
 import helios.core.thread.JobSystem;
@@ -30,7 +30,7 @@ export namespace helios::ecs::scheduling {
         /**
          * @brief Collection of passes belonging to this phase.
          */
-        std::vector<std::unique_ptr<BaseSchedule>> schedules_;
+        std::deque<Schedule> schedules_;
 
         EcsDataContainer ecsDataContainer_{};
 
@@ -56,9 +56,9 @@ export namespace helios::ecs::scheduling {
 
             for (auto& schedule : schedules_) {
 
-                if (schedule->shouldRun(ecsDataContainer)) {
-                    schedule->update(ecsDataContainer, jobSystem);
-                    schedule->onScheduleEnd(ecsDataContainer);
+                if (schedule.shouldRun(ecsDataContainer)) {
+                    schedule.update(ecsDataContainer, jobSystem);
+                    schedule.onScheduleEnd(ecsDataContainer);
                 }
             }
         };
@@ -77,26 +77,18 @@ export namespace helios::ecs::scheduling {
         template<typename TFunc>
         auto& beginSchedule(TFunc&& func) {
             using Predicate = std::remove_cvref_t<TFunc>;
-            auto entry = std::make_unique<Schedule<Predicate>>(
+
+            schedules_.emplace_back(
                 *this,
                 ecsDataContainer_,
                 std::forward<TFunc>(func)
             );
-            auto* raw = entry.get();
-            schedules_.emplace_back(std::move(entry));
-            return *raw;
+            return schedules_.back();
         }
 
         auto& beginSchedule() {
             auto l = []()->bool{return true;};
-            auto entry = std::make_unique<Schedule<decltype(l)>>(
-                *this,
-                ecsDataContainer_, l
-
-            );
-            auto* raw = entry.get();
-            schedules_.emplace_back(std::move(entry));
-            return *raw;
+            return beginSchedule(l);
         }
 
 

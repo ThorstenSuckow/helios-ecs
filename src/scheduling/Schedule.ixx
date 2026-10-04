@@ -14,13 +14,16 @@ module;
 #include <exception>
 #include "helios-ecs-config.h"
 
-export module helios.ecs.scheduling.Scheduler:BaseSchedule;
+export module helios.ecs.scheduling.Scheduler:Schedule;
 
 import helios.core.common;
 import helios.core.thread.JobSystem;
 
 import helios.ecs.scheduling.traits;
 import helios.ecs.scheduling.concepts;
+
+
+import helios.ecs.component.components;
 
 import helios.ecs.entity;
 import helios.ecs.common;
@@ -36,12 +39,11 @@ export namespace helios::ecs::scheduling {
     class Scheduler;
 
 
-    class BaseSchedule {
+    class Schedule {
 
         using EcsDataContainer = ecs::common::container::EcsDataContainer;
         using JobSystem = helios::core::thread::JobSystem;
 
-    protected:
 
         ecs::system::SystemRegistry systemRegistry_{};
 
@@ -73,7 +75,7 @@ export namespace helios::ecs::scheduling {
         }
 
         template<typename TSystem>
-        BaseSchedule& registerCallOperatorSystem(TSystem&& system) {
+        Schedule& registerCallOperatorSystem(TSystem&& system) {
             using SystemType = std::remove_cvref_t<TSystem>;
             systemRegistry_.template add<SystemType>(ecs::system::System(std::move(system)));
             return *this;
@@ -81,7 +83,7 @@ export namespace helios::ecs::scheduling {
 
         template<typename TSystem>
         requires ecs::system::concepts::IsTypedSystem<std::remove_cvref_t<TSystem>>
-        BaseSchedule& registerTypedSystemInstance(TSystem&& system) {
+        Schedule& registerTypedSystemInstance(TSystem&& system) {
             using SystemType = std::remove_cvref_t<TSystem>;
             systemRegistry_.add<SystemType>(std::move(system));
             return *this;
@@ -109,12 +111,17 @@ export namespace helios::ecs::scheduling {
                     using ReadSet = typename TAccessSet::ReadSet::list;
                     using WriteSet = typename TAccessSet::WriteSet::list;
 
+                    using DirtyReadSet = typename core::common::traits::WrapElements<ecs::components::DirtyComponentSpec, ReadSet>::list;
+                    using DirtyWriteSet = typename core::common::traits::WrapElements<ecs::components::DirtyComponentSpec, WriteSet>::list;
+
                     auto& em = ecsDataContainer.get<ecs::entity::EntityManager<HandleType>>();
                     auto ensure =[&em]<typename TComponent>() {
                         em.template ensureSparseSet<TComponent>();
                     };
                     core::common::traits::Apply<ReadSet>::forEach(ensure);
                     core::common::traits::Apply<WriteSet>::forEach(ensure);
+                    core::common::traits::Apply<DirtyReadSet>::forEach(ensure);
+                    core::common::traits::Apply<DirtyWriteSet>::forEach(ensure);
                 });
             };
 
@@ -123,18 +130,35 @@ export namespace helios::ecs::scheduling {
 
         }
 
+        using RunCondition = std::function<bool(EcsDataContainer&)>;
+        RunCondition runCondition_;
+
+
+
     public:
 
-         using RunCondition = std::function<bool()>;
+        Schedule(const Schedule&) = delete;
+        Schedule& operator=(const Schedule&) = delete;
+        Schedule(Schedule&&) noexcept = delete;
+        Schedule& operator=(Schedule&&) noexcept = delete;
 
 
-        virtual ~BaseSchedule() = default;
 
+        template<typename TPredicate>
+         explicit Schedule(
+             Scheduler& owner,
+             EcsDataContainer& parentEcsDataContainer,
+             TPredicate predicate
+         )
+         : owner_(owner),
+           runCondition_([predicate](auto& ecsDataContainer) -> bool {
+               return common::container::EcsDataContainerFunctionInvoker::invoke<&TPredicate::operator()>(
+                   predicate, ecsDataContainer
+               );
+           })
 
-        explicit BaseSchedule(Scheduler& owner)
-        : owner_(owner) {}
+        {ecsDataContainer_.borrow(parentEcsDataContainer);}
 
-        virtual bool shouldRun(EcsDataContainer& ecsDataContainer) const noexcept = 0;
 
 
         // +---------------------------------
@@ -142,14 +166,14 @@ export namespace helios::ecs::scheduling {
         // +---------------------------------
         template<typename TSystem>
         requires ecs::system::concepts::IsTypedSystem<TSystem>
-        BaseSchedule& add() {
+        Schedule& add() {
             using SystemType = std::remove_cvref_t<TSystem>;
             return add(SystemType{});
         }
 
         template<typename TSystem>
         requires ecs::system::concepts::IsTypedSystem<TSystem>
-        BaseSchedule& add(TSystem sys) {
+        Schedule& add(TSystem sys) {
             using SystemType = std::remove_cvref_t<TSystem>;
             ensureRequiredStorage<SystemType>(ecsDataContainer_);
             registerTypedSystemInstance<SystemType>(std::move(sys));
@@ -159,7 +183,7 @@ export namespace helios::ecs::scheduling {
 
         template<typename TFuncSystem>
         requires ecs::system::concepts::IsCallableSystem<TFuncSystem>
-        BaseSchedule& add(TFuncSystem&& system) {
+        Schedule& add(TFuncSystem&& system) {
             using SystemType = std::remove_cvref_t<TFuncSystem>;
 
             ensureRequiredStorage<SystemType>(ecsDataContainer_);
@@ -174,7 +198,7 @@ export namespace helios::ecs::scheduling {
 
         template<typename ... TSystem>
         requires concepts::ConflictFreeCallableSystems<TSystem...>
-        BaseSchedule& add(TSystem&&... system) {
+        Schedule& add(TSystem&&... system) {
 
             (ensureRequiredStorage<TSystem>(ecsDataContainer_), ...);
 
@@ -190,7 +214,7 @@ export namespace helios::ecs::scheduling {
 
         template<typename ...TSystem>
         requires concepts::ConflictFreeTypedSystems<TSystem...>
-        BaseSchedule& add() {
+        Schedule& add() {
 
             (ensureRequiredStorage<TSystem>(ecsDataContainer_), ...);
 
@@ -206,14 +230,14 @@ export namespace helios::ecs::scheduling {
 
         template <typename ... TSequentials>
         requires concepts::ConflictFreeSequentialSystems<TSequentials...>
-        BaseSchedule& add() {
+        Schedule& add() {
             return add(std::remove_cvref_t<TSequentials>{}...);
         }
 
 
         template <typename ... TSequentials>
         requires concepts::ConflictFreeSequentialSystems<TSequentials...>
-        BaseSchedule& add(TSequentials&& ... sequentials) {
+        Schedule& add(TSequentials&& ... sequentials) {
 
             auto& parallelGroup = systemTypeIdQueue_.emplace_back();
             parallelGroup.reserve(sizeof...(TSequentials));
@@ -316,10 +340,14 @@ export namespace helios::ecs::scheduling {
                         system->flush(ecsDataContainer);
                     }
                 }
-
             }
-
         }
+
+
+        [[nodiscard]] bool shouldRun(EcsDataContainer& ecsDataContainer) const noexcept {
+            return runCondition_(ecsDataContainer);
+        }
+
 
 
     };
