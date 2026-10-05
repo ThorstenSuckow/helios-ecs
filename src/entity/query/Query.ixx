@@ -141,6 +141,125 @@ private:
         em_->sort(sortedRequires_, SortCriteria::ComponentCount);
     };
 
+
+    template<typename TComponent>
+        auto extractReadComponent(EntityId entityId, const auto& mutableComponentTuples, const SparseSet<TComponent>* set) const {
+        using ComponentType = TComponent;
+
+        if constexpr (IsActiveComponent_v<ComponentType>) {
+            return std::tuple{}; // Active components are not included in the returned tuple.
+        } else if constexpr (core::common::traits::IsInList<ComponentType, TWriteComponents...>::value) {
+            // will be returned extractMutabelComponent
+            auto* mutableComponent = std::get<TComponent*>(mutableComponentTuples);
+            return std::make_tuple(mutableComponent);
+        }
+        else if constexpr (core::common::traits::IsInList<ComponentType, typename ReadSet::list>::value) {
+            return std::make_tuple(set->get(entityId));
+        } else {
+            assert(false && "component type not found in the query");
+            return std::tuple{};
+        }
+    }
+
+    template<typename TComponent>
+    auto extractMutableComponent(EntityId entityId, SparseSet<TComponent>* set) const {
+        using ComponentType = TComponent;
+
+        if constexpr (core::common::traits::IsInList<ComponentType, typename ModifiableSet::list>::value) {
+            return std::make_tuple(set->get(entityId));
+        } else {
+            assert(false && "component type not found in the query");
+            return std::tuple{};
+        }
+    }
+
+    [[nodiscard]] bool isValid(EntityId entityId, bool isQueriedFromLeadSet = true) const {
+        if constexpr (DirtySet::size > 0) {
+            const bool hasAnyDirtyIncludes = std::apply(
+                [entityId](auto*... sets) {
+                    return ((sets && entityId <= sets->maxEntityId() && sets->contains(entityId)) || ...);
+                },
+                anyDirtySets_
+            );
+
+            if (!hasAnyDirtyIncludes) {
+                return false;
+            }
+        }
+
+        // 2. INCLUDE CHECK (Do we have all required components? - leadset mustnt be considered if
+        // isQueriedFromLeadSet is set to true
+        const std::size_t begin = isQueriedFromLeadSet ? 1 : 0;
+        for (std::size_t i = begin; i < sortedRequires_.size(); ++i) {
+            auto* set = sortedRequires_[i];
+            if (entityId > set->maxEntityId() || !set->contains(entityId)) {
+                return false;
+            }
+        }
+
+        // 3. EXCLUDE CHECK (Must NOT be present)
+        for (const auto& excludeCheck : excludeChecks_) {
+            if (excludeCheck(entityId)) {
+                return false; // If check returns true (has component), the entity is invalid.
+            }
+        }
+
+        return true;
+    }
+
+    auto resolve(HandleType handle) const {
+
+        auto entityId = handle.entityId();
+
+        auto mutableTuples = std::apply(
+            [this, entityId](auto*... sets) {
+                return std::tuple_cat(
+                    extractMutableComponent(entityId, sets)...
+                );
+            },
+            mutableSet_
+        );
+
+        auto readMutateTuples = std::apply(
+            [this, &mutableTuples, entityId](auto*... sets) {
+                return std::tuple_cat(
+                    extractReadComponent(entityId, mutableTuples, sets)...
+                );
+            },
+            readSet_
+        );
+
+        return std::tuple_cat(
+
+            std::make_tuple(
+                EntityProxy<typename TEntityManager::HandleType, ModifiableSet, StructMutableSet>(
+                    handle, entityMutationBuffer_, mutableTuples
+                )),
+
+            // tuple_cat is required to make sure ActiveComponent is not included
+            // since this is treated as meta information we are not interested in
+            std::tuple_cat(readMutateTuples),
+
+            std::apply(
+                [entityId](auto*... sets) {
+                    return std::make_tuple(
+                        ([entityId, &sets]() {
+                            if (!sets || !sets->contains(entityId)) {
+                                return nullptr;
+                            }
+
+                            return sets->get(entityId);
+                        }())...
+
+                    );
+                },
+                optionalSets_
+            )
+
+        );
+
+    }
+
 public:
 
     using ReadSet = entity::ReadSet<TReadComponents...>;
@@ -178,6 +297,7 @@ public:
 
         initializeRequiredSets();
     };
+
 
     /**
      * @brief Constructs the view with the specified component sets and filters.
@@ -254,6 +374,36 @@ public:
         return begin() == end();
     }
 
+
+    /**
+     * @brief Returns a single query result based on Read- and WriteSets and Filter-criteria.
+     *
+     * @param handle The handle for hich the query result should be returned.
+     *
+     * @return Result wchich may be nullopt
+     *
+     * @example
+     *   Query<Domain, ReadSet<A>, WriteSet<B>> query
+     *   auto result = query.get(handle);
+     *   if (result) {
+     *      auto [entity, a, b] = *result;
+     *      a.setValue(foo);
+     *      entity.track<B>()->setValue(bar);
+     *   }
+     *
+     *
+     */
+    [[nodiscard]] auto get(HandleType handle) {
+
+        using ResultType = decltype(resolve(std::declval<HandleType>()));
+
+        if (em_->isValid(handle) && isValid(handle.entityId(), false)) {
+            return std::optional<ResultType>{resolve(handle)};
+        }
+
+        return std::optional<ResultType>{};
+    }
+
     /**
      * @brief Forward iterator for Query traversal.
      *
@@ -311,36 +461,9 @@ public:
             // 1. Get Entity ID (from the Lead Iterator)
             EntityId entityId = *current_;
 
+            return view_->isValid(entityId);
             // dirty check
-            if constexpr (DirtySet::size > 0) {
-                const bool hasAnyDirtyIncludes = std::apply(
-                    [entityId](auto*... sets) {
-                        return ((sets && entityId <= sets->maxEntityId() && sets->contains(entityId)) || ...);
-                    },
-                    view_->anyDirtySets_
-                );
 
-                if (!hasAnyDirtyIncludes) {
-                    return false;
-                }
-            }
-
-            // 2. INCLUDE CHECK (Do we have all required components? - leadset mustnt be considered)
-            for (std::size_t i = 1; i < view_->sortedRequires_.size(); ++i) {
-                auto* set = view_->sortedRequires_[i];
-                if (entityId > set->maxEntityId() || !set->contains(entityId)) {
-                    return false;
-                }
-            }
-
-            // 3. EXCLUDE CHECK (Must NOT be present)
-            for (const auto& excludeCheck : view_->excludeChecks_) {
-                if (excludeCheck(entityId)) {
-                    return false; // If check returns true (has component), the entity is invalid.
-                }
-            }
-
-            return true;
         }
 
         /**
@@ -376,45 +499,6 @@ public:
             return current_ != other.current_;
         }
 
-        /**
-         * @brief Active components are never part of the returned tuple.
-         *
-         * @tparam TSet The type of the component set.
-         * @param entityId The ID of the entity.
-         * @param set The component set.
-         * @return A tuple containing the component if it's not active, otherwise an empty tuple.
-         */
-        template<typename TComponent>
-        auto extractReadComponent(EntityId entityId, const auto& mutableComponentTuples, const SparseSet<TComponent>* set) const {
-            using ComponentType = TComponent;
-
-            if constexpr (IsActiveComponent_v<ComponentType>) {
-                return std::tuple{}; // Active components are not included in the returned tuple.
-            } else if constexpr (core::common::traits::IsInList<ComponentType, TWriteComponents...>::value) {
-                // will be returned extractMutabelComponent
-                auto* mutableComponent = std::get<TComponent*>(mutableComponentTuples);
-                return std::make_tuple(mutableComponent);
-            }
-            else if constexpr (core::common::traits::IsInList<ComponentType, typename ReadSet::list>::value) {
-                return std::make_tuple(set->get(entityId));
-            } else {
-                assert(false && "component type not found in the query");
-                return std::tuple{};
-            }
-        }
-
-        template<typename TComponent>
-        auto extractMutableComponent(EntityId entityId, SparseSet<TComponent>* set) const {
-            using ComponentType = TComponent;
-
-            if constexpr (core::common::traits::IsInList<ComponentType, typename ModifiableSet::list>::value) {
-                return std::make_tuple(set->get(entityId));
-            } else {
-                assert(false && "component type not found in the query");
-                return std::tuple{};
-            }
-        }
-
 
         /**
          * @brief Dereference operator.
@@ -433,52 +517,7 @@ public:
             EntityId entityId = *current_;
             auto handle = view_->em_->handle(entityId);
 
-            auto mutableTuples = std::apply(
-                [this, entityId](auto*... sets) {
-                    return std::tuple_cat(
-                        extractMutableComponent(entityId, sets)...
-                    );
-                },
-                view_->mutableSet_
-            );
-
-            auto readMutateTuples = std::apply(
-                [this, &mutableTuples, entityId](auto*... sets) {
-                    return std::tuple_cat(
-                        extractReadComponent(entityId, mutableTuples, sets)...
-                    );
-                },
-                view_->readSet_
-            );
-
-            return std::tuple_cat(
-
-                std::make_tuple(
-                    EntityProxy<typename TEntityManager::HandleType, ModifiableSet, StructMutableSet>(
-                        handle, view_->entityMutationBuffer_, mutableTuples
-                    )),
-
-                // tuple_cat is required to make sure ActiveComponent is not included
-                // since this is treated as meta information we are not interested in
-                std::tuple_cat(readMutateTuples),
-
-                std::apply(
-                    [entityId](auto*... sets) {
-                        return std::make_tuple(
-                            ([entityId, &sets]() {
-                                if (!sets || !sets->contains(entityId)) {
-                                    return nullptr;
-                                }
-
-                                return sets->get(entityId);
-                            }())...
-
-                        );
-                    },
-                    view_->optionalSets_
-                )
-
-            );
+            return view_->resolve(handle);
         }
 
         [[nodiscard]] bool operator==(const Iterator& other) const noexcept {
