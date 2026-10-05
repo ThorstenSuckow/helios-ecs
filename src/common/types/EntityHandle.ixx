@@ -138,9 +138,11 @@ public:
 template <typename TDomainTag>
 struct std::hash<EntityHandle<TDomainTag>> {
     std::size_t operator()(const EntityHandle<TDomainTag>& handle) const noexcept {
+        static_assert(sizeof(decltype(handle.entityId())) == 4, "EntityId must be 32 bits");
+        static_assert(sizeof(decltype(handle.versionId())) == 4, "VersionId must be 32 bits");
 
         const uint64_t packed =
-            (static_cast<uint64_t>(handle.entityId) << 32) | static_cast<uint64_t>(handle.versionId);
+            (static_cast<uint64_t>(handle.entityId()) << 32) | static_cast<uint64_t>(handle.versionId());
 
         return std::hash<uint64_t>{}(packed);
     }
