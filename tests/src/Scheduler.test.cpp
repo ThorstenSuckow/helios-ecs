@@ -24,9 +24,10 @@ namespace {
 
 TEST(SequentialScheduler, find) {
 
-    auto jobSystem = helios::core::thread::JobSystem(2);
     auto ecsDataContainer =
         helios::ecs::common::container::EcsDataContainer{};
+
+    ecsDataContainer.emplace<helios::core::thread::ThreadPool>(2);
     auto scheduler =
         helios::ecs::scheduling::Scheduler{};
 
@@ -77,7 +78,7 @@ TEST(SequentialScheduler, find) {
         .endSchedule();
 
     for (int i = 0; i < 100; ++i) {
-        scheduler.update(ecsDataContainer, jobSystem);
+        scheduler.update(ecsDataContainer);
     }
 
     EXPECT_EQ(s1State, 0);
@@ -87,9 +88,10 @@ TEST(SequentialScheduler, find) {
 
 TEST(Scheduler, ExecutesSequentialBranchesInParallel) {
 
-    auto jobSystem = helios::core::thread::JobSystem(2);
     auto ecsDataContainer =
-        helios::ecs::common::container::EcsDataContainer{};
+       helios::ecs::common::container::EcsDataContainer{};
+
+    ecsDataContainer.emplace<helios::core::thread::ThreadPool>(2);
     auto scheduler =
         helios::ecs::scheduling::Scheduler{};
 
@@ -169,7 +171,7 @@ TEST(Scheduler, ExecutesSequentialBranchesInParallel) {
 
     scheduler.init(ecsDataContainer);
 
-    scheduler.update(ecsDataContainer, jobSystem);
+    scheduler.update(ecsDataContainer);
 
     // Verify the sequential order within each branch and that the
     // two branches were active concurrently.

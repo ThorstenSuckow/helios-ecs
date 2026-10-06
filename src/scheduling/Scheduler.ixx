@@ -12,7 +12,6 @@ export module helios.ecs.scheduling.Scheduler;
 
 import :Schedule;
 
-import helios.core.thread.JobSystem;
 
 export namespace helios::ecs::scheduling {
 
@@ -25,7 +24,6 @@ export namespace helios::ecs::scheduling {
 
 
         using EcsDataContainer =  ecs::common::container::EcsDataContainer;
-        using JobSystem = helios::core::thread::JobSystem;
 
         /**
          * @brief Collection of passes belonging to this phase.
@@ -52,12 +50,12 @@ export namespace helios::ecs::scheduling {
        * @param ecsDataContainer The map of results from the current frame's system executions.
        * @param jobSystem The job system used for parallel execution of systems.
        */
-        void update(ecs::common::container::EcsDataContainer& ecsDataContainer, JobSystem& jobSystem){
+        void update(ecs::common::container::EcsDataContainer& ecsDataContainer){
 
             for (auto& schedule : schedules_) {
 
                 if (schedule.shouldRun(ecsDataContainer)) {
-                    schedule.update(ecsDataContainer, jobSystem);
+                    schedule.update(ecsDataContainer);
                     schedule.onScheduleEnd(ecsDataContainer);
                 }
             }

@@ -17,7 +17,7 @@ module;
 export module helios.ecs.scheduling.Scheduler:Schedule;
 
 import helios.core.common;
-import helios.core.thread.JobSystem;
+import helios.core.thread.ThreadPool;
 
 import helios.ecs.scheduling.traits;
 import helios.ecs.scheduling.concepts;
@@ -42,7 +42,7 @@ export namespace helios::ecs::scheduling {
     class Schedule {
 
         using EcsDataContainer = ecs::common::container::EcsDataContainer;
-        using JobSystem = helios::core::thread::JobSystem;
+        using ThreadPool = helios::core::thread::ThreadPool;
 
 
         ecs::system::SystemRegistry systemRegistry_{};
@@ -300,8 +300,10 @@ export namespace helios::ecs::scheduling {
             }
         }
 
-        void update(EcsDataContainer& ecsDataContainer, JobSystem& jobSystem) {
+        void update(EcsDataContainer& ecsDataContainer) {
 
+            auto* threadPool = ecsDataContainer.tryGet<ThreadPool>();
+            assert(threadPool && "ThreadPool not found in EcsDataContainer");
 
             for (auto& parallelSystems : systemTypeIdQueue_) {
 
@@ -317,8 +319,8 @@ export namespace helios::ecs::scheduling {
                     continue;
                 }
 
-                // parallelSystems > 1 will be queued with the JobSystems
-                jobSystem.runAndWait(
+                // parallelSystems > 1 will be queued with the ThreadPool
+                threadPool->runAndWait(
                     parallelSystems.size(),
                     [&] (const std::size_t i) {
                         // a parallel system owns more ore more serial systems
