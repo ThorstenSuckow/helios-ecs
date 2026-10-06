@@ -61,7 +61,7 @@ export namespace helios::ecs::entity::traits {
 
     template<typename THandle, typename ... TComponents>
     struct DirtySetTrait<THandle, core::common::types::TypeList<TComponents...>> {
-        using tuple = std::tuple<ecs::entity::storage::SparseSet<THandle, ecs::components::DirtyComponentSpec<TComponents>>*...>;
+        using tuple = std::tuple<ecs::entity::storage::SparseSet<THandle, TComponents>*...>;
         using readSet = ReadSet<TComponents...>;
     };
 

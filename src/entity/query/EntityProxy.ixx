@@ -11,6 +11,7 @@ export module helios.ecs.entity.query.EntityProxy;
 
 import helios.ecs.entity.EntityManager;
 import helios.ecs.entity.Entity;
+import helios.ecs.entity.storage;
 
 import helios.core.common.traits;
 import helios.core.common.types;
@@ -55,11 +56,23 @@ export namespace helios::ecs::entity::query {
         using ModifiableComponentTuple = typename core::common::traits::ListToTuple<
             typename core::common::traits::WrapElements<PtrWrap, ModifiableComponents>::list
         >::tuple;
-        ModifiableComponentTuple mutableComponents_;
+        ModifiableComponentTuple modifiableComponents_;
+
+        template<typename T>
+        using SparseSetWrap = storage::SparseSet<THandle, T>*;
+        using ModifiableSparseSet = typename core::common::traits::ListToTuple<
+            typename core::common::traits::WrapElements<SparseSetWrap, ModifiableComponents>::list
+        >::tuple;
+        ModifiableSparseSet modifiableSparseSets_;
 
         template<typename TComponent>
-        TComponent* mutableComponent() {
-            return std::get<TComponent*>(mutableComponents_);
+        TComponent* modifiableComponent() {
+            return std::get<TComponent*>(modifiableComponents_);
+        }
+
+        template<typename TComponent>
+        storage::SparseSet<THandle, TComponent>* modifiableSparseSet() {
+            return std::get<storage::SparseSet<THandle, TComponent>*>(modifiableSparseSets_);
         }
 
         std::bitset<TModSet::size> tracked_{};
@@ -67,8 +80,14 @@ export namespace helios::ecs::entity::query {
 
     public:
 
-        explicit EntityProxy(THandle handle, EntityMutationBuffer* buffer, ModifiableComponentTuple mutableComponents)
-        : handle_{handle}, buffer_{buffer}, mutableComponents_ {mutableComponents} {}
+        explicit EntityProxy(THandle handle,
+            EntityMutationBuffer* buffer,
+            ModifiableComponentTuple modifiableComponents,
+            ModifiableSparseSet modifiableSparseSets
+        )
+        : handle_{handle}, buffer_{buffer},
+        modifiableComponents_ {modifiableComponents},
+        modifiableSparseSets_{modifiableSparseSets} {}
 
         THandle handle() {
             return handle_;
@@ -80,14 +99,13 @@ export namespace helios::ecs::entity::query {
 
             constexpr auto position = core::common::traits::IsInList<TComponent, ModifiableComponents>::index;
             if (tracked_.test(position)) {
-                return mutableComponent<TComponent>();;
+                return modifiableComponent<TComponent>();;
             }
             tracked_[position] = true;
 
-            using CmdCompType = commands::AddComponentCommand<THandle, components::DirtyComponentSpec<std::remove_cvref_t<TComponent>>>;
-            buffer_->add(CmdCompType{handle_});
-            
-            return mutableComponent<TComponent>();
+            modifiableSparseSet<TComponent>()->markDirty(handle_.entityId());
+
+            return modifiableComponent<TComponent>();
         }
 
         template<typename TComponent, typename ... TArgs>

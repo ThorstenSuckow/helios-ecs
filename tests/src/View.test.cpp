@@ -54,10 +54,9 @@ TEST(Query, find) {
     EXPECT_EQ(handle.versionId(), 1);
 
     std::ignore = em.ensureSparseSet<MyComponent>();
-    std::ignore = em.ensureSparseSet<DirtyComponentSpec<MyComponent>>();
 
     EXPECT_FALSE(em.has<MyComponent>(handle));
-    EXPECT_FALSE(em.has<DirtyComponentSpec<MyComponent>>(handle));
+    EXPECT_FALSE(em.sparseSet<MyComponent>()->isDirty(handle.entityId()));
 
     auto* cmp = em.emplace<MyComponent>(handle, 10);
     EXPECT_TRUE(em.has<MyComponent>(handle));
@@ -66,10 +65,13 @@ TEST(Query, find) {
 
 
     cmp->setValue();
-    em.emplace<DirtyComponentSpec<MyComponent>>(handle);
+    em.sparseSet<MyComponent>()->markDirty(handle.entityId());
 
+    EXPECT_TRUE(em.sparseSet<MyComponent>()->isDirty(handle.entityId()));
 
     em.clearDirtySet<MyComponent>();
+
+    EXPECT_FALSE(em.sparseSet<MyComponent>()->isDirty(handle.entityId()));
 
 
 

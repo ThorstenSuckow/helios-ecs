@@ -4,7 +4,6 @@
  */
 export module helios.ecs.component.components;
 
-export import :DirtyComponentSpec;
 export import :Active;
 export import :Inactive;
 export import :BindingComponent;

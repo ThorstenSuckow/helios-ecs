@@ -45,20 +45,6 @@ private:
      */
     TEntityManager* entityManager_;
 
-    /**
-     * @brief Marks the specified component as dirty and registers the dirty set with the EntityManager.
-     *
-     * @tparam TComponent The component type to mark as dirty.
-     */
-    template <typename TComponent>
-    void markDirty() {
-        if (!entityManager_->template managesDirty<TComponent>()) {
-            bool mg = entityManager_->template managesDirty<TComponent>();
-            assert(mg && "Cannot mark component as dirty, not tracked by EntityManager.");
-        }
-        getOrAdd<DirtyComponentSpec<TComponent>>();
-    }
-
     using ComponentTypeId = ComponentTypeId<HandleType>;
 
 public:
@@ -140,93 +126,6 @@ public:
         return *cmp;
     }
 
-
-    /**
-     * @brief Enqueues a deferred add-component command into `buffer`.
-     *
-     * The component is not attached immediately; the command is applied
-     * when the buffer is flushed by the `EntityMutationManager`.
-     *
-     * @tparam TComponent Component type to add.
-     * @tparam TBuffer    Command buffer type. Its `HandleType` must match this entity's.
-     * @tparam Args       Constructor argument types for `TComponent`.
-     * @param  buffer     Target command buffer to enqueue into.
-     * @param  args       Arguments forwarded to the `TComponent` constructor.
-     */
-    template <typename TComponent, typename TBuffer, typename... Args>
-        requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
-    void deferAdd(TBuffer& buffer, Args&&... args) {
-        buffer.template add<commands::AddComponentCommand<HandleType, TComponent>>(entityHandle_, std::forward<Args>(args)...);
-    }
-
-    /**
-     * @brief Enqueues a deferred remove-component command into `buffer`.
-     *
-     * The component is not detached immediately; the command is applied
-     * when the buffer is flushed by the `EntityMutationManager`.
-     *
-     * @tparam TComponent Component type to remove.
-     * @tparam TBuffer    Command buffer type. Its `HandleType` must match this entity's.
-     * @param  buffer     Target command buffer to enqueue into.
-     */
-    template <typename TComponent, typename TBuffer>
-        requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
-    void deferRemove(TBuffer& buffer) {
-        buffer.template add<commands::RemoveComponentCommand<HandleType, TComponent>>(entityHandle_);
-    }
-
-    /**
-     * @brief Enqueues the commands required to activate this entity into `buffer`.
-     *
-     * Adds `Active`, removes `Inactive`, and adds `DirtyComponentSpec<Active>`
-     * via deferred commands. Also registers `Active` for dirty tracking immediately.
-     * Commands are applied when the buffer is flushed by the `EntityMutationManager`.
-     *
-     * @tparam TBuffer Command buffer type. Its `HandleType` must match this entity's.
-     * @param  buffer  Target command buffer to enqueue into.
-     */
-    template <typename TBuffer>
-    requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
-    void deferSetActive(TBuffer& buffer) {
-        buffer.template add<commands::AddComponentCommand<HandleType, Active>>(entityHandle_);
-        buffer.template add<commands::RemoveComponentCommand<HandleType, Inactive>>(
-            entityHandle_
-        );
-        buffer.template add<
-            commands::AddComponentCommand<HandleType, DirtyComponentSpec<Active>>
-        >(entityHandle_);
-    }
-
-    /**
-     * @brief Enqueues the commands required to deactivate this entity into `buffer`.
-     *
-     * Adds `Inactive`, removes `Active`, and adds `DirtyComponentSpec<Inactive>`
-     * via deferred commands. Also registers `Inactive` for dirty tracking immediately.
-     * Commands are applied when the buffer is flushed by the `EntityMutationManager`.
-     *
-     * @tparam TBuffer Command buffer type. Its `HandleType` must match this entity's.
-     * @param  buffer  Target command buffer to enqueue into.
-     */
-    template <typename TBuffer>
-    requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
-    void deferSetInactive(TBuffer& buffer) {
-        buffer.template add<commands::AddComponentCommand<HandleType, Inactive>>(
-            entityHandle_
-        );
-        buffer.template add<commands::RemoveComponentCommand<HandleType, Active>>(
-            entityHandle_
-        );
-        buffer.template add<
-            commands::AddComponentCommand<HandleType, DirtyComponentSpec<Inactive>>
-        >(entityHandle_);
-    }
-
-    template<typename TComponent, typename TBuffer>
-    requires std::is_same_v<typename TEntityManager::HandleType, typename TBuffer::HandleType>
-    void deferMarkDirty(TBuffer& buffer) {
-        buffer.template add<commands::AddComponentCommand<HandleType, DirtyComponentSpec<TComponent>>>(entityHandle_);
-    }
-
     /**
      * @brief Returns existing component or creates a new one.
      *
@@ -245,55 +144,14 @@ public:
         return add<TComponent>(std::forward<Args>(args)...);
     }
 
-    /**
-     * @brief Tracks the specified component which will be added if not already existing.
-     *
-     * @tparam TComponent The component type to track.
-     * @tparam Args Constructor argument types.
-     * @param args Arguments forwarded to the component constructor.
-     * @return Reference to the tracked component.
-     *
-     * @see markDirty
-     */
-    template <typename TComponent, typename... Args>
-    TComponent& trackDirty(Args&&... args) {
-        entityManager_->template trackDirty<TComponent>();
-        markDirty<TComponent>();
-        return getOrAdd<TComponent>(std::forward<Args>(args)...);
-    }
 
-    /**
-     * @brief Updates the component's value and marks the component type dirty.
-     *
-     * @tparam TComponent The component type to update. Must be existing for this entity.
-     * @tparam TValue The value type to set. Must be compatible with TComponent::Value_type.
-     * @param component Pointer to the TComponent
-     * @param value The value to update the component with.
-     */
-    template <typename TComponent, typename TValue>
-        requires IsComponentDirtyTrackable<TComponent, TValue> && std::is_trivially_copyable_v<TValue> &&
-                 (sizeof(TValue) <= 2 * sizeof(void*))
-    void setTrackedValue(TComponent* component, TValue value) {
-        assert(component != nullptr && "Unexpected nullptr for component.");
-        component->setValue(value);
-        markDirty<TComponent>();
-    }
 
-    /**
-     * @brief Updates the component's value and marks the component type dirty.
-     *
-     * @tparam TComponent The component type to update. Must be existing for this entity.
-     * @tparam TValue The value type to set. Must be compatible with TComponent::Value_type.
-     * @param component Pointer to the TComponent
-     * @param value The value to update the component with.
-     */
     template <typename TComponent, typename TValue>
-        requires IsComponentDirtyTrackable<TComponent, TValue> &&
-                 (!(std::is_trivially_copyable_v<TValue> && (sizeof(TValue) <= 2 * sizeof(void*))))
     void setTrackedValue(TComponent* component, const TValue& value) {
         assert(component != nullptr && "Unexpected nullptr for component.");
         component->setValue(value);
-        markDirty<TComponent>();
+        auto* sp = entityManager_->template sparseSet<TComponent>();
+        sp->markDirty(entityHandle_.entityId());
     }
 
     /**
@@ -367,12 +225,12 @@ public:
 
         if (!isActive && active) {
             remove<InactiveComponent_type>();
-            trackDirty<ActiveComponent_type>();
+            add<ActiveComponent_type>();
         }
 
         if (!isInActive && !active) {
             remove<ActiveComponent_type>();
-            trackDirty<InactiveComponent_type>();
+            add<InactiveComponent_type>();
         }
     }
 

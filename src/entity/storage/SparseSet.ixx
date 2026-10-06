@@ -12,6 +12,7 @@ module;
 
 export module helios.ecs.entity.storage.SparseSet;
 
+import helios.core.common.DynamicBitSet;
 import helios.ecs.common.types;
 
 using namespace helios::ecs::common::types;
@@ -30,6 +31,12 @@ public:
      */
     virtual ~SparseSetBase() = default;
 
+    virtual void clearDirty() noexcept = 0;
+/*
+    virtual bool isDirty(EntityId id)  const noexcept = 0;
+
+    virtual std::size_t dirtyCount()  const noexcept = 0;
+*/
     /**
      * @brief Removes the element at the given index.
      *
@@ -172,6 +179,9 @@ constexpr auto Tombstone = EntityTombstone;
  */
 template <typename THandle, typename TComponent>
 class SparseSet : public SparseSetBase {
+
+    core::common::DynamicBitSet dirtySet_;
+
     /**
      * @brief Maps EntityId to dense storage index.
      *
@@ -267,6 +277,23 @@ public:
         return ComponentTypeId<THandle>::template id<TComponent>();
     };
 
+   bool isDirty(const EntityId id) const noexcept {//override {
+        return dirtySet_.get(id);
+    }
+
+    std::size_t dirtyCount() const noexcept {// override {
+        return dirtySet_.count();
+    }
+
+    void clearDirty() noexcept override {
+        dirtySet_.clear();
+    }
+
+    void markDirty(const EntityId id) noexcept {// override {
+       dirtySet_.set(id);
+   }
+
+
     /**
      * @brief Set the capacity of the underlying storages.
      *
@@ -277,6 +304,7 @@ public:
             sparse_.reserve(capacity);
             storage_.reserve(capacity);
             denseToSparse_.reserve(capacity);
+            dirtySet_.reserve(capacity);
             capacity_ = capacity;
         }
     }
@@ -311,6 +339,7 @@ public:
         storage_.emplace_back(std::forward<Args>(args)...);
 
         sparse_[idx] = denseIndex;
+        dirtySet_.set(idx);
 
         updateMaxEntityId(idx);
 
@@ -345,6 +374,7 @@ public:
         storage_.emplace_back(std::move(obj));
 
         sparse_[idx] = denseIndex;
+        dirtySet_.set(idx);
 
         updateMaxEntityId(idx);
 
@@ -440,6 +470,7 @@ public:
         denseToSparse_.pop_back();
 
         sparse_[idx] = Tombstone;
+        dirtySet_.clear(idx);
 
         if (denseToSparse_.empty()) {
             maxEntityId_ = Tombstone;
@@ -510,6 +541,7 @@ public:
         sparse_.clear();
         denseToSparse_.clear();
         storage_.clear();
+        dirtySet_.clear();
         maxEntityId_ = Tombstone;
         invalidatedMaxEntityId_ = Tombstone;
     }

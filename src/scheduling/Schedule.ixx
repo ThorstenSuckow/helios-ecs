@@ -111,17 +111,12 @@ export namespace helios::ecs::scheduling {
                     using ReadSet = typename TAccessSet::ReadSet::list;
                     using WriteSet = typename TAccessSet::WriteSet::list;
 
-                    using DirtyReadSet = typename core::common::traits::WrapElements<ecs::components::DirtyComponentSpec, ReadSet>::list;
-                    using DirtyWriteSet = typename core::common::traits::WrapElements<ecs::components::DirtyComponentSpec, WriteSet>::list;
-
                     auto& em = ecsDataContainer.get<ecs::entity::EntityManager<HandleType>>();
                     auto ensure =[&em]<typename TComponent>() {
                         em.template ensureSparseSet<TComponent>();
                     };
                     core::common::traits::Apply<ReadSet>::forEach(ensure);
                     core::common::traits::Apply<WriteSet>::forEach(ensure);
-                    core::common::traits::Apply<DirtyReadSet>::forEach(ensure);
-                    core::common::traits::Apply<DirtyWriteSet>::forEach(ensure);
                 });
             };
 

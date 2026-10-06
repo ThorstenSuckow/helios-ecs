@@ -75,9 +75,9 @@ private:
     using ModifiableComponentsList = typename core::common::traits::IntersectionList<
         core::common::types::TypeList<TReadComponents...>, core::common::types::TypeList<TWriteComponents...>
     >::list;
-    using MutableComponents = core::common::traits::WrapElements<SparseSetPtr, ModifiableComponentsList>::list;
-    using MutableComponentsTuple = typename core::common::traits::ListToTuple<MutableComponents>::tuple;
-    MutableComponentsTuple mutableSet_;
+    using ModifiableComponents = core::common::traits::WrapElements<SparseSetPtr, ModifiableComponentsList>::list;
+    using ModifiableComponentsTuple = typename core::common::traits::ListToTuple<ModifiableComponents>::tuple;
+    ModifiableComponentsTuple modifiableSet_;
 
     /**
      * @brief Add components, present in write sets only.
@@ -162,7 +162,7 @@ private:
     }
 
     template<typename TComponent>
-    auto extractMutableComponent(EntityId entityId, SparseSet<TComponent>* set) const {
+    auto extractModifiableComponent(EntityId entityId, SparseSet<TComponent>* set) const {
         using ComponentType = TComponent;
 
         if constexpr (core::common::traits::IsInList<ComponentType, typename ModifiableSet::list>::value) {
@@ -177,7 +177,7 @@ private:
         if constexpr (DirtySet::size > 0) {
             const bool hasAnyDirtyIncludes = std::apply(
                 [entityId](auto*... sets) {
-                    return ((sets && entityId <= sets->maxEntityId() && sets->contains(entityId)) || ...);
+                    return ((sets && entityId <= sets->maxEntityId() && sets->isDirty(entityId)) || ...);
                 },
                 anyDirtySets_
             );
@@ -211,19 +211,19 @@ private:
 
         auto entityId = handle.entityId();
 
-        auto mutableTuples = std::apply(
+        auto modifiableTuples = std::apply(
             [this, entityId](auto*... sets) {
                 return std::tuple_cat(
-                    extractMutableComponent(entityId, sets)...
+                    extractModifiableComponent(entityId, sets)...
                 );
             },
-            mutableSet_
+            modifiableSet_
         );
 
         auto readMutateTuples = std::apply(
-            [this, &mutableTuples, entityId](auto*... sets) {
+            [this, &modifiableTuples, entityId](auto*... sets) {
                 return std::tuple_cat(
-                    extractReadComponent(entityId, mutableTuples, sets)...
+                    extractReadComponent(entityId, modifiableTuples, sets)...
                 );
             },
             readSet_
@@ -233,7 +233,10 @@ private:
 
             std::make_tuple(
                 EntityProxy<typename TEntityManager::HandleType, ModifiableSet, StructMutableSet>(
-                    handle, entityMutationBuffer_, mutableTuples
+                    handle, 
+                    entityMutationBuffer_, 
+                    modifiableTuples, 
+                    modifiableSet_
                 )),
 
             // tuple_cat is required to make sure ActiveComponent is not included
@@ -280,7 +283,7 @@ public:
     explicit PartialQuery(TEntityManager* em, EntityMutationBuffer* entityMutationBuffer = nullptr)
         : em_(em),
         readSet_(std::make_tuple(em_->template sparseSet<TReadComponents>()...)),
-        mutableSet_(
+        modifiableSet_(
             [em]<typename ... TMutableComponent>(core::common::types::TypeList<TMutableComponent...>) {
                 return std::make_tuple(em->template sparseSet<TMutableComponent>()...);
             }(typename ModifiableSet::list{})
@@ -288,7 +291,7 @@ public:
         entityMutationBuffer_(entityMutationBuffer) ,
         anyDirtySets_(
             [em]<typename ... TDirty>(core::common::types::TypeList<TDirty...>){
-                return std::make_tuple(em->template sparseSet<DirtyComponentSpec<TDirty>>()...);
+                return std::make_tuple(em->template sparseSet<TDirty>()...);
             }(typename TFilter::dirtyList{})
         )
 
@@ -317,14 +320,14 @@ public:
     ) :
         em_(em),
         readSet_(std::move(includeSets)),
-        mutableSet_(std::move(writeSets)),
+        modifiableSet_(std::move(writeSets)),
         excludeChecks_(std::move(excludeChecks)),
         entityMutationBuffer_(entityMutationBuffer),
 
         optionalSets_(std::make_tuple(em_->template sparseSet<TOptional>()...)),
         anyDirtySets_(
             [em]<typename ... TDirty>(core::common::types::TypeList<TDirty...>){
-                return std::make_tuple(em->template sparseSet<DirtyComponentSpec<TDirty>>()...);
+                return std::make_tuple(em->template sparseSet<TDirty>()...);
             }(typename TFilter::dirtyList{})
         ) {
 
@@ -458,12 +461,8 @@ public:
                 return true;
             }
 
-            // 1. Get Entity ID (from the Lead Iterator)
             EntityId entityId = *current_;
-
             return view_->isValid(entityId);
-            // dirty check
-
         }
 
         /**
@@ -550,7 +549,7 @@ public:
         if constexpr (DirtySet::size > 0) {
             const bool areDirtyIncludesEmpty =
                 std::apply([](auto*... sets) {
-                    return ((sets && sets->componentCount() == 0) && ...);
+                    return ((sets && sets->dirtyCount() == 0) && ...);
                 }, anyDirtySets_);
 
             if (areDirtyIncludesEmpty) {

@@ -21,8 +21,7 @@ export namespace helios::ecs::entity::mutation {
         using EntityManager = EntityManager<THandle>;
 
         std::tuple<
-            std::vector<commands::AddComponentCommand<THandle, TWriteComponents>>...,
-            std::vector<commands::AddComponentCommand<THandle, components::DirtyComponentSpec<TWriteComponents>>>...
+            std::vector<commands::AddComponentCommand<THandle, TWriteComponents>>...
         > addComponents_{};
 
         std::tuple<

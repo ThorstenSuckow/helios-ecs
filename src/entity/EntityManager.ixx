@@ -444,72 +444,21 @@ public:
     }
 
     /**
-     * @brief Returns true if the specified ComponentType is managed by this EntityManager.
-     *
-     * @tparam TComponent The component to check.
-     *
-     * @returns true if this component is managed by this Entitymanager.
-     */
-    template <typename TComponent>
-    [[nodiscard]] bool managesDirty() {
-
-        auto typeId = ComponentTypeId::template id<DirtyComponentSpec<TComponent>>().value();
-
-        return typeId < components_.size() && components_[typeId];
-    }
-
-    /**
-     * @brief Registers and allocates the dirty set for `TComponent`.
-     *
-     * @tparam TComponent Component type to track.
-     */
-    template <typename TComponent>
-    void trackDirty() {
-        auto typeId = ComponentTypeId::template id<DirtyComponentSpec<TComponent>>().value();
-
-        if (typeId >= components_.size()) {
-            components_.resize(typeId + 1);
-        }
-
-        // not calling ensureSparseSet() since we need to make sure registeredDirtySets
-        // is pushed once with typeId
-        if (!components_[typeId]) {
-            components_[typeId] = std::make_unique<SparseSet<THandle, DirtyComponentSpec<TComponent>>>(capacity_);
-            registeredDirtySets_.push_back(typeId);
-        }
-#if HELIOS_DEBUG
-        else {
-            bool found = false;
-            for (auto id : registeredDirtySets_) {
-                if (id == typeId) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                assert(false && "typeId found, but was missing in registeredDirtySets_");
-                // registeredDirtySets_.push_back(typeId);
-            }
-        }
-#endif
-    }
-
-    /**
      * @brief Clears all dirty sets that have been registered via `trackDirty()`.
      *
      * @todo garbage management when components are entirely removed and not managed by this manager anymore
      */
     void clearAllDirtySets() {
 
-        for (const auto id : registeredDirtySets_) {
-            if (id < components_.size() && components_[id]) {
-                components_[id]->clear();
+        for (auto& components : components_) {
+            if (components) {
+                components->clearDirty();
             }
         }
     }
 
     /**
-     * @brief Checks if the `SparseSet` for `DirtyComponentSpec<TComponent>` exists and clears it.
+     * @brief Clears dirty flags for the specified SparseSet.
      *
      * Accepts a variadic list of component types; all matching dirty sets are cleared.
      *
@@ -519,9 +468,9 @@ public:
     void clearDirtySet() {
         (
             [this] {
-                const auto typeId = ComponentTypeId::template id<DirtyComponentSpec<TComponent>>().value();
+                const auto typeId = ComponentTypeId::template id<TComponent>().value();
                 if (typeId < components_.size() && components_[typeId]) {
-                    components_[typeId]->clear();
+                    components_[typeId]->clearDirty();
                 }
             }(),
             ...);
@@ -746,10 +695,7 @@ public:
     }
 
 private:
-    /**
-     * @brief Dirty-set type IDs registered via `trackDirty()`.
-     */
-    std::vector<size_t> registeredDirtySets_;
+
 
     /**
      * @brief Component storage indexed by type ID.
