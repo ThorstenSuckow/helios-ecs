@@ -123,6 +123,7 @@ public:
 
         auto* cmp = entityManager_->template ensureAndEmplace<TComponent>(entityHandle_, std::forward<Args>(args)...);
 
+        assert(cmp != nullptr && "Component emplace failed.");
         return *cmp;
     }
 
