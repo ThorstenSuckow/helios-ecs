@@ -36,7 +36,8 @@ export namespace helios::ecs::entity::traits {
         typename THandle,
         typename TReadSet,
         typename TWriteSet,
-        typename TFilter
+        typename TFilter,
+        typename TOptionalComponents
    >
    struct QueryBuilder {
 
@@ -51,7 +52,7 @@ export namespace helios::ecs::entity::traits {
             ReadComponents,
             typename TWriteSet::list,
             TFilter,
-            std::tuple<>
+            typename TOptionalComponents::list
         >;
     };
 

@@ -50,4 +50,9 @@ export namespace helios::ecs::entity::query {
         static constexpr bool onlyActive = true;
         using dirtyList = core::common::types::TypeList<TDirty...>;
     };
+
+    template <typename ... TOptional>
+    struct Optional {
+        using list = core::common::types::TypeList<TOptional...>;
+    };
 }

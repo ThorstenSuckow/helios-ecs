@@ -41,12 +41,30 @@ using namespace helios::ecs::common::concepts::traits;
 export namespace helios::ecs::entity::query {
 
 
-template<typename THandle, typename TReadSet, typename TWriteSet = WriteSet<>, typename TFilter = query::Filter<query::AnyDirty<>>>
-using Query = typename traits::QueryBuilder<THandle, TReadSet, TWriteSet, TFilter>::type;
+template<
+    typename THandle,
+    typename TReadSet,
+    typename TWriteSet = WriteSet<>,
+    typename TFilter = query::Filter<query::AnyDirty<>>,
+    typename TOptional = query::Optional<>
+    >
+using Query = typename traits::QueryBuilder<THandle, TReadSet, TWriteSet, TFilter, TOptional>::type;
 
 
-template <typename TEntityManager, typename... TReadComponents, typename ... TWriteComponents, typename TFilter,  typename... TOptional>
-class PartialQuery<TEntityManager, core::common::types::TypeList<TReadComponents...>, core::common::types::TypeList<TWriteComponents...>, TFilter,  std::tuple<TOptional...>> {
+template <
+    typename TEntityManager,
+    typename... TReadComponents,
+    typename ... TWriteComponents,
+    typename TFilter,
+    typename ... TOptionalComponents
+>
+class PartialQuery<
+    TEntityManager,
+    core::common::types::TypeList<TReadComponents...>,
+    core::common::types::TypeList<TWriteComponents...>,
+    TFilter,
+    core::common::types::TypeList<TOptionalComponents...>
+> {
 
 
 public:
@@ -87,9 +105,15 @@ private:
     >::list;
 
     /**
-     * @brief Optional components, might return nullptr. Are not considered by whereAnyDirty().
+     * @brief Optional components, nullptr. Are not considered by whereAnyDirty().
      */
-    std::tuple<SparseSet<TOptional>*...> optionalSets_;
+    using OptionalComponentsList = typename core::common::traits::IntersectionList<
+        core::common::types::TypeList<TReadComponents...>,
+        core::common::types::TypeList<TOptionalComponents...>
+    >::list;
+    using OptionalComponents = core::common::traits::WrapElements<SparseSetPtr, OptionalComponentsList>::list;
+    using OptionalComponentsTuple = typename core::common::traits::ListToTuple<OptionalComponents>::tuple;
+    OptionalComponentsTuple optionalComponents_;
 
     /**
      * @brief Pointers to the SparseSets of the dirty component sets.
@@ -132,7 +156,16 @@ private:
      */
     void initializeRequiredSets() {
 
-        (sortedRequires_.push_back(em_->template sparseSet<TReadComponents>()), ...);
+        using RequiredList = core::common::traits::ExclusionList<
+            core::common::types::TypeList<TReadComponents...>,
+            core::common::types::TypeList<TOptionalComponents...>
+        >::list;
+
+        core::common::traits::Apply<RequiredList>::forEach(
+            [this]<typename TComponent>() {
+                sortedRequires_.push_back(em_->template sparseSet<TComponent>());
+            }
+        );
 
         maxEntityId_ = std::ranges::min(std::views::transform(sortedRequires_, [](const auto* set) {
             return set ? set->maxEntityId() : Tombstone;
@@ -165,7 +198,15 @@ private:
     auto extractModifiableComponent(EntityId entityId, SparseSet<TComponent>* set) const {
         using ComponentType = TComponent;
 
-        if constexpr (core::common::traits::IsInList<ComponentType, typename ModifiableSet::list>::value) {
+        if constexpr (core::common::traits::IsInList<ComponentType, OptionalComponentsList>::value) {
+            assert(set && "optional component set must not be null");
+            if (!set->contains(entityId)) {
+                return std::tuple{};
+            }
+            return std::make_tuple(
+                set->get(entityId)
+            );
+        } else if constexpr (core::common::traits::IsInList<ComponentType, typename ModifiableSet::list>::value) {
             return std::make_tuple(set->get(entityId));
         } else {
             assert(false && "component type not found in the query");
@@ -241,23 +282,8 @@ private:
 
             // tuple_cat is required to make sure ActiveComponent is not included
             // since this is treated as meta information we are not interested in
-            std::tuple_cat(readMutateTuples),
+            std::tuple_cat(readMutateTuples)
 
-            std::apply(
-                [entityId](auto*... sets) {
-                    return std::make_tuple(
-                        ([entityId, &sets]() {
-                            if (!sets || !sets->contains(entityId)) {
-                                return nullptr;
-                            }
-
-                            return sets->get(entityId);
-                        }())...
-
-                    );
-                },
-                optionalSets_
-            )
 
         );
 
@@ -311,7 +337,7 @@ public:
      * @param filterActiveOnly Flag to filter only entities with Active component.
      * @param activeSet Pointer to the SparseSet of Active components.
      */
-    explicit PartialQuery(
+   /* explicit PartialQuery(
         TEntityManager* em,
         std::tuple<const SparseSet<TReadComponents>*...> includeSets,
         std::tuple<SparseSet<TWriteComponents>*...> writeSets,
@@ -332,7 +358,8 @@ public:
         ) {
 
         initializeRequiredSets();
-    }
+    }*/
+
 
 
     /**
