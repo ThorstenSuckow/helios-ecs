@@ -4,6 +4,7 @@
 import helios.ecs;
 import helios.core;
 
+
 using namespace helios::ecs;
 using namespace helios::ecs::entity;
 using namespace helios::core::common::types;
@@ -12,6 +13,11 @@ using namespace helios::ecs::scheduling::traits;
 
 
 namespace {
+
+    struct Foo{};
+    struct Bar{};
+    struct Foobar{};
+
 
 
     struct GameObjectHandle{};
@@ -446,5 +452,83 @@ TEST(ConflictAnalyzerTest, SequentialTwoGroupsMultipleSystemsWithSingleRealConfl
     static_assert(conflict);
     EXPECT_TRUE(conflict);
 }
+
+TEST(ConflictAnalyzerTest, TwoSystemsSameReturnValue) {
+    auto s1 = []()-> Foo {return Foo{};};
+    auto s2 = []()-> Foo {return Foo{};};
+    auto s3 = []()-> Bar {return Bar{};};
+
+    auto Group1 = system::Sequential(s1, s3);
+    auto Group2 = system::Sequential(s2);
+
+    static constexpr bool conflict = HasConflict<
+        TypeList<decltype(Group1), decltype(Group2)>
+    >::value;
+    static_assert(conflict);
+    EXPECT_TRUE(conflict);
+}
+
+TEST(ConflictAnalyzerTest, TwoSystemsSameArg) {
+    auto s1 = [](Foo&)-> Foo {return Foo{};};
+    auto s3 = []()-> Foobar {return Foobar{};};
+    auto s2 = [](Foo&)-> Bar {return Bar{};};
+
+    auto Group1 = system::Sequential(s1, s3);
+    auto Group2 = system::Sequential(s2);
+
+    static constexpr bool conflict = HasConflict<
+        TypeList<decltype(Group1), decltype(Group2)>
+    >::value;
+    static_assert(conflict);
+    EXPECT_TRUE(conflict);
+}
+
+TEST(ConflictAnalyzerTest, TwoSystemsSameArgButOneIsConst) {
+    auto s1 = [](const Foo&)-> Foo {return Foo{};};
+    auto s3 = []()-> Foobar {return Foobar{};};
+    auto s2 = [](Foo&)-> Bar {return Bar{};};
+
+    auto Group1 = system::Sequential(s1, s3);
+    auto Group2 = system::Sequential(s2);
+
+    static constexpr bool conflict = HasConflict<
+        TypeList<decltype(Group1), decltype(Group2)>
+    >::value;
+    static_assert(conflict);
+    EXPECT_TRUE(conflict);
+}
+
+
+TEST(ConflictAnalyzerTest, TwoSystemsSameArgButBothAreConst) {
+    auto s1 = [](const Foo&)-> Foo {return Foo{};};
+    auto s3 = []()-> Foobar {return Foobar{};};
+    auto s2 = [](const Foo&)-> Bar {return Bar{};};
+
+    auto Group1 = system::Sequential(s1, s3);
+    auto Group2 = system::Sequential(s2);
+
+    static constexpr bool conflict = HasConflict<
+        TypeList<decltype(Group1), decltype(Group2)>
+    >::value;
+    static_assert(!conflict);
+    EXPECT_TRUE(!conflict);
+}
+
+TEST(ConflictAnalyzerTest, TwoSystemsSameArgInOneGroupButBothAreConst) {
+    auto s1 = [](const Foo&)-> Foo {return Foo{};};
+    auto s3 = [](const Foo&)-> Foobar {return Foobar{};};
+    auto s2 = [](const Bar&)-> Bar {return Bar{};};
+
+    auto Group1 = system::Sequential(s1, s3);
+    auto Group2 = system::Sequential(s2);
+
+    static constexpr bool conflict = HasConflict<
+        TypeList<decltype(Group1), decltype(Group2)>
+    >::value;
+    static_assert(!conflict);
+    EXPECT_TRUE(!conflict);
+}
+
+
 
 

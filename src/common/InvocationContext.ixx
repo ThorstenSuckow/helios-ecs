@@ -15,7 +15,8 @@ import helios.core.common;
 
 import helios.ecs.entity.query.NullQuery;
 import helios.ecs.entity.EntityManager;
-
+import helios.ecs.system.traits;
+import helios.ecs.system.types;
 
 import helios.ecs.command.traits;
 import helios.ecs.entity.query.traits;
@@ -40,14 +41,15 @@ export namespace helios::ecs::common {
 
         using InvocationFunctionTraits = core::common::traits::FunctionSignatureTraits<TFunction>;
 
-        using ReturnType = typename InvocationFunctionTraits::ReturnType;
-
         using CommandBufferInfo = ecs::command::traits::CommandBufferFromArguments<typename InvocationFunctionTraits::ArgumentTypes>;
         static_assert(
             CommandBufferInfo::Count <= 1, "System update function must have at most one command buffer argument."
         );
         using ConcreteCommandBufferType = CommandBufferInfo::Type;
 
+        using UpdateMethodSignature =  struct system::types::UpdateMethodSignature<
+            typename InvocationFunctionTraits::ReturnType, typename InvocationFunctionTraits::ArgumentTypes
+        >;
 
 
         using QueryInfo = ecs::entity::query::traits::QueryFromArguments<typename InvocationFunctionTraits::ArgumentTypes>;
@@ -59,5 +61,23 @@ export namespace helios::ecs::common {
         template<std::size_t TIdx>
         using InvocationFunctionArgType = typename InvocationFunctionTraits::template ArgumentType<TIdx>;
     };
+
+    template<typename TSystem, bool = requires { &TSystem::operator(); }>
+    struct SystemInvocationContext;
+
+    template<typename TSystem>
+    struct SystemInvocationContext<TSystem, true> {
+        using type = InvocationContext<
+            decltype(&TSystem::operator())
+        >;
+    };
+
+    template<typename TSystem>
+    struct SystemInvocationContext<TSystem, false> {
+        using type = InvocationContext<
+            decltype(&TSystem::update)
+        >;
+    };
+
 
 } // namespace helios::ecs::common

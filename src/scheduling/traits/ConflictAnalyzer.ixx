@@ -5,11 +5,14 @@
 module;
 
 #include <concepts>
+#include <utility>
 
 export module helios.ecs.scheduling.traits:ConflictAnalyzer;
 
 import :SystemAccessSets;
 import :SequentialAccessSets;
+import :SequentialSystemUpdateMethodSignatureSets;
+import :SystemToUpdateMethodSignature;
 
 import helios.core.common.traits;
 import helios.core.common.types;
@@ -17,17 +20,73 @@ import helios.core.common.types;
 import helios.ecs.system.Sequential;
 
 import helios.ecs.entity.QueryAccessSet;
+import helios.ecs.system.types;
+
+namespace {
+    template<typename TArgA, typename TList>
+    struct HasConflictWithArgument;
+
+    template<typename TListA, typename TListB>
+    struct HasArgumentTypeConflict;
 
 
-export namespace helios::ecs::scheduling::traits {
+    template<typename TLeft, typename TRight>
+    struct IsArgumentTypeConflict {
+        using TypeA = std::remove_cvref_t<TLeft>;
+        using TypeB = std::remove_cvref_t<TRight>;
+
+        static constexpr bool ConstA = std::is_const_v<std::remove_reference_t<TLeft>>;
+        static constexpr bool ConstB = std::is_const_v<std::remove_reference_t<TRight>>;
+
+        static constexpr bool RefA = std::is_reference_v<TLeft>;
+        static constexpr bool RefB = std::is_reference_v<TRight>;
+
+        static constexpr bool value =
+            (RefA && RefB) &&
+            (!ConstA || !ConstB) &&
+            std::same_as<TypeA, TypeB>;
+    };
+
+    template<typename TArgA, typename ... TRest>
+    struct HasConflictWithArgument<TArgA, helios::core::common::types::TypeList<TRest...>> {
+        static constexpr bool value = (
+            (IsArgumentTypeConflict<TArgA, TRest>::value || ...)
+        );
+    };
+
+    template<typename ...TArgsA, typename ... TArgsB>
+    struct HasArgumentTypeConflict<
+        helios::core::common::types::TypeList<TArgsA...>,
+        helios::core::common::types::TypeList<TArgsB...>> {
+        static constexpr bool value = (
+            HasConflictWithArgument<TArgsA, helios::core::common::types::TypeList<TArgsB...>>::value || ...
+        );
+    };
 
     template<typename ... TAccessSets>
     struct IsConflictPair;
 
+    template<typename TSignatureA, typename TSignatureB>
+    struct IsConflictPair<TSignatureA, TSignatureB> {
+
+        using ReturnTypeA = std::remove_cvref_t<typename TSignatureA::ReturnType>;
+        using ReturnTypeB = std::remove_cvref_t<typename TSignatureB::ReturnType>;
+
+        static constexpr bool VoidA = std::is_void_v<ReturnTypeA>;
+        static constexpr bool VoidB = std::is_void_v<ReturnTypeB>;
+
+        static constexpr bool value =
+            ((!VoidA) && std::same_as<ReturnTypeA, ReturnTypeB>) ||
+            HasArgumentTypeConflict<
+                typename TSignatureA::ArgumentTypeList,
+                typename TSignatureB::ArgumentTypeList
+            >::value;
+    };
+
     template<typename THandleA, typename TReadSetA, typename TWriteSetA, typename THandleB, typename TReadSetB, typename TWriteSetB>
     struct IsConflictPair<
-        ecs::entity::QueryAccessSet<THandleA, TReadSetA, TWriteSetA>,
-        ecs::entity::QueryAccessSet<THandleB, TReadSetB, TWriteSetB>> {
+        helios::ecs::entity::QueryAccessSet<THandleA, TReadSetA, TWriteSetA>,
+        helios::ecs::entity::QueryAccessSet<THandleB, TReadSetB, TWriteSetB>> {
 
         using ReadSetA = TReadSetA::list;
         using WriteSetA = TWriteSetA::list;
@@ -35,9 +94,9 @@ export namespace helios::ecs::scheduling::traits {
         using ReadSetB = TReadSetB::list;
         using WriteSetB = TWriteSetB::list;
 
-        using WriteWriteConflict = core::common::traits::IntersectionList<WriteSetA, WriteSetB>::list;
-        using ReadWriteConflict = core::common::traits::IntersectionList<ReadSetA, WriteSetB>::list;
-        using WriteReadConflict = core::common::traits::IntersectionList<WriteSetA, ReadSetB>::list;
+        using WriteWriteConflict = helios::core::common::traits::IntersectionList<WriteSetA, WriteSetB>::list;
+        using ReadWriteConflict = helios::core::common::traits::IntersectionList<ReadSetA, WriteSetB>::list;
+        using WriteReadConflict = helios::core::common::traits::IntersectionList<WriteSetA, ReadSetB>::list;
 
         static constexpr bool value =
             std::same_as<THandleA, THandleB> &&
@@ -51,36 +110,48 @@ export namespace helios::ecs::scheduling::traits {
     struct HasConflictWithAny;
 
     template<typename TAccessSet, typename ... TOtherAccessSet>
-    struct HasConflictWithAny<TAccessSet, core::common::types::TypeList<TOtherAccessSet...>> {;
-        static constexpr bool value =
-            (IsConflictPair<TAccessSet, TOtherAccessSet>::value || ...);
+    struct HasConflictWithAny<TAccessSet, helios::core::common::types::TypeList<TOtherAccessSet...>> {;
+        static constexpr bool value = (IsConflictPair<TAccessSet, TOtherAccessSet>::value || ...);
     };
 
     template<typename TListA, typename TListB>
     struct HasAnyConflict;
 
     template<typename ... TAccessSetsA, typename ... TAccessSetsB>
-    struct HasAnyConflict<core::common::types::TypeList<TAccessSetsA...>, core::common::types::TypeList<TAccessSetsB...>> {
-
-        static constexpr bool value =
-            (HasConflictWithAny<
-                TAccessSetsA,
-                core::common::types::TypeList<TAccessSetsB...>
-            >::value || ...);
+    struct HasAnyConflict<helios::core::common::types::TypeList<TAccessSetsA...>, helios::core::common::types::TypeList<TAccessSetsB...>> {
+        static constexpr bool value = (HasConflictWithAny<
+            TAccessSetsA,
+            helios::core::common::types::TypeList<TAccessSetsB...>
+        >::value || ...);
     };
+
 
     template<typename TSystemA, typename TSystemB>
     struct SystemsConflict : HasAnyConflict<
-        typename SystemAccessSets<TSystemA>::list,
-        typename SystemAccessSets<TSystemB>::list
+        typename helios::ecs::scheduling::traits::SystemAccessSets<TSystemA>::list,
+        typename helios::ecs::scheduling::traits::SystemAccessSets<TSystemB>::list
     > {};
 
     template<typename TSequentialA, typename TSequentialB>
     struct SequentialConflict : HasAnyConflict<
-        typename SequentialAccessSets<TSequentialA>::list,
-        typename SequentialAccessSets<TSequentialB>::list
+        typename helios::ecs::scheduling::traits::SequentialAccessSets<TSequentialA>::list,
+        typename helios::ecs::scheduling::traits::SequentialAccessSets<TSequentialB>::list
     > {};
 
+    template<typename TSequentialA, typename TSequentialB>
+    struct SequentialSystemUpdateArgumentsConflict : HasAnyConflict<
+        typename helios::ecs::scheduling::traits::SequentialSystemUpdateMethodSignatureSets<TSequentialA>::list,
+        typename helios::ecs::scheduling::traits::SequentialSystemUpdateMethodSignatureSets<TSequentialB>::list
+    > {};
+
+    template<typename TSystemA, typename TSystemB>
+    struct SystemUpdateArgumentsConflict : IsConflictPair<
+        helios::ecs::scheduling::traits::SystemToUpdateMethodSignature<TSystemA>,
+        helios::ecs::scheduling::traits::SystemToUpdateMethodSignature<TSystemB>
+    > {};
+}
+
+export namespace helios::ecs::scheduling::traits {
 
     template<typename TList>
     struct HasConflict;
@@ -91,8 +162,10 @@ export namespace helios::ecs::scheduling::traits {
 
     template<typename TSystem, typename ... TRest>
     struct HasConflict<core::common::types::TypeList<TSystem, TRest...>> {
-        static constexpr bool value = (SystemsConflict<TSystem, TRest>::value || ...)
-            || HasConflict<core::common::types::TypeList<TRest...>>::value;
+        static constexpr bool value =
+            (SystemsConflict<TSystem, TRest>::value || ...) ||
+            (SystemUpdateArgumentsConflict<TSystem, TRest>::value || ...) ||
+            HasConflict<core::common::types::TypeList<TRest...>>::value;
     };
 
     //sequential
@@ -101,10 +174,10 @@ export namespace helios::ecs::scheduling::traits {
         using Head = system::Sequential<TSystems...>;
 
         static constexpr bool value = (
-            SequentialConflict<
-                system::Sequential<TSystems...>, TRest
-            >::value || ...
-        ) || HasConflict<core::common::types::TypeList<TRest...>>::value;
+            (SequentialConflict<system::Sequential<TSystems...>, TRest>::value || ...) ||
+            (SequentialSystemUpdateArgumentsConflict<Head, TRest>::value || ...) ||
+            (HasConflict<core::common::types::TypeList<TRest...>>::value)
+        );
     };
 
 

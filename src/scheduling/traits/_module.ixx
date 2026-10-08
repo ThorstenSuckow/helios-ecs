@@ -9,5 +9,5 @@ export import :ConflictAnalyzer;
 export import :QueriesToAccessSet;
 export import :SystemAccessSets;
 export import :SequentialAccessSets;
-export import :SystemReturnType;
-
+export import :SystemToUpdateMethodSignature;
+export import :SequentialSystemUpdateMethodSignatureSets;

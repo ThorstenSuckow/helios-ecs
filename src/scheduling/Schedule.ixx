@@ -120,7 +120,7 @@ export namespace helios::ecs::scheduling {
                 });
             };
 
-            using ReturnType = traits::SystemReturnType<SystemType>::type;
+            using ReturnType = traits::SystemToUpdateMethodSignature<SystemType>::ReturnType;
             if constexpr (!std::is_void_v<ReturnType>) {
                 ecsDataContainer.reserve<ReturnType>();
             }
