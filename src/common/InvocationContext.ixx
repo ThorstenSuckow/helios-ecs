@@ -40,6 +40,8 @@ export namespace helios::ecs::common {
 
         using InvocationFunctionTraits = core::common::traits::FunctionSignatureTraits<TFunction>;
 
+        using ReturnType = typename InvocationFunctionTraits::ReturnType;
+
         using CommandBufferInfo = ecs::command::traits::CommandBufferFromArguments<typename InvocationFunctionTraits::ArgumentTypes>;
         static_assert(
             CommandBufferInfo::Count <= 1, "System update function must have at most one command buffer argument."
