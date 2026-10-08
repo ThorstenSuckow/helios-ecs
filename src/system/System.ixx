@@ -60,6 +60,7 @@ private:
         virtual ~Concept() = default;
 
         virtual bool commitMutations(EcsDataContainer& ecsDataContainer) noexcept = 0;
+        virtual bool publishResults(EcsDataContainer& ecsDataContainer) noexcept = 0;
         virtual bool update(EcsDataContainer& ecsDataContainer) noexcept = 0;
         virtual bool flush(EcsDataContainer& ecsDataContainer) noexcept = 0;
 
@@ -167,16 +168,21 @@ private:
             return true;
         }
 
+        bool publishResults(EcsDataContainer &ecsDataContainer) noexcept override {
+            if constexpr (!std::is_void_v<ProducedSystemResultType>) {
+                ecsDataContainer.replace<ProducedSystemResultType>(std::move(*systemResult_));
+                systemResult_.reset();
+            }
+            return true;
+        }
+
+
         bool update(EcsDataContainer& ecsDataContainer) noexcept override {
             updateAndStore(ecsDataContainer);
             return true;
         }
 
         bool flush(EcsDataContainer& ecsDataContainer) noexcept override {
-            if constexpr (!std::is_void_v<ProducedSystemResultType>) {
-                ecsDataContainer.emplace<ProducedSystemResultType>(std::move(*systemResult_));
-                systemResult_.reset();
-            }
 
             if constexpr (hasCommandBuffer()) {
                 commandBuffer_.flush(ecsDataContainer);
@@ -217,6 +223,9 @@ public:
             return false;
         }
         if (!pimpl_->commitMutations(ecsDataContainer)) {
+            return false;
+        }
+        if (!pimpl_->publishResults(ecsDataContainer)) {
             return false;
         }
         return true;
