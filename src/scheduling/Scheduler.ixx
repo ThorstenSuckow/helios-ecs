@@ -54,9 +54,9 @@ export namespace helios::ecs::scheduling {
 
             for (auto& schedule : schedules_) {
 
-                if (schedule.shouldRun(ecsDataContainer)) {
-                    schedule.update(ecsDataContainer);
-                    schedule.onScheduleEnd(ecsDataContainer);
+                if (schedule.shouldRun()) {
+                    schedule.update();
+                    schedule.onScheduleEnd();
                 }
             }
         };

@@ -120,6 +120,11 @@ export namespace helios::ecs::scheduling {
                 });
             };
 
+            using ReturnType = traits::SystemReturnType<SystemType>::type;
+            if constexpr (!std::is_void_v<ReturnType>) {
+                ecsDataContainer.reserve<ReturnType>();
+            }
+
             using AccessSets = traits::SystemAccessSets<SystemType>;
             ensureStorage.template operator()<AccessSets>();
 
@@ -275,13 +280,13 @@ export namespace helios::ecs::scheduling {
         // +---------------------------
         // | Runtime
         // +---------------------------
-        void onScheduleEnd(EcsDataContainer& ecsDataContainer) noexcept {
+        void onScheduleEnd() noexcept {
 
             if (managerTypeIds_.empty()) {
                 return;
             }
 
-            auto* reg = ecsDataContainer.tryGet<ecs::manager::ManagerRegistry>();
+            auto* reg = ecsDataContainer_.tryGet<ecs::manager::ManagerRegistry>();
             #if HELIOS_DEBUG
             if (!reg) {
                 assert(reg && "ManagerRegistry not found in EcsDataContainer");
@@ -295,14 +300,14 @@ export namespace helios::ecs::scheduling {
                 }
             #endif
 
-                manager->execute(ecsDataContainer);
-                manager->flush(ecsDataContainer);
+                manager->execute(ecsDataContainer_);
+                manager->flush(ecsDataContainer_);
             }
         }
 
-        void update(EcsDataContainer& ecsDataContainer) {
+        void update() {
 
-            auto* threadPool = ecsDataContainer.tryGet<ThreadPool>();
+            auto* threadPool = ecsDataContainer_.tryGet<ThreadPool>();
             assert(threadPool && "ThreadPool not found in EcsDataContainer");
 
             for (auto& parallelSystems : systemTypeIdQueue_) {
@@ -312,9 +317,9 @@ export namespace helios::ecs::scheduling {
                     for (const auto& serialSystem : parallelSystems[0]) {
                         auto* system = systemRegistry_.item(serialSystem);
                         // update, commit mutations
-                        system->update(ecsDataContainer);
+                        system->update(ecsDataContainer_);
                         // produce system results, flush any underlying flushable objects
-                        system->flush(ecsDataContainer);
+                        system->flush(ecsDataContainer_);
                     }
                     continue;
                 }
@@ -326,7 +331,7 @@ export namespace helios::ecs::scheduling {
                         // a parallel system owns more ore more serial systems
                         for (const auto& serialSystem : parallelSystems[i]) {
                             auto* system = systemRegistry_.item(serialSystem);
-                            system->update(ecsDataContainer);
+                            system->update(ecsDataContainer_);
                         }
                 });
 
@@ -334,15 +339,15 @@ export namespace helios::ecs::scheduling {
                 for (const auto& parallelSystem : parallelSystems) {
                     for (const auto& serialSystem : parallelSystem) {
                         auto* system = systemRegistry_.item(serialSystem);
-                        system->flush(ecsDataContainer);
+                        system->flush(ecsDataContainer_);
                     }
                 }
             }
         }
 
 
-        [[nodiscard]] bool shouldRun(EcsDataContainer& ecsDataContainer) const noexcept {
-            return runCondition_(ecsDataContainer);
+        [[nodiscard]] bool shouldRun() noexcept {
+            return runCondition_(ecsDataContainer_);
         }
 
 
