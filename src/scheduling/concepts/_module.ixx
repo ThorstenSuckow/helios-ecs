@@ -6,3 +6,4 @@
 export module helios.ecs.scheduling.concepts;
 
 export import :ConflictFreeSystems;
+export import :ConflictFreeManagers;

@@ -9,15 +9,15 @@ module;
 
 export module helios.ecs.scheduling.traits:ConflictAnalyzer;
 
-import :SystemAccessSets;
+import :RuntimeSystemAccessSets;
 import :SequentialAccessSets;
-import :SequentialSystemUpdateMethodSignatureSets;
-import :SystemToUpdateMethodSignature;
+import :SequentialRuntimeSystemMainMethodSignatureSets;
+import :RuntimeSystemToMainMethodSignature;
 
 import helios.core.common.traits;
 import helios.core.common.types;
 
-import helios.ecs.system.Sequential;
+import helios.ecs.common.SequentialRuntimeSystemGroup;
 
 import helios.ecs.entity.QueryAccessSet;
 import helios.ecs.system.types;
@@ -137,8 +137,8 @@ namespace {
 
     template<typename TSystemA, typename TSystemB>
     struct SystemsConflict : HasAnyConflict<
-        typename helios::ecs::scheduling::traits::SystemAccessSets<TSystemA>::list,
-        typename helios::ecs::scheduling::traits::SystemAccessSets<TSystemB>::list
+        typename helios::ecs::scheduling::traits::RuntimeSystemAccessSets<TSystemA>::list,
+        typename helios::ecs::scheduling::traits::RuntimeSystemAccessSets<TSystemB>::list
     > {};
 
     template<typename TSequentialA, typename TSequentialB>
@@ -149,14 +149,14 @@ namespace {
 
     template<typename TSequentialA, typename TSequentialB>
     struct SequentialSystemUpdateArgumentsConflict : HasAnyConflict<
-        typename helios::ecs::scheduling::traits::SequentialSystemUpdateMethodSignatureSets<TSequentialA>::list,
-        typename helios::ecs::scheduling::traits::SequentialSystemUpdateMethodSignatureSets<TSequentialB>::list
+        typename helios::ecs::scheduling::traits::SequentialRuntimeSystemMainMethodSignatureSets<TSequentialA>::list,
+        typename helios::ecs::scheduling::traits::SequentialRuntimeSystemMainMethodSignatureSets<TSequentialB>::list
     > {};
 
     template<typename TSystemA, typename TSystemB>
     struct SystemUpdateArgumentsConflict : IsConflictPair<
-        helios::ecs::scheduling::traits::SystemToUpdateMethodSignature<TSystemA>,
-        helios::ecs::scheduling::traits::SystemToUpdateMethodSignature<TSystemB>
+        helios::ecs::scheduling::traits::RuntimeSystemToMainMethodSignature<TSystemA>,
+        helios::ecs::scheduling::traits::RuntimeSystemToMainMethodSignature<TSystemB>
     > {};
 }
 
@@ -179,11 +179,11 @@ export namespace helios::ecs::scheduling::traits {
 
     //sequential
     template<typename ... TSystems, typename ... TRest>
-    struct HasConflict<core::common::types::TypeList<system::Sequential<TSystems...>, TRest...>> {
-        using Head = system::Sequential<TSystems...>;
+    struct HasConflict<core::common::types::TypeList<common::Sequential<TSystems...>, TRest...>> {
+        using Head = common::Sequential<TSystems...>;
 
         static constexpr bool value = (
-            (SequentialConflict<system::Sequential<TSystems...>, TRest>::value || ...) ||
+            (SequentialConflict<common::Sequential<TSystems...>, TRest>::value || ...) ||
             (SequentialSystemUpdateArgumentsConflict<Head, TRest>::value || ...) ||
             (HasConflict<core::common::types::TypeList<TRest...>>::value)
         );

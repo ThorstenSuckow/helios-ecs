@@ -6,3 +6,4 @@ export import :Constraints;
 export import :ProvidesCommandHandlerRegistry;
 export import :ProvidesManagerRegistry;
 export import :ProvidesEntityManager;
+export import :IsSequentialRuntimeSystemGroupContext;

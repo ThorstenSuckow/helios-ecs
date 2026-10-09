@@ -8,28 +8,28 @@ module;
 #include <tuple>
 
 
-export module helios.ecs.system.traits:UpdateMethodArguments;
+export module helios.ecs.scheduling.traits:RuntimeSystemMainMethodArgumentSelector;
 
 import helios.ecs.entity.concepts;
 import helios.core.common.traits;
 import helios.core.common.types;
 import helios.ecs.entity.query.NullQuery;
 
-export namespace helios::ecs::system::traits {
+export namespace helios::ecs::scheduling::traits {
 
     template <typename... TArgs>
-    struct UpdateMethodArgumentSelector;
+    struct RuntimeSystemMainMethodArgumentSelector;
 
     template <>
-    struct UpdateMethodArgumentSelector<> {
+    struct RuntimeSystemMainMethodArgumentSelector<> {
         using list = core::common::types::TypeList<>;
     };
 
     template <typename TFirst, typename... TRest>
-    struct UpdateMethodArgumentSelector<TFirst, TRest...> {
+    struct RuntimeSystemMainMethodArgumentSelector<TFirst, TRest...> {
 
         using FirstType = std::remove_cvref_t<TFirst>;
-        using Rest = UpdateMethodArgumentSelector<TRest...>;
+        using Rest = RuntimeSystemMainMethodArgumentSelector<TRest...>;
 
         static constexpr bool IsQuery = entity::concepts::IsQuery<FirstType>;
 
@@ -42,9 +42,9 @@ export namespace helios::ecs::system::traits {
     };
 
     template <typename>
-    struct UpdateMethodArguments;
+    struct RuntimeSystemMainMethodArguments;
 
     template <typename... TArgs>
-    struct UpdateMethodArguments<std::tuple<TArgs...>> : UpdateMethodArgumentSelector<TArgs...> {};
+    struct RuntimeSystemMainMethodArguments<std::tuple<TArgs...>> : RuntimeSystemMainMethodArgumentSelector<TArgs...> {};
 
 }

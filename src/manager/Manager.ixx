@@ -7,6 +7,7 @@ module;
 #include <cassert>
 #include <memory>
 #include <variant>
+#include <optional>
 
 export module helios.ecs.manager.Manager;
 
@@ -17,6 +18,8 @@ import helios.core.common.traits;
 import helios.ecs.common.InvocationContext;
 import helios.ecs.common.types;
 import helios.ecs.common.container;
+import helios.ecs.common.RuntimeResultRegistry;
+import helios.ecs.common.RuntimeResult;
 
 import helios.ecs.manager.types;
 import helios.ecs.manager.concepts;
@@ -64,6 +67,8 @@ private:
         virtual bool commitMutations(EcsDataContainer& ecsDataContainer) noexcept = 0;
         virtual bool execute(EcsDataContainer& dataContainer) noexcept = 0;
         virtual bool flush(EcsDataContainer& dataContainer) noexcept = 0;
+        virtual bool publishResults(EcsDataContainer& ecsDataContainer) noexcept = 0;
+        [[nodiscard]] virtual bool hasResult() const noexcept = 0;
 
         virtual command::CommandBuffer* commandBuffer() noexcept = 0;
 
@@ -83,6 +88,14 @@ private:
         using InvocationContext= ecs::common::InvocationContext<CommitFunction>;
         using EntityMutationBufferTypes = typename InvocationContext::EntityMutationBufferTypes;
         using ConcreteCommandBufferType = typename InvocationContext::ConcreteCommandBufferType;
+        using ProducedRuntimeResultType = InvocationContext::InvocationFunctionTraits::ReturnType;
+
+        using StoredRuntimeResultType =
+        std::conditional_t<std::is_void_v<ProducedRuntimeResultType>, std::monostate, ProducedRuntimeResultType>;
+
+
+        std::optional<StoredRuntimeResultType> runtimeResult_;
+
 
         TConcreteManager manager_;
         CommandBuffer commandBuffer_{ConcreteCommandBufferType{}};
@@ -127,13 +140,21 @@ private:
 
         bool execute(EcsDataContainer& ecsDataContainer) noexcept override {
 
-            EcsDataContainerFunctionInvoker::invoke<&TConcreteManager::execute>(
-                manager_,
-                ecsDataContainer,
-                entityMutationBuffers_,
-                ecsDataContainer,
-                *static_cast<ConcreteCommandBufferType*>(commandBuffer_.underlying())
-            );
+            auto invoke= [&]()->decltype(auto) {
+                return EcsDataContainerFunctionInvoker::invoke<&TConcreteManager::execute>(
+                    manager_,
+                    ecsDataContainer,
+                    entityMutationBuffers_,
+                    ecsDataContainer,
+                    *static_cast<ConcreteCommandBufferType*>(commandBuffer_.underlying())
+                );
+            };
+
+            if constexpr (!std::is_void_v<ProducedRuntimeResultType>) {
+                runtimeResult_.emplace(invoke());
+            } else {
+                invoke();
+            }
 
             return true;
         }
@@ -146,6 +167,24 @@ private:
             return true;
         }
 
+        bool publishResults(EcsDataContainer &ecsDataContainer) noexcept override {
+            if constexpr (!std::is_void_v<ProducedRuntimeResultType>) {
+                auto* resultRegistry = ecsDataContainer.tryGet<ecs::common::RuntimeResultRegistry>();
+                assert(resultRegistry && "RuntimeResultRegistry not found in EcsDataContainer");
+                resultRegistry->replace<ProducedRuntimeResultType>(
+                    common::RuntimeResult(std::move(*runtimeResult_))
+                );
+                runtimeResult_.reset();
+            }
+            return true;
+        }
+
+        bool hasResult() const noexcept override {
+            if constexpr (!std::is_void_v<ProducedRuntimeResultType>) {
+                return true;
+            }
+            return false;
+        }
 
         bool init(EcsDataContainer& ecsDataContainer) noexcept override {
             EcsDataContainerFunctionInvoker::invoke<&TConcreteManager::init>(
@@ -207,12 +246,20 @@ public:
         return pimpl_->flush(ecsDataContainer);
     }
 
+    [[nodiscard]] bool hasResult() const noexcept {
+        assert(pimpl_ && "Manager not initialized");
+        return pimpl_->hasResult();
+    }
+
     bool execute(EcsDataContainer& ecsDataContainer) noexcept {
         assert(pimpl_ && "Manager not initialized");
         if (!pimpl_->execute(ecsDataContainer)) {
             return false;
         }
         if (!pimpl_-> commitMutations(ecsDataContainer)) {
+            return false;
+        }
+        if (!pimpl_->publishResults(ecsDataContainer)) {
             return false;
         }
         return true;

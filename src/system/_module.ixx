@@ -7,8 +7,6 @@ export module helios.ecs.system;
 
 export import helios.ecs.system.System;
 export import helios.ecs.system.SystemRegistry;
-export import helios.ecs.system.Sequential;
 
 export import helios.ecs.system.types;
-export import helios.ecs.system.traits;
 export import helios.ecs.system.concepts;

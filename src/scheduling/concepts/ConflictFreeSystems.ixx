@@ -6,6 +6,7 @@ export module helios.ecs.scheduling.concepts:ConflictFreeSystems;
 
 import helios.ecs.scheduling.traits;
 import helios.ecs.system.concepts;
+import helios.ecs.common.concepts;
 import helios.core.common.types;
 
 export namespace helios::ecs::scheduling::concepts {
@@ -22,6 +23,6 @@ export namespace helios::ecs::scheduling::concepts {
 
     template<typename ... TSequential>
     concept ConflictFreeSequentialSystems = (sizeof...(TSequential) >= 1) &&
-        (ecs::system::concepts::IsSequentialSystemGroup<std::remove_cvref_t<TSequential>> && ...) &&
+        (ecs::common::concepts::IsSequentialRuntimeSystemGroup<std::remove_cvref_t<TSequential>> && ...) &&
         !traits::HasConflict<core::common::types::TypeList<std::remove_cvref_t<TSequential>...>>::value;
 };

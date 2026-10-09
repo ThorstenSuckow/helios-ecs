@@ -15,9 +15,9 @@ import helios.core.common;
 
 import helios.ecs.entity.query.NullQuery;
 import helios.ecs.entity.EntityManager;
-import helios.ecs.system.traits;
+import helios.ecs.manager.concepts;
 import helios.ecs.system.types;
-
+import helios.ecs.scheduling.types;
 import helios.ecs.command.traits;
 import helios.ecs.entity.query.traits;
 import helios.ecs.entity.mutation.traits;
@@ -47,7 +47,7 @@ export namespace helios::ecs::common {
         );
         using ConcreteCommandBufferType = CommandBufferInfo::Type;
 
-        using UpdateMethodSignature =  struct system::types::UpdateMethodSignature<
+        using RuntimeMainMethodSignature =  struct scheduling::types::RuntimeMainMethodSignature<
             typename InvocationFunctionTraits::ReturnType, typename InvocationFunctionTraits::ArgumentTypes
         >;
 
@@ -62,20 +62,27 @@ export namespace helios::ecs::common {
         using InvocationFunctionArgType = typename InvocationFunctionTraits::template ArgumentType<TIdx>;
     };
 
-    template<typename TSystem, bool = requires { &TSystem::operator(); }>
-    struct SystemInvocationContext;
+    template<typename TSystem, bool = requires { &TSystem::operator(); }, bool = ecs::manager::concepts::IsManagerLike<TSystem>>
+    struct RuntimeSystemInvocationContext;
 
-    template<typename TSystem>
-    struct SystemInvocationContext<TSystem, true> {
+    template<typename TRuntimeSystem>
+    struct RuntimeSystemInvocationContext<TRuntimeSystem, true, false> {
         using type = InvocationContext<
-            decltype(&TSystem::operator())
+            decltype(&TRuntimeSystem::operator())
         >;
     };
 
-    template<typename TSystem>
-    struct SystemInvocationContext<TSystem, false> {
+    template<typename TRuntimeSystem>
+    struct RuntimeSystemInvocationContext<TRuntimeSystem, false, false> {
         using type = InvocationContext<
-            decltype(&TSystem::update)
+            decltype(&TRuntimeSystem::update)
+        >;
+    };
+
+    template<typename TRuntimeSystem>
+    struct RuntimeSystemInvocationContext<TRuntimeSystem, false, true> {
+        using type = InvocationContext<
+            decltype(&TRuntimeSystem::execute)
         >;
     };
 

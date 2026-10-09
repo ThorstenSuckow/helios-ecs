@@ -49,30 +49,40 @@ export namespace helios::ecs::scheduling {
 
         std::vector<std::vector<std::vector<ecs::system::types::SystemTypeId>>> systemTypeIdQueue_;
 
-        std::vector<ecs::manager::types::ManagerTypeId> managerTypeIds_;
+        std::vector<bool> registeredManagerTypeIds_;
+        std::vector<std::vector<std::vector<ecs::manager::types::ManagerTypeId>>> managerTypeIdQueue_;
 
-        template<typename T>
-        void registerManagerExecuteCommands(EcsDataContainer& ecsDataContainer) {
-
-            auto* reg = ecsDataContainer.tryGet<ecs::manager::ManagerRegistry>();
+        template<typename TManager>
+        void registerManager() {
+            auto typeId = manager::types::ManagerTypeId::template id<TManager>();
+            auto* reg = ecsDataContainer_.tryGet<ecs::manager::ManagerRegistry>();
             #if HELIOS_DEBUG
             if (!reg) {
                 assert(reg && "ManagerRegistry not found in EcsDataContainer");
             }
             #endif
 
-            if (!reg->item<T>()) {
+            if (registeredManagerTypeIds_.size() <= typeId.value()) {
+                registeredManagerTypeIds_.resize(typeId.value() + 1);
+            }
+            if (registeredManagerTypeIds_[typeId.value()]) {
+                assert(false && "Manager was already registered with this schedule.");
+                std::terminate();
+            }
+            registeredManagerTypeIds_[typeId.value()] = true;
 
-                if constexpr (std::is_default_constructible_v<T>) {
-                    reg->add<T>(T{});
+            auto* manager = reg->item(typeId);
+            if (!manager) {
+                 if constexpr (std::is_default_constructible_v<TManager>) {
+                    reg->add<TManager>(TManager{});
                 } else {
                     assert(false && "Failed to construct manager");
                     std::terminate();
                 }
             }
-
-            managerTypeIds_.push_back(ecs::manager::types::ManagerTypeId::template id<T>());
         }
+
+
 
         template<typename TSystem>
         Schedule& registerCallOperatorSystem(TSystem&& system) {
@@ -87,11 +97,6 @@ export namespace helios::ecs::scheduling {
             using SystemType = std::remove_cvref_t<TSystem>;
             systemRegistry_.add<SystemType>(std::move(system));
             return *this;
-        }
-
-
-        [[nodiscard]] std::span<const ecs::manager::types::ManagerTypeId> managerTypeIds() noexcept {
-            return managerTypeIds_;
         }
 
         EcsDataContainer ecsDataContainer_{};
@@ -120,14 +125,14 @@ export namespace helios::ecs::scheduling {
                 });
             };
 
-            using ReturnType = traits::SystemToUpdateMethodSignature<SystemType>::ReturnType;
+            using ReturnType = traits::RuntimeSystemToMainMethodSignature<SystemType>::ReturnType;
             if constexpr (!std::is_void_v<ReturnType>) {
                 auto* resultRegistry = ecsDataContainer.tryGet<ecs::common::RuntimeResultRegistry>();
                 assert(resultRegistry && "RuntimeResultRegistry not found in EcsDataContainer");
                 resultRegistry->reserve<ReturnType>();
             }
 
-            using AccessSets = traits::SystemAccessSets<SystemType>;
+            using AccessSets = traits::RuntimeSystemAccessSets<SystemType>;
             ensureStorage.template operator()<AccessSets>();
 
         }
@@ -259,7 +264,7 @@ export namespace helios::ecs::scheduling {
             };
 
             auto registerSystems = [this, &addSystemInstance]<typename ...TSystems>
-            (ecs::system::Sequential<TSystems...>& sequential, auto& sequentialGroup) {
+            (common::Sequential<TSystems...>& sequential, auto& sequentialGroup) {
                 sequentialGroup.reserve(sizeof...(TSystems));
                 (addSystemInstance.template operator()<TSystems>(sequential, sequentialGroup), ...);
             };
@@ -269,22 +274,54 @@ export namespace helios::ecs::scheduling {
             return *this;
         }
 
-
-        template<typename... T>
-        requires (ecs::manager::concepts::IsManagerLike<T> && ...)
         Scheduler& endSchedule() {
+            return owner_;
+        }
 
-            (registerManagerExecuteCommands<T>(ecsDataContainer_), ...);
+        template<typename... TManagers>
+        requires concepts::ConflictFreeManagers<TManagers...>
+        Scheduler& endSchedule() {
+            endSchedule<common::Sequential<TManagers>...>();
+            return owner_;
+        }
+
+        template <typename ... TSequentials>
+        requires concepts::ConflictFreeSequentialManagers<TSequentials...>
+        Scheduler& endSchedule() {
+            auto& parallelGroup = managerTypeIdQueue_.emplace_back();
+            parallelGroup.reserve(sizeof...(TSequentials));
+
+            auto addManager = [this]<typename TManager>(auto& sequentialGroup) {
+                ensureRequiredStorage<TManager>(ecsDataContainer_);
+                registerManager<TManager>();
+                sequentialGroup.push_back({{ecs::manager::types::ManagerTypeId::template id<TManager>()}});
+            };
+
+            auto registerManagers = [this, &addManager]<typename ...TManagers>(
+                std::type_identity<common::Sequential<TManagers...>>,
+                auto& sequentialGroup
+            ) {
+                sequentialGroup.reserve(sizeof...(TManagers));
+                (addManager.template operator()<TManagers>(sequentialGroup), ...);
+            };
+
+
+            (registerManagers(
+                std::type_identity<TSequentials>{},
+                parallelGroup.emplace_back()), ...
+            );
 
             return owner_;
         }
+
+
 
         // +---------------------------
         // | Runtime
         // +---------------------------
         void onScheduleEnd() noexcept {
 
-            if (managerTypeIds_.empty()) {
+            if (managerTypeIdQueue_.empty()) {
                 return;
             }
 
@@ -294,75 +331,78 @@ export namespace helios::ecs::scheduling {
                 assert(reg && "ManagerRegistry not found in EcsDataContainer");
             }
             #endif
-            for (const auto typeId : managerTypeIds_) {
-                auto* manager = reg->item(typeId);
-            #if HELIOS_DEBUG
-                if (!manager) {
-                    assert(manager && "Manager not found in registry");
-                }
-            #endif
 
-                manager->execute(ecsDataContainer_);
-                manager->flush(ecsDataContainer_);
-            }
+             run(managerTypeIdQueue_, *reg, [](auto& manager, auto& ecsDataContainer) {
+                manager.execute(ecsDataContainer);
+            });
         }
 
         void update() {
+            run(systemTypeIdQueue_, systemRegistry_, [](auto& system, auto& ecsDataContainer) {
+                system.update(ecsDataContainer);
+            });
+        }
 
-            bool mustInvalidate = false;
+        template<typename TRuntimeQueue, typename TRegistry, typename TExecute>
+        void run(const TRuntimeQueue& queue, TRegistry& registry, TExecute cmd) {
 
-            auto* threadPool = ecsDataContainer_.tryGet<ThreadPool>();
-            assert(threadPool && "ThreadPool not found in EcsDataContainer");
 
-            for (auto& parallelSystems : systemTypeIdQueue_) {
-                // parallelSystems with only one entry are treated serial
-                if (parallelSystems.size() == 1) {
-                    for (const auto& serialSystem : parallelSystems[0]) {
-                        auto* system = systemRegistry_.item(serialSystem);
-                        // update, commit mutations
-                        system->update(ecsDataContainer_);
-                        // produce system results, flush any underlying flushable objects
-                        system->flush(ecsDataContainer_);
-
-                        if (system->hasResult()) {
-                            mustInvalidate = true;
-                        }
-
-                    }
-                    continue;
-                }
-
-                // parallelSystems > 1 will be queued with the ThreadPool
-                threadPool->runAndWait(
-                    parallelSystems.size(),
-                    [&] (const std::size_t i) {
-                        // a parallel system owns more ore more serial systems
-                        for (const auto& serialSystem : parallelSystems[i]) {
-                            auto* system = systemRegistry_.item(serialSystem);
-                            system->update(ecsDataContainer_);
-                        }
-                });
-
-                // once parallel systems where updates, flush their command buffers
-                for (const auto& parallelSystem : parallelSystems) {
-                    for (const auto& serialSystem : parallelSystem) {
-                        auto* system = systemRegistry_.item(serialSystem);
-                        system->flush(ecsDataContainer_);
-                        if (system->hasResult()) {
-                            mustInvalidate = true;
-                        }
-                    }
-                }
-
+            auto invalidateView = [this](bool mustInvalidate) {
                 if (mustInvalidate) {
                     if (auto* resultRegistry = ecsDataContainer_.tryGet<ecs::common::RuntimeResultRegistry>()) {
                         assert(resultRegistry && "RuntimeResultRegistry not found in EcsDataContainer");
                         resultRegistry->invalidateView();
                     }
                 }
+            };
+
+            auto* threadPool = ecsDataContainer_.tryGet<ThreadPool>();
+            assert(threadPool && "ThreadPool not found in EcsDataContainer");
+
+            for (auto& parallelRuntimeSystems : queue) {
+                 bool mustInvalidate = false;
+                // parallelSystems with only one entry are treated serial
+                if (parallelRuntimeSystems.size() == 1) {
+                    for (const auto& serialRuntimeSystem : parallelRuntimeSystems[0]) {
+                        auto* runtimeSystem = registry.item(serialRuntimeSystem);
+                        // update, commit mutations
+                        cmd(*runtimeSystem, ecsDataContainer_);
+                        // produce system results, flush any underlying flushable objects
+                        runtimeSystem->flush(ecsDataContainer_);
+
+                        if (runtimeSystem->hasResult()) {
+                            mustInvalidate = true;
+                        }
+
+                    }
+                    invalidateView(mustInvalidate);
+                    continue;
+                }
+                mustInvalidate = false;
+                // parallelSystems > 1 will be queued with the ThreadPool
+                threadPool->runAndWait(
+                    parallelRuntimeSystems.size(),
+                    [&] (const std::size_t i) {
+                        // a parallel system owns more ore more serial systems
+                        for (const auto& serialRuntimeSystem : parallelRuntimeSystems[i]) {
+                            auto* runtimeSystem = registry.item(serialRuntimeSystem);
+                            cmd(*runtimeSystem, ecsDataContainer_);
+                        }
+                });
+
+                // once parallel systems where updates, flush their command buffers
+                for (const auto& parallelRuntimeSystem : parallelRuntimeSystems) {
+                    for (const auto& serialRuntimeSystem : parallelRuntimeSystem) {
+                        auto* runtimeSystem = registry.item(serialRuntimeSystem);
+                        runtimeSystem->flush(ecsDataContainer_);
+                        if (runtimeSystem->hasResult()) {
+                            mustInvalidate = true;
+                        }
+                    }
+                }
+                invalidateView(mustInvalidate);
             }
         }
-
 
         [[nodiscard]] bool shouldRun() noexcept {
             return runCondition_(ecsDataContainer_);

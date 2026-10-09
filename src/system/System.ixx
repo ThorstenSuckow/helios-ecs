@@ -90,12 +90,12 @@ private:
         using UpdateFunctionTraits = InvocationContext::InvocationFunctionTraits;
         template <std::size_t TIdx>
         using UpdateFuncArgType = typename InvocationContext::template InvocationFunctionArgType<TIdx>;
-        using ProducedSystemResultType = UpdateFunctionTraits::ReturnType;
+        using ProducedRuntimeResultType = UpdateFunctionTraits::ReturnType;
 
-        using StoredSystemResultType =
-        std::conditional_t<std::is_void_v<ProducedSystemResultType>, std::monostate, ProducedSystemResultType>;
+        using StoredRuntimeResultType =
+        std::conditional_t<std::is_void_v<ProducedRuntimeResultType>, std::monostate, ProducedRuntimeResultType>;
 
-        std::optional<StoredSystemResultType> systemResult_;
+        std::optional<StoredRuntimeResultType> runtimeResult_;
 
         CommandBuffer commandBuffer_{ConcreteCommandBufferType{}};
 
@@ -128,18 +128,19 @@ private:
         }
 
         void updateAndStore(EcsDataContainer& ecsDataContainer) {
-            if constexpr (std::is_void_v<ProducedSystemResultType>) {
-                invokeUpdate(
+
+            auto invoke = [&]()->decltype(auto) {
+                return invokeUpdate(
                     ecsDataContainer,
                     *commandBuffer_.tryGet<ConcreteCommandBufferType>(),
                     std::make_index_sequence<UpdateFunctionTraits::NumArgs>{}
                 );
+            };
+
+            if constexpr (!std::is_void_v<ProducedRuntimeResultType>) {
+                runtimeResult_.emplace(invoke());
             } else {
-                systemResult_.emplace(invokeUpdate(
-                    ecsDataContainer,
-                    *commandBuffer_.tryGet<ConcreteCommandBufferType>(),
-                    std::make_index_sequence<UpdateFunctionTraits::NumArgs>{}
-                ));
+                invoke();
             }
         }
 
@@ -170,13 +171,13 @@ private:
         }
 
         bool publishResults(EcsDataContainer &ecsDataContainer) noexcept override {
-            if constexpr (!std::is_void_v<ProducedSystemResultType>) {
+            if constexpr (!std::is_void_v<ProducedRuntimeResultType>) {
                 auto* resultRegistry = ecsDataContainer.tryGet<ecs::common::RuntimeResultRegistry>();
                 assert(resultRegistry && "RuntimeResultRegistry not found in EcsDataContainer");
-                resultRegistry->replace<ProducedSystemResultType>(
-                    common::RuntimeResult(std::move(*systemResult_))
+                resultRegistry->replace<ProducedRuntimeResultType>(
+                    common::RuntimeResult(std::move(*runtimeResult_))
                 );
-                systemResult_.reset();
+                runtimeResult_.reset();
             }
             return true;
         }
@@ -188,7 +189,7 @@ private:
         }
 
         bool hasResult() const noexcept override {
-            if constexpr (!std::is_void_v<ProducedSystemResultType>) {
+            if constexpr (!std::is_void_v<ProducedRuntimeResultType>) {
                 return true;
             }
             return false;
