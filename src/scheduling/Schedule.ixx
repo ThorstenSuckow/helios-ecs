@@ -253,7 +253,7 @@ export namespace helios::ecs::scheduling {
 
                 ensureRequiredStorage<TSystem>(ecsDataContainer_);
 
-                auto& sys = sequential.template systemFor<TSystem>();
+                auto& sys = sequential.template runtimeSystemFor<TSystem>();
 
                 if constexpr(ecs::system::concepts::IsCallableSystem<TSystem>) {
                     registerCallOperatorSystem(std::forward<TSystem>(sys));
