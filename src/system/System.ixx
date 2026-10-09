@@ -63,6 +63,7 @@ private:
         virtual bool publishResults(EcsDataContainer& ecsDataContainer) noexcept = 0;
         virtual bool update(EcsDataContainer& ecsDataContainer) noexcept = 0;
         virtual bool flush(EcsDataContainer& ecsDataContainer) noexcept = 0;
+        [[nodiscard]] virtual bool hasResult() const noexcept = 0;
 
         [[nodiscard]] virtual void* underlying() noexcept = 0;
         [[nodiscard]] virtual const void* underlying() const noexcept = 0;
@@ -170,7 +171,11 @@ private:
 
         bool publishResults(EcsDataContainer &ecsDataContainer) noexcept override {
             if constexpr (!std::is_void_v<ProducedSystemResultType>) {
-                ecsDataContainer.replace<ProducedSystemResultType>(std::move(*systemResult_));
+                auto* resultRegistry = ecsDataContainer.tryGet<ecs::common::RuntimeResultRegistry>();
+                assert(resultRegistry && "RuntimeResultRegistry not found in EcsDataContainer");
+                resultRegistry->replace<ProducedSystemResultType>(
+                    common::RuntimeResult(std::move(*systemResult_))
+                );
                 systemResult_.reset();
             }
             return true;
@@ -180,6 +185,13 @@ private:
         bool update(EcsDataContainer& ecsDataContainer) noexcept override {
             updateAndStore(ecsDataContainer);
             return true;
+        }
+
+        bool hasResult() const noexcept override {
+            if constexpr (!std::is_void_v<ProducedSystemResultType>) {
+                return true;
+            }
+            return false;
         }
 
         bool flush(EcsDataContainer& ecsDataContainer) noexcept override {
@@ -234,6 +246,11 @@ public:
     bool flush(EcsDataContainer& ecsDataContainer) noexcept {
         assert(pimpl_ && "System not initialized");
         return pimpl_->flush(ecsDataContainer);
+    }
+
+    [[nodiscard]] bool hasResult() const noexcept {
+        assert(pimpl_ && "System not initialized");
+        return pimpl_->hasResult();
     }
 
     [[nodiscard]] const void* underlying() const noexcept {

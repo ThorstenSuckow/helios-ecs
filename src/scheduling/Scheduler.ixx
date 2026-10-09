@@ -50,7 +50,7 @@ export namespace helios::ecs::scheduling {
        * @param ecsDataContainer The map of results from the current frame's system executions.
        * @param jobSystem The job system used for parallel execution of systems.
        */
-        void update(ecs::common::container::EcsDataContainer& ecsDataContainer){
+        void update(){
 
             for (auto& schedule : schedules_) {
 

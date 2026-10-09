@@ -7,5 +7,6 @@ export import :EntityHandleValue;
 export import :HandleSpanRef;
 
 export import :ComponentTypeId;
+export import :RuntimeResultTypeId;
 export import :EntityHandle;
 export import :TypeDefs;

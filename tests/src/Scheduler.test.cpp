@@ -78,7 +78,7 @@ TEST(SequentialScheduler, find) {
         .endSchedule();
 
     for (int i = 0; i < 100; ++i) {
-        scheduler.update(ecsDataContainer);
+        scheduler.update();
     }
 
     EXPECT_EQ(s1State, 0);
@@ -171,7 +171,7 @@ TEST(Scheduler, ExecutesSequentialBranchesInParallel) {
 
     scheduler.init(ecsDataContainer);
 
-    scheduler.update(ecsDataContainer);
+    scheduler.update();
 
     // Verify the sequential order within each branch and that the
     // two branches were active concurrently.

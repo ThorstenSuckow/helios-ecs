@@ -122,7 +122,9 @@ export namespace helios::ecs::scheduling {
 
             using ReturnType = traits::SystemToUpdateMethodSignature<SystemType>::ReturnType;
             if constexpr (!std::is_void_v<ReturnType>) {
-                ecsDataContainer.reserve<ReturnType>();
+                auto* resultRegistry = ecsDataContainer.tryGet<ecs::common::RuntimeResultRegistry>();
+                assert(resultRegistry && "RuntimeResultRegistry not found in EcsDataContainer");
+                resultRegistry->reserve<ReturnType>();
             }
 
             using AccessSets = traits::SystemAccessSets<SystemType>;
@@ -307,11 +309,12 @@ export namespace helios::ecs::scheduling {
 
         void update() {
 
+            bool mustInvalidate = false;
+
             auto* threadPool = ecsDataContainer_.tryGet<ThreadPool>();
             assert(threadPool && "ThreadPool not found in EcsDataContainer");
 
             for (auto& parallelSystems : systemTypeIdQueue_) {
-
                 // parallelSystems with only one entry are treated serial
                 if (parallelSystems.size() == 1) {
                     for (const auto& serialSystem : parallelSystems[0]) {
@@ -320,6 +323,11 @@ export namespace helios::ecs::scheduling {
                         system->update(ecsDataContainer_);
                         // produce system results, flush any underlying flushable objects
                         system->flush(ecsDataContainer_);
+
+                        if (system->hasResult()) {
+                            mustInvalidate = true;
+                        }
+
                     }
                     continue;
                 }
@@ -340,6 +348,16 @@ export namespace helios::ecs::scheduling {
                     for (const auto& serialSystem : parallelSystem) {
                         auto* system = systemRegistry_.item(serialSystem);
                         system->flush(ecsDataContainer_);
+                        if (system->hasResult()) {
+                            mustInvalidate = true;
+                        }
+                    }
+                }
+
+                if (mustInvalidate) {
+                    if (auto* resultRegistry = ecsDataContainer_.tryGet<ecs::common::RuntimeResultRegistry>()) {
+                        assert(resultRegistry && "RuntimeResultRegistry not found in EcsDataContainer");
+                        resultRegistry->invalidateView();
                     }
                 }
             }

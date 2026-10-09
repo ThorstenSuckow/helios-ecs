@@ -7,11 +7,14 @@ module;
 #include <tuple>
 #include <utility>
 #include <variant>
+#include <cassert>
 
 export module helios.ecs.common.container:EcsDataContainer;
 
 import helios.core.common.container;
 import helios.core.common.traits;
+import helios.ecs.common.RuntimeResultRegistry;
+import helios.ecs.common.types;
 import helios.ecs.command.concepts;
 import helios.ecs.entity.EntityManager;
 import helios.ecs.entity.QueryAccessSet;
@@ -55,6 +58,7 @@ struct EcsDataContainerArgumentResolver {
     decltype(auto) resolve(TConcreteTypes&... concreteTypes) {
 
         using Type = std::remove_cvref_t<TArg>;
+
         using QualifiedType = std::remove_reference_t<TArg>;
 
         static_assert(!std::is_rvalue_reference_v<TArg>, "Function arguments must be lvalue references.");
@@ -82,10 +86,32 @@ struct EcsDataContainerArgumentResolver {
                 return Type{&ecsDataContainer_.get<EntityManager>(), nullptr};
             }
 
-        }  else if constexpr (std::is_const_v<QualifiedType>) {
-            return static_cast<const Type&>(ecsDataContainer_.get<Type>());
+        } else if constexpr (!std::is_lvalue_reference_v<TArg>) {
+            static_assert(false, "Function arguments must be lvalue reference if not provided in concrete type list.");
         } else {
-            return static_cast<Type&>(ecsDataContainer_.get<Type>());
+
+            using Reference = std::conditional_t<
+                std::is_const_v<QualifiedType>,
+                const Type&,
+                Type&
+            >;
+
+            // look up ecsDataContainer before checking RuntimeResults
+            if (auto* item = ecsDataContainer_.tryGet<Type>()) {
+                return static_cast<Reference>(*item);
+            }
+
+            auto runtimeId = types::RuntimeResultTypeId::template id<Type>();
+            auto* runtimeResultRegistry = ecsDataContainer_.tryGet<ecs::common::RuntimeResultRegistry>();
+
+            assert(runtimeResultRegistry != nullptr);
+
+            if (runtimeResultRegistry->has<Type>()) {
+                auto* wrappedItem = runtimeResultRegistry->item(runtimeId);
+                assert(wrappedItem->typeId() == runtimeId && "Unexpected TypeId mismatch.");
+                return static_cast<Reference>(wrappedItem->template get<Type>());
+            }
+
         }
 
     }
