@@ -14,7 +14,7 @@ export namespace helios::ecs::scheduling::concepts {
 
 
     template<typename ... TManagers>
-   concept ConflictFreeManagers = (sizeof...(TManagers) >= 2) &&
+   concept ConflictFreeManagers = (sizeof...(TManagers) >= 1) &&
        (ecs::manager::concepts::IsManagerLike<std::remove_cvref_t<TManagers>> && ...) &&
        !traits::HasConflict<core::common::types::TypeList<std::remove_cvref_t<TManagers>...>>::value;
 
