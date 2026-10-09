@@ -500,9 +500,9 @@ TEST(ConflictAnalyzerTest, TwoSystemsSameArgButOneIsConst) {
 
 
 TEST(ConflictAnalyzerTest, TwoSystemsSameArgButBothAreConst) {
-    auto s1 = [](const Foo&)-> Foo {return Foo{};};
-    auto s3 = []()-> Foobar {return Foobar{};};
-    auto s2 = [](const Foo&)-> Bar {return Bar{};};
+    auto s1 = [](const Foo) {};
+    auto s3 = [](){};
+    auto s2 = [](const Foo&) {};
 
     auto Group1 = system::Sequential(s1, s3);
     auto Group2 = system::Sequential(s2);
@@ -529,6 +529,34 @@ TEST(ConflictAnalyzerTest, TwoSystemsSameArgInOneGroupButBothAreConst) {
     EXPECT_TRUE(!conflict);
 }
 
+TEST(ConflictAnalyzerTest, TwoSystemsSameConstArgSameReturnType) {
+    auto s1 = []()-> Foo {return Foo{};};
+    auto s3 = []() {};
+    auto s2 = [](const Foo&){};
 
+    auto Group1 = system::Sequential(s1, s3);
+    auto Group2 = system::Sequential(s2);
+
+    static constexpr bool conflict = HasConflict<
+        TypeList<decltype(Group1), decltype(Group2)>
+    >::value;
+    static_assert(conflict);
+    EXPECT_TRUE(conflict);
+}
+
+TEST(ConflictAnalyzerTest, TwoSystemsSameArgSameReturnType) {
+    auto s1 = []()-> Foo {return Foo{};};
+    auto s3 = []() {};
+    auto s2 = [](Foo){};
+
+    auto Group1 = system::Sequential(s1, s3);
+    auto Group2 = system::Sequential(s2);
+
+    static constexpr bool conflict = HasConflict<
+        TypeList<decltype(Group1), decltype(Group2)>
+    >::value;
+    static_assert(conflict);
+    EXPECT_TRUE(conflict);
+}
 
 

@@ -41,10 +41,9 @@ namespace {
         static constexpr bool RefA = std::is_reference_v<TLeft>;
         static constexpr bool RefB = std::is_reference_v<TRight>;
 
-        static constexpr bool value =
-            (RefA && RefB) &&
-            (!ConstA || !ConstB) &&
-            std::same_as<TypeA, TypeB>;
+        static constexpr bool value = std::same_as<TypeA, TypeB> &&
+            ((RefA && !ConstA) || (RefB && !ConstB));
+
     };
 
     template<typename TArgA, typename ... TRest>
@@ -77,10 +76,20 @@ namespace {
 
         static constexpr bool value =
             ((!VoidA) && std::same_as<ReturnTypeA, ReturnTypeB>) ||
-            HasArgumentTypeConflict<
+            (HasArgumentTypeConflict<
                 typename TSignatureA::ArgumentTypeList,
                 typename TSignatureB::ArgumentTypeList
-            >::value;
+            >::value) ||
+            // check the return types. If at least one return type (treated as ref since it
+            // represents a value being written) appears in another systems
+            // as a R or W value, this is a conflict.
+            (!VoidA && HasConflictWithArgument<
+                std::add_lvalue_reference_t<ReturnTypeA>, typename TSignatureB::ArgumentTypeList
+                >::value) ||
+            (!VoidB && HasConflictWithArgument<
+                std::add_lvalue_reference_t<ReturnTypeB>, typename TSignatureA::ArgumentTypeList
+            >::value);
+
     };
 
     template<typename THandleA, typename TReadSetA, typename TWriteSetA, typename THandleB, typename TReadSetB, typename TWriteSetB>
