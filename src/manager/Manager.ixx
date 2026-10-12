@@ -91,7 +91,7 @@ private:
         using ProducedRuntimeResultType = InvocationContext::InvocationFunctionTraits::ReturnType;
 
         using StoredRuntimeResultType =
-        std::conditional_t<std::is_void_v<ProducedRuntimeResultType>, std::monostate, ProducedRuntimeResultType>;
+        std::conditional_t<!std::is_class_v<ProducedRuntimeResultType>, std::monostate, ProducedRuntimeResultType>;
 
 
         std::optional<StoredRuntimeResultType> runtimeResult_;
@@ -150,7 +150,7 @@ private:
                 );
             };
 
-            if constexpr (!std::is_void_v<ProducedRuntimeResultType>) {
+            if constexpr (std::is_class_v<ProducedRuntimeResultType>) {
                 runtimeResult_.emplace(invoke());
             } else {
                 invoke();
@@ -168,7 +168,7 @@ private:
         }
 
         bool publishResults(EcsDataContainer &ecsDataContainer) noexcept override {
-            if constexpr (!std::is_void_v<ProducedRuntimeResultType>) {
+            if constexpr (std::is_class_v<ProducedRuntimeResultType>) {
                 auto* resultRegistry = ecsDataContainer.tryGet<ecs::common::RuntimeResultRegistry>();
                 assert(resultRegistry && "RuntimeResultRegistry not found in EcsDataContainer");
                 resultRegistry->replace<ProducedRuntimeResultType>(
@@ -180,7 +180,7 @@ private:
         }
 
         bool hasResult() const noexcept override {
-            if constexpr (!std::is_void_v<ProducedRuntimeResultType>) {
+            if constexpr (std::is_class_v<ProducedRuntimeResultType>) {
                 return true;
             }
             return false;
