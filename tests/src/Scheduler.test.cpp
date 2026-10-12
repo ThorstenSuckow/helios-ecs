@@ -73,7 +73,7 @@ TEST(SequentialScheduler, find) {
 
     scheduler.beginSchedule()
         .add(
-            helios::ecs::system::Sequential(s1, s2, s3, s4)
+            helios::ecs::common::Sequential(s1, s2, s3, s4)
         )
         .endSchedule();
 
@@ -163,8 +163,8 @@ TEST(Scheduler, ExecutesSequentialBranchesInParallel) {
     // parallel execution group. Systems within each branch remain ordered.
     scheduler.beginSchedule()
         .add(
-            helios::ecs::system::Sequential(s1, s2),
-            helios::ecs::system::Sequential(s3, s4)
+            helios::ecs::common::Sequential(s1, s2),
+            helios::ecs::common::Sequential(s3, s4)
         )
         .endSchedule();
 

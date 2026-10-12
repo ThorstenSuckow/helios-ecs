@@ -8,6 +8,7 @@ import helios.core;
 using namespace helios::ecs;
 using namespace helios::ecs::entity;
 using namespace helios::core::common::types;
+using namespace helios::ecs::common;
 using namespace helios::ecs::scheduling::concepts;
 using namespace helios::ecs::scheduling::traits;
 
@@ -192,9 +193,9 @@ TEST(ConflictFreeConceptsTest, CallableSystemsMirrorConflictAnalyzerScenarios) {
  * Small sequential setup with one conflicting and one non-conflicting case.
  */
 TEST(ConflictFreeConceptsTest, SequentialGroupsMirrorConflictAnalyzerScenarios) {
-    using GroupA = system::Sequential<GameObjectReadPositionSystem, GameObjectWriteVelocitySystem>;
-    using GroupB = system::Sequential<GameObjectReadVelocitySystem>;
-    using GroupC = system::Sequential<ParticleWritePositionSystem>;
+    using GroupA = Sequential<GameObjectReadPositionSystem, GameObjectWriteVelocitySystem>;
+    using GroupB = Sequential<GameObjectReadVelocitySystem>;
+    using GroupC = Sequential<ParticleWritePositionSystem>;
 
     static_assert(!ConflictFreeSequentialSystems<GroupA, GroupB>);
     static_assert(ConflictFreeSequentialSystems<GroupA, GroupC>);
@@ -206,17 +207,17 @@ TEST(ConflictFreeConceptsTest, SequentialGroupsMirrorConflictAnalyzerScenarios) 
  * Five-group setup: verify non-neighbor conflict detection and a safe variant.
  */
 TEST(ConflictFreeConceptsTest, SequentialFiveGroupsParallelCoverage) {
-    using Group1 = system::Sequential<GameObjectReadScaleSystem>;
-    using Group2 = system::Sequential<ParticleWritePositionSystem>;
-    using Group3 = system::Sequential<GameObjectWriteRotationSystem>;
-    using Group4 = system::Sequential<GameObjectWriteHealthSystem>;
-    using Group5 = system::Sequential<GameObjectWriteScaleSystem>;
+    using Group1 = Sequential<GameObjectReadScaleSystem>;
+    using Group2 = Sequential<ParticleWritePositionSystem>;
+    using Group3 = Sequential<GameObjectWriteRotationSystem>;
+    using Group4 = Sequential<GameObjectWriteHealthSystem>;
+    using Group5 = Sequential<GameObjectWriteScaleSystem>;
 
-    using FreeGroup1 = system::Sequential<GameObjectReadScaleSystem>;
-    using FreeGroup2 = system::Sequential<ParticleWritePositionSystem>;
-    using FreeGroup3 = system::Sequential<GameObjectWriteRotationSystem>;
-    using FreeGroup4 = system::Sequential<GameObjectWriteHealthSystem>;
-    using FreeGroup5 = system::Sequential<GameObjectReadVelocitySystem>;
+    using FreeGroup1 = Sequential<GameObjectReadScaleSystem>;
+    using FreeGroup2 = Sequential<ParticleWritePositionSystem>;
+    using FreeGroup3 = Sequential<GameObjectWriteRotationSystem>;
+    using FreeGroup4 = Sequential<GameObjectWriteHealthSystem>;
+    using FreeGroup5 = Sequential<GameObjectReadVelocitySystem>;
 
     // Conflict is between Group1 and Group5 (same write target), not neighbors.
     static_assert(!ConflictFreeSequentialSystems<Group1, Group2, Group3, Group4, Group5>);
@@ -233,7 +234,7 @@ TEST(ConflictFreeConceptsTest, ArityAndCvRefGuards) {
     static_assert(!ConflictFreeTypedSystems<GameObjectReadPositionSystem>);
     static_assert(!ConflictFreeCallableSystems<GameObjectReadPositionCallableSystem>);
 
-    using SingleGroup = system::Sequential<GameObjectReadPositionSystem>;
+    using SingleGroup = Sequential<GameObjectReadPositionSystem>;
     static_assert(ConflictFreeSequentialSystems<SingleGroup>);
 
     static_assert(ConflictFreeTypedSystems<const GameObjectReadPositionSystem&, ParticleWritePositionSystem&&>);
@@ -247,11 +248,11 @@ TEST(ConflictFreeConceptsTest, ArityAndCvRefGuards) {
  * Same component, different handles: should stay conflict-free.
  */
 TEST(ConflictFreeConceptsTest, SequentialFiveGroupsSameComponentDifferentHandlesStayConflictFree) {
-    using Group1 = system::Sequential<GameObjectWriteScaleSystem>;
-    using Group2 = system::Sequential<ParticleWritePositionSystem>;
-    using Group3 = system::Sequential<GameObjectWriteRotationSystem>;
-    using Group4 = system::Sequential<GameObjectWriteHealthSystem>;
-    using Group5 = system::Sequential<ParticleWriteScaleSystem>;
+    using Group1 = Sequential<GameObjectWriteScaleSystem>;
+    using Group2 = Sequential<ParticleWritePositionSystem>;
+    using Group3 = Sequential<GameObjectWriteRotationSystem>;
+    using Group4 = Sequential<GameObjectWriteHealthSystem>;
+    using Group5 = Sequential<ParticleWriteScaleSystem>;
 
     static_assert(ConflictFreeSequentialSystems<Group1, Group2, Group3, Group4, Group5>);
 
@@ -262,11 +263,11 @@ TEST(ConflictFreeConceptsTest, SequentialFiveGroupsSameComponentDifferentHandles
  * Mixed setup with one real same-handle conflict: concept must reject it.
  */
 TEST(ConflictFreeConceptsTest, SequentialFiveGroupsMixedIsolationWithSingleRealConflict) {
-    using Group1 = system::Sequential<GameObjectWriteScaleSystem>;
-    using Group2 = system::Sequential<ParticleWriteScaleSystem>;
-    using Group3 = system::Sequential<GameObjectWriteHealthSystem>;
-    using Group4 = system::Sequential<GameObjectWriteRotationSystem>;
-    using Group5 = system::Sequential<GameObjectWriteScaleSystem>;
+    using Group1 = Sequential<GameObjectWriteScaleSystem>;
+    using Group2 = Sequential<ParticleWriteScaleSystem>;
+    using Group3 = Sequential<GameObjectWriteHealthSystem>;
+    using Group4 = Sequential<GameObjectWriteRotationSystem>;
+    using Group5 = Sequential<GameObjectWriteScaleSystem>;
 
     // Group1 and Group5 conflict; Group2 stays isolated by handle.
     static_assert(!ConflictFreeSequentialSystems<Group1, Group2, Group3, Group4, Group5>);
@@ -350,9 +351,9 @@ TEST(ConflictAnalyzerTest, MultiQuerySystemDetectsConflictsAcrossQueries) {
  * Sequential baseline: one conflicting and one safe grouping.
  */
 TEST(ConflictAnalyzerTest, SequentialGroupsConflictAndConflictFreeScenarios) {
-    using GroupA = system::Sequential<GameObjectReadPositionSystem, GameObjectWriteVelocitySystem>;
-    using GroupB = system::Sequential<GameObjectReadVelocitySystem>;
-    using GroupC = system::Sequential<ParticleWritePositionSystem>;
+    using GroupA = Sequential<GameObjectReadPositionSystem, GameObjectWriteVelocitySystem>;
+    using GroupB = Sequential<GameObjectReadVelocitySystem>;
+    using GroupC = Sequential<ParticleWritePositionSystem>;
 
     static constexpr bool conflict = HasConflict<TypeList<GroupA, GroupB>>::value;
     static constexpr bool conflictFree = HasConflict<TypeList<GroupA, GroupC>>::value;
@@ -367,7 +368,7 @@ TEST(ConflictAnalyzerTest, SequentialGroupsConflictAndConflictFreeScenarios) {
  * A single sequential group must be conflict-free.
  */
 TEST(ConflictAnalyzerTest, SingleSequentialGroupIsConflictFree) {
-    using SingleGroup = system::Sequential<GameObjectReadPositionSystem, GameObjectWriteVelocitySystem>;
+    using SingleGroup = Sequential<GameObjectReadPositionSystem, GameObjectWriteVelocitySystem>;
 
     static constexpr bool conflict = HasConflict<TypeList<SingleGroup>>::value;
 
@@ -379,17 +380,17 @@ TEST(ConflictAnalyzerTest, SingleSequentialGroupIsConflictFree) {
  * Five groups: conflict can come from non-neighbor groups.
  */
 TEST(ConflictAnalyzerTest, SequentialFiveGroupsNonNeighborConflictAndConflictFreeCases) {
-    using Group1 = system::Sequential<GameObjectReadScaleSystem>;
-    using Group2 = system::Sequential<ParticleWritePositionSystem>;
-    using Group3 = system::Sequential<GameObjectWriteRotationSystem>;
-    using Group4 = system::Sequential<GameObjectWriteHealthSystem>;
-    using Group5 = system::Sequential<GameObjectWriteScaleSystem>;
+    using Group1 = Sequential<GameObjectReadScaleSystem>;
+    using Group2 = Sequential<ParticleWritePositionSystem>;
+    using Group3 = Sequential<GameObjectWriteRotationSystem>;
+    using Group4 = Sequential<GameObjectWriteHealthSystem>;
+    using Group5 = Sequential<GameObjectWriteScaleSystem>;
 
-    using FreeGroup1 = system::Sequential<GameObjectReadScaleSystem>;
-    using FreeGroup2 = system::Sequential<ParticleWritePositionSystem>;
-    using FreeGroup3 = system::Sequential<GameObjectWriteRotationSystem>;
-    using FreeGroup4 = system::Sequential<GameObjectWriteHealthSystem>;
-    using FreeGroup5 = system::Sequential<GameObjectReadVelocitySystem>;
+    using FreeGroup1 = Sequential<GameObjectReadScaleSystem>;
+    using FreeGroup2 = Sequential<ParticleWritePositionSystem>;
+    using FreeGroup3 = Sequential<GameObjectWriteRotationSystem>;
+    using FreeGroup4 = Sequential<GameObjectWriteHealthSystem>;
+    using FreeGroup5 = Sequential<GameObjectReadVelocitySystem>;
 
     static constexpr bool hasConflict = HasConflict<
         TypeList<Group1, Group2, Group3, Group4, Group5>
@@ -409,11 +410,11 @@ TEST(ConflictAnalyzerTest, SequentialFiveGroupsNonNeighborConflictAndConflictFre
  * Five groups: same component across handles stays conflict-free.
  */
 TEST(ConflictAnalyzerTest, SequentialFiveGroupsSameComponentDifferentHandlesStayConflictFree) {
-    using Group1 = system::Sequential<GameObjectWriteScaleSystem>;
-    using Group2 = system::Sequential<ParticleWritePositionSystem>;
-    using Group3 = system::Sequential<GameObjectWriteRotationSystem>;
-    using Group4 = system::Sequential<GameObjectWriteHealthSystem>;
-    using Group5 = system::Sequential<ParticleWriteScaleSystem>;
+    using Group1 = Sequential<GameObjectWriteScaleSystem>;
+    using Group2 = Sequential<ParticleWritePositionSystem>;
+    using Group3 = Sequential<GameObjectWriteRotationSystem>;
+    using Group4 = Sequential<GameObjectWriteHealthSystem>;
+    using Group5 = Sequential<ParticleWriteScaleSystem>;
 
     static constexpr bool conflict = HasConflict<
         TypeList<Group1, Group2, Group3, Group4, Group5>
@@ -427,11 +428,11 @@ TEST(ConflictAnalyzerTest, SequentialFiveGroupsSameComponentDifferentHandlesStay
  * Five groups: one same-handle conflict makes the whole set conflicting.
  */
 TEST(ConflictAnalyzerTest, SequentialFiveGroupsMixedIsolationWithSingleRealConflict) {
-    using Group1 = system::Sequential<GameObjectWriteScaleSystem>;
-    using Group2 = system::Sequential<ParticleWriteScaleSystem>;
-    using Group3 = system::Sequential<GameObjectWriteHealthSystem>;
-    using Group4 = system::Sequential<GameObjectWriteRotationSystem>;
-    using Group5 = system::Sequential<GameObjectWriteScaleSystem>;
+    using Group1 = Sequential<GameObjectWriteScaleSystem>;
+    using Group2 = Sequential<ParticleWriteScaleSystem>;
+    using Group3 = Sequential<GameObjectWriteHealthSystem>;
+    using Group4 = Sequential<GameObjectWriteRotationSystem>;
+    using Group5 = Sequential<GameObjectWriteScaleSystem>;
 
     static constexpr bool conflict = HasConflict<
         TypeList<Group1, Group2, Group3, Group4, Group5>
@@ -442,8 +443,8 @@ TEST(ConflictAnalyzerTest, SequentialFiveGroupsMixedIsolationWithSingleRealConfl
 }
 
 TEST(ConflictAnalyzerTest, SequentialTwoGroupsMultipleSystemsWithSingleRealConflict) {
-    using Group1 = system::Sequential<GameObjectWriteScaleSystem, GameObjectWriteHealthSystem, ParticleWriteScaleSystem>;
-    using Group2 = system::Sequential<ParticleWriteScaleSystem>;
+    using Group1 = Sequential<GameObjectWriteScaleSystem, GameObjectWriteHealthSystem, ParticleWriteScaleSystem>;
+    using Group2 = Sequential<ParticleWriteScaleSystem>;
 
     static constexpr bool conflict = HasConflict<
         TypeList<Group1, Group2>
@@ -458,8 +459,8 @@ TEST(ConflictAnalyzerTest, TwoSystemsSameReturnValue) {
     auto s2 = []()-> Foo {return Foo{};};
     auto s3 = []()-> Bar {return Bar{};};
 
-    auto Group1 = system::Sequential(s1, s3);
-    auto Group2 = system::Sequential(s2);
+    auto Group1 = Sequential(s1, s3);
+    auto Group2 = Sequential(s2);
 
     static constexpr bool conflict = HasConflict<
         TypeList<decltype(Group1), decltype(Group2)>
@@ -470,11 +471,11 @@ TEST(ConflictAnalyzerTest, TwoSystemsSameReturnValue) {
 
 TEST(ConflictAnalyzerTest, TwoSystemsSameArg) {
     auto s1 = [](Foo&)-> Foo {return Foo{};};
-    auto s3 = []()-> Foobar {return Foobar{};};
-    auto s2 = [](Foo&)-> Bar {return Bar{};};
+    auto s2 = []()-> Foobar {return Foobar{};};
+    auto s3 = [](Foo&)-> Bar {return Bar{};};
 
-    auto Group1 = system::Sequential(s1, s3);
-    auto Group2 = system::Sequential(s2);
+    auto Group1 = Sequential(s1, s2);
+    auto Group2 = Sequential(s3);
 
     static constexpr bool conflict = HasConflict<
         TypeList<decltype(Group1), decltype(Group2)>
@@ -488,8 +489,8 @@ TEST(ConflictAnalyzerTest, TwoSystemsSameArgButOneIsConst) {
     auto s3 = []()-> Foobar {return Foobar{};};
     auto s2 = [](Foo&)-> Bar {return Bar{};};
 
-    auto Group1 = system::Sequential(s1, s3);
-    auto Group2 = system::Sequential(s2);
+    auto Group1 = Sequential(s1, s3);
+    auto Group2 = Sequential(s2);
 
     static constexpr bool conflict = HasConflict<
         TypeList<decltype(Group1), decltype(Group2)>
@@ -504,8 +505,8 @@ TEST(ConflictAnalyzerTest, TwoSystemsSameArgButBothAreConst) {
     auto s3 = [](){};
     auto s2 = [](const Foo&) {};
 
-    auto Group1 = system::Sequential(s1, s3);
-    auto Group2 = system::Sequential(s2);
+    auto Group1 = Sequential(s1, s3);
+    auto Group2 = Sequential(s2);
 
     static constexpr bool conflict = HasConflict<
         TypeList<decltype(Group1), decltype(Group2)>
@@ -519,8 +520,8 @@ TEST(ConflictAnalyzerTest, TwoSystemsSameArgInOneGroupButBothAreConst) {
     auto s3 = [](const Foo&)-> Foobar {return Foobar{};};
     auto s2 = [](const Bar&)-> Bar {return Bar{};};
 
-    auto Group1 = system::Sequential(s1, s3);
-    auto Group2 = system::Sequential(s2);
+    auto Group1 = Sequential(s1, s3);
+    auto Group2 = Sequential(s2);
 
     static constexpr bool conflict = HasConflict<
         TypeList<decltype(Group1), decltype(Group2)>
@@ -534,8 +535,8 @@ TEST(ConflictAnalyzerTest, TwoSystemsSameConstArgSameReturnType) {
     auto s3 = []() {};
     auto s2 = [](const Foo&){};
 
-    auto Group1 = system::Sequential(s1, s3);
-    auto Group2 = system::Sequential(s2);
+    auto Group1 = Sequential(s1, s3);
+    auto Group2 = Sequential(s2);
 
     static constexpr bool conflict = HasConflict<
         TypeList<decltype(Group1), decltype(Group2)>
@@ -549,8 +550,8 @@ TEST(ConflictAnalyzerTest, TwoSystemsSameArgSameReturnType) {
     auto s3 = []() {};
     auto s2 = [](Foo){};
 
-    auto Group1 = system::Sequential(s1, s3);
-    auto Group2 = system::Sequential(s2);
+    auto Group1 = Sequential(s1, s3);
+    auto Group2 = Sequential(s2);
 
     static constexpr bool conflict = HasConflict<
         TypeList<decltype(Group1), decltype(Group2)>
@@ -559,4 +560,39 @@ TEST(ConflictAnalyzerTest, TwoSystemsSameArgSameReturnType) {
     EXPECT_TRUE(conflict);
 }
 
+TEST(ConflictAnalyzerTest, TwoSystemsEntityManagerAndQuery) {
+    auto s1 = [](EntityManager<GameObjectHandle>){};
+    auto s2 = []() {};
+    auto s3 = [](entity::query::Query<
+            GameObjectHandle,
+            ReadSet<PositionComponent>,
+            WriteSet<>
+        >){};
+
+    auto Group1 = Sequential(s1, s2);
+    auto Group2 = Sequential(s3);
+
+    static constexpr bool conflict = HasConflict<
+        TypeList<decltype(Group1), decltype(Group2)>
+    >::value;
+    static_assert(conflict);
+    EXPECT_TRUE(conflict);
+
+    auto s4 = [](EntityManager<GameObjectHandle>){};
+    auto s5 = []() {};
+    auto s6 = [](entity::query::Query<
+            ParticleHandle,
+            ReadSet<PositionComponent>,
+            WriteSet<>
+        >){};
+
+    auto Group3 = Sequential(s4, s5);
+    auto Group4 = Sequential(s6);
+
+    static constexpr bool conflict2 = HasConflict<
+        TypeList<decltype(Group3), decltype(Group4)>
+    >::value;
+    static_assert(!conflict2);
+    EXPECT_FALSE(conflict2);
+}
 

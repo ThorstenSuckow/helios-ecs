@@ -13,7 +13,8 @@ export module helios.ecs.scheduling.traits:RuntimeSystemMainMethodArgumentSelect
 import helios.ecs.entity.concepts;
 import helios.core.common.traits;
 import helios.core.common.types;
-import helios.ecs.entity.query.NullQuery;
+import helios.core.thread;
+import helios.ecs.command.concepts;
 
 export namespace helios::ecs::scheduling::traits {
 
@@ -25,20 +26,31 @@ export namespace helios::ecs::scheduling::traits {
         using list = core::common::types::TypeList<>;
     };
 
+    template<typename TList>
+    struct RuntimeSystemMainMethodArgumentSelectorFromList;
+
+    template<typename... TArgs>
+    struct RuntimeSystemMainMethodArgumentSelectorFromList<
+        core::common::types::TypeList<TArgs...>> {
+        using list = typename RuntimeSystemMainMethodArgumentSelector<TArgs...>::list;
+    };
+
     template <typename TFirst, typename... TRest>
     struct RuntimeSystemMainMethodArgumentSelector<TFirst, TRest...> {
 
         using FirstType = std::remove_cvref_t<TFirst>;
         using Rest = RuntimeSystemMainMethodArgumentSelector<TRest...>;
 
-        static constexpr bool IsQuery = entity::concepts::IsQuery<FirstType>;
+        static constexpr bool IsCommandBuffer = ecs::command::concepts::IsCommandBufferLike<FirstType>;
+        static constexpr bool IsThreadPool = std::same_as<FirstType, core::thread::ThreadPool>;
 
         using list = std::conditional_t<
-                IsQuery,
+                IsCommandBuffer || IsThreadPool,
                 typename Rest::list,
-                // do not append remove_cvref_t since type is required.
+                // do not append remove_cvref_t since qualifiers are required.
                 typename Rest::list::template Prepend<TFirst>
         >;
+
     };
 
     template <typename>

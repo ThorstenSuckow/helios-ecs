@@ -22,6 +22,8 @@ import helios.ecs.common.SequentialRuntimeSystemGroup;
 import helios.ecs.entity.QueryAccessSet;
 import helios.ecs.system.types;
 
+import helios.ecs.entity.concepts;
+
 namespace {
     template<typename TArgA, typename TList>
     struct HasConflictWithArgument;
@@ -35,15 +37,40 @@ namespace {
         using TypeA = std::remove_cvref_t<TLeft>;
         using TypeB = std::remove_cvref_t<TRight>;
 
+        static constexpr bool IsQueryA = helios::ecs::entity::concepts::IsQuery<TypeA>;
+        static constexpr bool IsQueryB = helios::ecs::entity::concepts::IsQuery<TypeB>;
+
+        static constexpr bool IsEntityManagerA = helios::ecs::entity::concepts::IsEntityManager<TypeA>;
+        static constexpr bool IsEntityManagerB = helios::ecs::entity::concepts::IsEntityManager<TypeB>;
+
         static constexpr bool ConstA = std::is_const_v<std::remove_reference_t<TLeft>>;
         static constexpr bool ConstB = std::is_const_v<std::remove_reference_t<TRight>>;
 
         static constexpr bool RefA = std::is_reference_v<TLeft>;
         static constexpr bool RefB = std::is_reference_v<TRight>;
 
-        static constexpr bool value = std::same_as<TypeA, TypeB> &&
-            ((RefA && !ConstA) || (RefB && !ConstB));
+        static constexpr bool value = []() {
+            if constexpr (!IsQueryA && !IsQueryB && std::same_as<TypeA, TypeB> &&
+                         ((RefA && !ConstA)
+                         || (RefB && !ConstB))) {
+                         return true;
+            }
 
+            if constexpr (IsQueryA && IsEntityManagerB && !ConstB) {
+                if constexpr(std::same_as<typename TypeA::HandleType, typename TypeB::HandleType>) {
+                    return true;
+                }
+            }
+
+            if constexpr (IsQueryB && IsEntityManagerA && !ConstA){
+                if constexpr (std::same_as<typename TypeA::HandleType, typename TypeB::HandleType>) {
+                    return true;
+                }
+            }
+
+            return false;
+
+        }();
     };
 
     template<typename TArgA, typename ... TRest>
@@ -71,11 +98,11 @@ namespace {
         using ReturnTypeA = std::remove_cvref_t<typename TSignatureA::ReturnType>;
         using ReturnTypeB = std::remove_cvref_t<typename TSignatureB::ReturnType>;
 
-        static constexpr bool VoidA = std::is_void_v<ReturnTypeA>;
-        static constexpr bool VoidB = std::is_void_v<ReturnTypeB>;
+        static constexpr bool IsClassA = std::is_class_v<ReturnTypeA>;
+        static constexpr bool IsClassB = std::is_class_v<ReturnTypeB>;
 
         static constexpr bool value =
-            ((!VoidA) && std::same_as<ReturnTypeA, ReturnTypeB>) ||
+            ((IsClassA) && std::same_as<ReturnTypeA, ReturnTypeB>) ||
             (HasArgumentTypeConflict<
                 typename TSignatureA::ArgumentTypeList,
                 typename TSignatureB::ArgumentTypeList
@@ -83,10 +110,10 @@ namespace {
             // check the return types. If at least one return type (treated as ref since it
             // represents a value being written) appears in another systems
             // as a R or W value, this is a conflict.
-            (!VoidA && HasConflictWithArgument<
+            (IsClassA && HasConflictWithArgument<
                 std::add_lvalue_reference_t<ReturnTypeA>, typename TSignatureB::ArgumentTypeList
                 >::value) ||
-            (!VoidB && HasConflictWithArgument<
+            (IsClassB && HasConflictWithArgument<
                 std::add_lvalue_reference_t<ReturnTypeB>, typename TSignatureA::ArgumentTypeList
             >::value);
 
