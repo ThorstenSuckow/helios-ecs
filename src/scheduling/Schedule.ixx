@@ -53,8 +53,9 @@ export namespace helios::ecs::scheduling {
         std::vector<std::vector<std::vector<ecs::manager::types::ManagerTypeId>>> managerTypeIdQueue_;
 
         template<typename TManager>
-        void registerManager() {
-            auto typeId = manager::types::ManagerTypeId::template id<TManager>();
+        void prepareManagerRegistration() {
+            using ManagerType = std::remove_cvref_t<TManager>;
+            auto typeId = manager::types::ManagerTypeId::template id<ManagerType>();
             auto* reg = ecsDataContainer_.tryGet<ecs::manager::ManagerRegistry>();
             #if HELIOS_DEBUG
             if (!reg) {
@@ -70,19 +71,43 @@ export namespace helios::ecs::scheduling {
                 std::terminate();
             }
             registeredManagerTypeIds_[typeId.value()] = true;
+        }
+
+        template<typename TManager>
+        void registerManagerInstance(TManager&& mgr) {
+            prepareManagerRegistration<TManager>();
+            using ManagerType = std::remove_cvref_t<TManager>;
+            auto typeId = manager::types::ManagerTypeId::template id<ManagerType>();
+            auto* reg = ecsDataContainer_.tryGet<ecs::manager::ManagerRegistry>();
 
             auto* manager = reg->item(typeId);
             if (!manager) {
-                 if constexpr (std::is_default_constructible_v<TManager>) {
-                    reg->add<TManager>(TManager{});
+                reg->add<ManagerType>(std::forward<TManager>(mgr));
+            } else {
+                assert(false && "Manager already registered, provide Type only in this case.");
+                std::terminate();
+            }
+
+        }
+
+        template<typename TManager>
+        void registerManager() {
+            prepareManagerRegistration<TManager>();
+            using ManagerType = std::remove_cvref_t<TManager>;
+            auto typeId = manager::types::ManagerTypeId::template id<ManagerType>();
+            auto* reg = ecsDataContainer_.tryGet<ecs::manager::ManagerRegistry>();
+
+
+            auto* manager = reg->item(typeId);
+            if (!manager) {
+                 if constexpr (std::is_default_constructible_v<ManagerType>) {
+                    reg->add<ManagerType>(ManagerType{});
                 } else {
                     assert(false && "Failed to construct manager");
                     std::terminate();
                 }
             }
         }
-
-
 
         template<typename TSystem>
         Schedule& registerCallOperatorSystem(TSystem&& system) {
@@ -282,6 +307,33 @@ export namespace helios::ecs::scheduling {
         requires concepts::ConflictFreeManagers<TManagers...>
         Scheduler& endSchedule() {
             endSchedule<common::Sequential<TManagers>...>();
+            return owner_;
+        }
+
+        template <typename ... TSequentials>
+        requires concepts::ConflictFreeSequentialManagers<TSequentials...>
+        Scheduler& endSchedule(TSequentials&&... sequentials) {
+            auto& parallelGroup = managerTypeIdQueue_.emplace_back();
+            parallelGroup.reserve(sizeof...(TSequentials));
+
+            auto addManagerInstance = [this]<typename TManager>(auto& sequential, auto& sequentialGroup) {
+
+                ensureRequiredStorage<TManager>(ecsDataContainer_);
+
+                auto& mgr = sequential.template runtimeSystemFor<TManager>();
+
+                registerManagerInstance<TManager>(std::move(mgr));
+                sequentialGroup.push_back({{ecs::manager::types::ManagerTypeId::template id<TManager>()}});
+            };
+
+            auto registerManagers = [this, &addManagerInstance]<typename ...TManagers>
+            (common::Sequential<TManagers...>& sequential, auto& sequentialGroup) {
+                sequentialGroup.reserve(sizeof...(TManagers));
+                (addManagerInstance.template operator()<TManagers>(sequential, sequentialGroup), ...);
+            };
+
+
+            (registerManagers(sequentials, parallelGroup.emplace_back()), ...);
             return owner_;
         }
 
