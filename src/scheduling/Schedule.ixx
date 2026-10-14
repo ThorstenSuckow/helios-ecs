@@ -259,6 +259,21 @@ export namespace helios::ecs::scheduling {
             return *this;
         }
 
+        template<typename ...TSystem>
+        requires concepts::ConflictFreeTypedSystems<TSystem...>
+        Schedule& add(TSystem&& ...systems) {
+
+            (ensureRequiredStorage<TSystem>(ecsDataContainer_), ...);
+
+            (registerTypedSystemInstance(std::move(systems)), ...);
+
+            auto& group = systemTypeIdQueue_.emplace_back();
+            group.reserve(sizeof...(TSystem));
+            (group.push_back({{ecs::system::types::SystemTypeId::template id<std::remove_cvref_t<TSystem>>()}}), ...);
+
+            return *this;
+        }
+
 
         template <typename ... TSequentials>
         requires concepts::ConflictFreeSequentialSystems<TSequentials...>
