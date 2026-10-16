@@ -3,10 +3,13 @@ project(helios-ecs LANGUAGES CXX)
 
 include(CTest)
 
-set(HELIOS_USE_DEVTOOLS_DEFAULT OFF)
-if(PROJECT_IS_TOP_LEVEL)
-    set(HELIOS_USE_DEVTOOLS_DEFAULT ON)
-endif()
+set(
+        HELIOS_USE_DEVTOOLS
+        OFF
+        CACHE BOOL
+        "Load shared tooling from helios-devtools"
+        FORCE
+)
 
 option(HELIOS_USE_DEVTOOLS "Load shared tooling from helios-devtools" ${HELIOS_USE_DEVTOOLS_DEFAULT})
 set(HELIOS_DEVTOOLS_GIT_REPOSITORY "https://github.com/thorstensuckow/helios-devtools.git" CACHE STRING "helios-devtools git repository")
