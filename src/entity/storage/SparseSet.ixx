@@ -32,11 +32,7 @@ public:
     virtual ~SparseSetBase() = default;
 
     virtual void clearDirty() noexcept = 0;
-/*
-    virtual bool isDirty(EntityId id)  const noexcept = 0;
 
-    virtual std::size_t dirtyCount()  const noexcept = 0;
-*/
     /**
      * @brief Removes the element at the given index.
      *
