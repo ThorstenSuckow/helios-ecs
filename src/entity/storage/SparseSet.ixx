@@ -9,6 +9,7 @@ module;
 #include <cstddef>
 #include <span>
 #include <vector>
+#include <memory>
 
 export module helios.ecs.entity.storage.SparseSet;
 
