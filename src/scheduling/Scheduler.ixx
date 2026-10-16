@@ -7,10 +7,12 @@ module;
 #include <memory>
 #include <vector>
 #include <deque>
+#include <cassert>
 
 export module helios.ecs.scheduling.Scheduler;
 
 import :Schedule;
+import helios.ecs.scheduling.types;
 
 
 export namespace helios::ecs::scheduling {
@@ -50,16 +52,16 @@ export namespace helios::ecs::scheduling {
        * @param ecsDataContainer The map of results from the current frame's system executions.
        * @param jobSystem The job system used for parallel execution of systems.
        */
-        void update(){
+        void update(bool collectScheduleTimings = false, bool collectRuntimeSystemTimings = false){
 
             for (auto& schedule : schedules_) {
-
                 if (schedule.shouldRun()) {
-                    schedule.update();
-                    schedule.onScheduleEnd();
+                    schedule.update(collectScheduleTimings, collectRuntimeSystemTimings);
+                    schedule.onScheduleEnd(collectScheduleTimings, collectRuntimeSystemTimings);
                 }
             }
         };
+
 
         /**
          * @brief Creates and adds a new typed schedule to this phase.
@@ -79,7 +81,8 @@ export namespace helios::ecs::scheduling {
             schedules_.emplace_back(
                 *this,
                 ecsDataContainer_,
-                std::forward<TFunc>(func)
+                std::forward<TFunc>(func),
+                schedules_.size()
             );
             return schedules_.back();
         }
@@ -89,6 +92,11 @@ export namespace helios::ecs::scheduling {
             return beginSchedule(l);
         }
 
+        template<typename TRuntimeSystemTypeId>
+        types::RuntimeSystemTiming<TRuntimeSystemTypeId> timings(types::RuntimeSystemTimingHandle<TRuntimeSystemTypeId> handle) const {
+            assert (handle.scheduleIdx < schedules_.size() && "Schedule not found.");
+            return schedules_[handle.scheduleIdx].timings(handle);
+        }
 
     };
 
