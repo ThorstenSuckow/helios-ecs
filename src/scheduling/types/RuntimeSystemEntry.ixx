@@ -2,7 +2,7 @@ module;
 
 #include <chrono>
 
-export module helios.ecs.scheduling.types:RuntimeSystemTiming;
+export module helios.ecs.scheduling.types:RuntimeSystemEntry;
 
 import helios.ecs.system.types;
 import helios.ecs.manager.types;
@@ -10,7 +10,7 @@ import helios.ecs.manager.types;
 export namespace helios::ecs::scheduling::types {
 
     template<typename TRuntimeSystemTypeId>
-    struct RuntimeSystemTimingHandle {
+    struct RuntimeSystemEntryHandle {
 
         using TypeId = std::remove_cvref_t<TRuntimeSystemTypeId>;
 
@@ -25,7 +25,7 @@ export namespace helios::ecs::scheduling::types {
 
 
     template<typename TRuntimeSystemTypeId>
-    struct RuntimeSystemTiming {
+    struct RuntimeSystemEntry {
 
         TRuntimeSystemTypeId runtimeSystemTypeId;
 
@@ -36,7 +36,7 @@ export namespace helios::ecs::scheduling::types {
         std::chrono::nanoseconds::rep updateDuration;
 
         /**
-         * @brief flishign the command buffer is treated separately
+         * @brief flushing the command buffer is treated separately
          */
         std::chrono::nanoseconds::rep flushDuration;
 

@@ -93,7 +93,7 @@ export namespace helios::ecs::scheduling {
         }
 
         template<typename TRuntimeSystemTypeId>
-        types::RuntimeSystemTiming<TRuntimeSystemTypeId> timings(types::RuntimeSystemTimingHandle<TRuntimeSystemTypeId> handle) const {
+        types::RuntimeSystemEntry<TRuntimeSystemTypeId> timings(types::RuntimeSystemEntryHandle<TRuntimeSystemTypeId> handle) const {
             assert (handle.scheduleIdx < schedules_.size() && "Schedule not found.");
             return schedules_[handle.scheduleIdx].timings(handle);
         }
