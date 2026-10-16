@@ -565,9 +565,9 @@ export namespace helios::ecs::scheduling {
             auto sequentialIdx = handle.sequentialIdx;
             auto runtimeIdx    = handle.runtimeIdx;
 
-            assert(parallelIdx >= queue.size() && "Unexpected parallelIdx");
-            assert(sequentialIdx >= queue.size() && "Unexpected sequentialIdx");
-            assert(runtimeIdx >= queue.size() && "Unexpected runtimeIdx");
+            assert(parallelIdx < queue.size() && "Unexpected parallelIdx");
+            assert(sequentialIdx < queue[parallelIdx].size() && "Unexpected sequentialIdx");
+            assert(runtimeIdx < queue[parallelIdx][sequentialIdx].size() && "Unexpected runtimeIdx");
 
             auto runtimeTimings = queue[parallelIdx][sequentialIdx][runtimeIdx];
 
