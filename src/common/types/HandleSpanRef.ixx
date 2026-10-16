@@ -4,6 +4,7 @@ module;
 #include <cstddef>
 #include <exception>
 #include <span>
+#include <vector>
 
 export module helios.ecs.common.types:HandleSpanRef;
 

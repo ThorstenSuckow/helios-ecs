@@ -7,7 +7,6 @@ module;
 #include <cassert>
 #include <type_traits>
 #include <utility>
-#include <mach/thread_info.h>
 
 export module helios.ecs.entity.Entity;
 

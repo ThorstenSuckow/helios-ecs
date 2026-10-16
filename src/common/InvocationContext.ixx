@@ -47,7 +47,7 @@ export namespace helios::ecs::common {
         );
         using ConcreteCommandBufferType = CommandBufferInfo::Type;
 
-        using RuntimeMainMethodSignature =  struct scheduling::types::RuntimeMainMethodSignature<
+        using RuntimeMainMethodSignature = scheduling::types::RuntimeMainMethodSignature<
             typename InvocationFunctionTraits::ReturnType, typename InvocationFunctionTraits::ArgumentTypes
         >;
 

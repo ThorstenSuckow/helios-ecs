@@ -112,6 +112,8 @@ struct EcsDataContainerArgumentResolver {
                 return static_cast<Reference>(wrappedItem->template get<Type>());
             }
 
+            assert(false && "Argument could not be resolved from EcsDataContainer or RuntimeResultRegistry.");
+            std::unreachable();
         }
 
     }

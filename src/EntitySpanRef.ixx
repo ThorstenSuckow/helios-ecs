@@ -7,6 +7,7 @@ module;
 #include <cassert>
 #include <exception>
 #include <span>
+#include <vector>
 
 export module helios.ecs.EntitySpanRef;
 

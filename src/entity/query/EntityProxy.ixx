@@ -32,7 +32,7 @@ export namespace helios::ecs::entity::query {
 
         THandle handle_;
 
-        template<typename ...T>
+        template<typename T>
         struct EntityMutationBufferWrap;
 
         using WriteList = typename core::common::traits::UniqueList<
@@ -44,10 +44,10 @@ export namespace helios::ecs::entity::query {
 
         // EntityMutationBuffer
         template<typename ... TWriteComponents>
-        struct EntityMutationBufferWrap<THandle, core::common::types::TypeList<TWriteComponents...>> {
+        struct EntityMutationBufferWrap< core::common::types::TypeList<TWriteComponents...>> {
             using type = mutation::EntityMutationBuffer<THandle, TWriteComponents...>;
         };
-        using EntityMutationBuffer = EntityMutationBufferWrap<THandle, WriteList>::type;
+        using EntityMutationBuffer = EntityMutationBufferWrap<WriteList>::type;
         EntityMutationBuffer* buffer_;
 
         // ModifiableComponents
