@@ -331,6 +331,15 @@ export namespace helios::ecs::scheduling {
             return owner_;
         }
 
+        template<typename... TManagers>
+        requires concepts::ConflictFreeManagers<TManagers...>
+        Scheduler& endSchedule(TManagers&& ... managers) {
+            endSchedule(
+                common::Sequential(std::forward<TManagers>(managers))...
+            );
+            return owner_;
+        }
+
         template <typename ... TSequentials>
         requires concepts::ConflictFreeSequentialManagers<TSequentials...>
         Scheduler& endSchedule(TSequentials&&... sequentials) {
