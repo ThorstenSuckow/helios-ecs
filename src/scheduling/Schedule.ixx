@@ -51,7 +51,9 @@ export namespace helios::ecs::scheduling {
 
         ecs::system::SystemRegistry systemRegistry_{};
 
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_SCHEDULES)
         types::ScheduleTiming scheduleTiming_{};
+#endif
 
         std::vector<std::vector<std::vector<SystemExecutionEntry>>> systemTypeIdQueue_;
 
@@ -401,7 +403,7 @@ export namespace helios::ecs::scheduling {
         // +---------------------------
         // | Runtime
         // +---------------------------
-        void onScheduleEnd(const bool collectScheduleTimings = false, const bool collectRuntimeSystemEntrys = false) noexcept {
+        void onScheduleEnd() noexcept {
 
             if (managerTypeIdQueue_.empty()) {
                 return;
@@ -414,36 +416,31 @@ export namespace helios::ecs::scheduling {
             }
             #endif
 
-            if (collectScheduleTimings) {
-                const auto stopwatch = helios::core::time::Stopwatch{};
-                run(managerTypeIdQueue_, *reg, [](auto& manager, auto& ecsDataContainer) {
-                   manager.execute(ecsDataContainer);
-                }, collectRuntimeSystemEntrys);
-                scheduleTiming_.scheduleEndDuration = stopwatch.elapsedNanoseconds();
-            } else {
-                run(managerTypeIdQueue_, *reg, [](auto& manager, auto& ecsDataContainer) {
-                   manager.execute(ecsDataContainer);
-               }, collectRuntimeSystemEntrys);
-            }
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_SCHEDULES)
+            const auto stopwatch = helios::core::time::Stopwatch{};
+#endif
+            run(managerTypeIdQueue_, *reg, [](auto& manager, auto& ecsDataContainer) {
+                manager.execute(ecsDataContainer);
+            });
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_SCHEDULES)
+            scheduleTiming_.scheduleEndDuration = stopwatch.elapsedNanoseconds();
+#endif
         }
 
-        void update(const bool collectScheduleTimings = false, const bool collectRuntimeSystemEntrys = false) {
-
-            if (collectScheduleTimings) {
-                const auto stopwatch = helios::core::time::Stopwatch{};
-                run(systemTypeIdQueue_, systemRegistry_, [](auto& system, auto& ecsDataContainer) {
-                    system.update(ecsDataContainer);
-                }, collectRuntimeSystemEntrys);
-                scheduleTiming_.scheduleUpdateDuration = stopwatch.elapsedNanoseconds();
-            } else {
-                run(systemTypeIdQueue_, systemRegistry_, [](auto& system, auto& ecsDataContainer) {
-                    system.update(ecsDataContainer);
-                }, collectRuntimeSystemEntrys);
-            }
+        void update() {
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_SCHEDULES)
+            const auto stopwatch = helios::core::time::Stopwatch{};
+#endif
+            run(systemTypeIdQueue_, systemRegistry_, [](auto& system, auto& ecsDataContainer) {
+                system.update(ecsDataContainer);
+            });
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_SCHEDULES)
+            scheduleTiming_.scheduleUpdateDuration = stopwatch.elapsedNanoseconds();
+#endif
         }
 
         template<typename TRuntimeQueue, typename TRegistry, typename TExecute>
-        void run(TRuntimeQueue& queue, TRegistry& registry, TExecute cmd, bool collectRuntimeSystemEntrys = false) {
+        void run(TRuntimeQueue& queue, TRegistry& registry, TExecute cmd) {
 
             auto runtimeSystemFor = [&registry](auto &entry) {
                 using EntryType = std::remove_cvref_t<decltype(entry)>;
@@ -472,22 +469,19 @@ export namespace helios::ecs::scheduling {
                         auto* runtimeSystem = runtimeSystemFor(serialRuntimeSystem);
 
                         // update, commit mutations
-                        if (collectRuntimeSystemEntrys) {
-                            auto stopwatch = helios::core::time::Stopwatch{};
-                            cmd(*runtimeSystem, ecsDataContainer_);
-                            // produce system results, flush any underlying flushable objects
-                            serialRuntimeSystem.updateDuration = stopwatch.elapsedNanoseconds();
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_RUNTIME_SYSTEMS)
+                        auto stopwatch = helios::core::time::Stopwatch{};
+                        cmd(*runtimeSystem, ecsDataContainer_);
+                        serialRuntimeSystem.updateDuration = stopwatch.elapsedNanoseconds();
 
-                            stopwatch.start();
-                            runtimeSystem->flush(ecsDataContainer_);
-                            serialRuntimeSystem.flushDuration = stopwatch.elapsedNanoseconds();
-
-                        } else {
-                            cmd(*runtimeSystem, ecsDataContainer_);
-                            runtimeSystem->flush(ecsDataContainer_);
-                            serialRuntimeSystem.flushDuration = 0.0;
-                            serialRuntimeSystem.updateDuration = 0.0;
-                        }
+                        // produce system results, flush any underlying flushable objects
+                        stopwatch.start();
+                        runtimeSystem->flush(ecsDataContainer_);
+                        serialRuntimeSystem.flushDuration = stopwatch.elapsedNanoseconds();
+#else
+                        cmd(*runtimeSystem, ecsDataContainer_);
+                        runtimeSystem->flush(ecsDataContainer_);
+#endif
 
                         if (runtimeSystem->hasResult()) {
                             mustInvalidate = true;
@@ -506,14 +500,13 @@ export namespace helios::ecs::scheduling {
                         for (auto& serialRuntimeSystem : parallelRuntimeSystems[i]) {
                             auto* runtimeSystem = runtimeSystemFor(serialRuntimeSystem);
 
-                            if (collectRuntimeSystemEntrys) {
-                                auto stopwatch = helios::core::time::Stopwatch{};
-                                cmd(*runtimeSystem, ecsDataContainer_);
-                                serialRuntimeSystem.updateDuration = stopwatch.elapsedNanoseconds();
-                            } else {
-                                cmd(*runtimeSystem, ecsDataContainer_);
-                                serialRuntimeSystem.updateDuration = 0.0;
-                            }
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_RUNTIME_SYSTEMS)
+                            auto stopwatch = helios::core::time::Stopwatch{};
+                            cmd(*runtimeSystem, ecsDataContainer_);
+                            serialRuntimeSystem.updateDuration = stopwatch.elapsedNanoseconds();
+#else
+                            cmd(*runtimeSystem, ecsDataContainer_);
+#endif
 
                         }
                 });
@@ -523,14 +516,13 @@ export namespace helios::ecs::scheduling {
                     for (auto& serialRuntimeSystem : parallelRuntimeSystem) {
                         auto* runtimeSystem = runtimeSystemFor(serialRuntimeSystem);
 
-                        if (collectRuntimeSystemEntrys) {
-                            auto stopwatch = helios::core::time::Stopwatch{};
-                            runtimeSystem->flush(ecsDataContainer_);
-                            serialRuntimeSystem.flushDuration = stopwatch.elapsedNanoseconds();
-                        } else {
-                            runtimeSystem->flush(ecsDataContainer_);
-                            serialRuntimeSystem.flushDuration = 0.0;
-                        }
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_RUNTIME_SYSTEMS)
+                        auto stopwatch = helios::core::time::Stopwatch{};
+                        runtimeSystem->flush(ecsDataContainer_);
+                        serialRuntimeSystem.flushDuration = stopwatch.elapsedNanoseconds();
+#else
+                        runtimeSystem->flush(ecsDataContainer_);
+#endif
 
                         if (runtimeSystem->hasResult()) {
                             mustInvalidate = true;
@@ -550,10 +542,13 @@ export namespace helios::ecs::scheduling {
             return idx_;
         }
 
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_SCHEDULES)
         types::ScheduleTiming timings() const {
             return scheduleTiming_;
         }
+#endif
 
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_RUNTIME_SYSTEMS)
         template<typename TRuntimeSystemTypeId>
         const types::RuntimeSystemEntry<TRuntimeSystemTypeId> timings(types::RuntimeSystemEntryHandle<TRuntimeSystemTypeId> handle) const {
             assert(handle.scheduleIdx == idx_ && "Unexpected idx mismatch.");
@@ -584,7 +579,7 @@ export namespace helios::ecs::scheduling {
 
             return runtimeTimings;
         }
-
+#endif
 
     };
 

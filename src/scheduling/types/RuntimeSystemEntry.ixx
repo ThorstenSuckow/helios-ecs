@@ -1,6 +1,9 @@
 module;
 
 #include <chrono>
+#include <cstddef>
+#include <type_traits>
+#include "helios-ecs-config.h"
 
 export module helios.ecs.scheduling.types:RuntimeSystemEntry;
 
@@ -29,6 +32,7 @@ export namespace helios::ecs::scheduling::types {
 
         TRuntimeSystemTypeId runtimeSystemTypeId;
 
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_RUNTIME_SYSTEMS)
         /**
          * @brief represents main method duration, i.e. systems.update()
          * and manager.execute(), respectively
@@ -39,6 +43,7 @@ export namespace helios::ecs::scheduling::types {
          * @brief flushing the command buffer is treated separately
          */
         std::chrono::nanoseconds::rep flushDuration;
+#endif
 
     };
 

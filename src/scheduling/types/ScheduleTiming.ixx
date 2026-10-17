@@ -1,6 +1,7 @@
 module;
 
 #include <chrono>
+#include "helios-ecs-config.h"
 
 export module helios.ecs.scheduling.types:ScheduleTiming;
 
@@ -9,7 +10,12 @@ import helios.ecs.manager.types;
 
 export namespace helios::ecs::scheduling::types {
 
+    /**
+     * @brief Schedule durations. Members are only available if HELIOS_PERFORMANCE
+     * contains HELIOS_PERFORMANCE_SCHEDULES, otherwise the struct is empty.
+     */
     struct ScheduleTiming {
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_SCHEDULES)
         std::chrono::nanoseconds::rep scheduleUpdateDuration;
         std::chrono::nanoseconds::rep scheduleEndDuration;
 
@@ -23,8 +29,7 @@ export namespace helios::ecs::scheduling::types {
         [[nodiscard]] std::chrono::nanoseconds::rep total() const {
             return scheduleUpdateDuration + scheduleEndDuration;
         }
-
-
+#endif
     };
 
 

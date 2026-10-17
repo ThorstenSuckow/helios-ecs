@@ -8,6 +8,7 @@ module;
 #include <vector>
 #include <deque>
 #include <cassert>
+#include "helios-ecs-config.h"
 
 export module helios.ecs.scheduling.Scheduler;
 
@@ -52,12 +53,12 @@ export namespace helios::ecs::scheduling {
        * @param ecsDataContainer The map of results from the current frame's system executions.
        * @param jobSystem The job system used for parallel execution of systems.
        */
-        void update(bool collectScheduleTimings = false, bool collectRuntimeSystemTimings = false){
+        void update(){
 
             for (auto& schedule : schedules_) {
                 if (schedule.shouldRun()) {
-                    schedule.update(collectScheduleTimings, collectRuntimeSystemTimings);
-                    schedule.onScheduleEnd(collectScheduleTimings, collectRuntimeSystemTimings);
+                    schedule.update();
+                    schedule.onScheduleEnd();
                 }
             }
         };
@@ -92,11 +93,13 @@ export namespace helios::ecs::scheduling {
             return beginSchedule(l);
         }
 
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_RUNTIME_SYSTEMS)
         template<typename TRuntimeSystemTypeId>
         types::RuntimeSystemEntry<TRuntimeSystemTypeId> timings(types::RuntimeSystemEntryHandle<TRuntimeSystemTypeId> handle) const {
             assert (handle.scheduleIdx < schedules_.size() && "Schedule not found.");
             return schedules_[handle.scheduleIdx].timings(handle);
         }
+#endif
 
     };
 
