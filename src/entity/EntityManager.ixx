@@ -699,6 +699,17 @@ public:
         finalizeMutations(ComponentTypeId::template id<TComponent>());
     }
 
+    /**
+     * @warning Not thread-safe. Requires exclusive access.
+     */
+    void finalizeMutations() noexcept {
+        for (const auto& component : components_) {
+            if (component) {
+                component->finalizeMutations();
+            }
+        }
+    }
+
 private:
 
 

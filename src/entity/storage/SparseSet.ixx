@@ -215,13 +215,24 @@ class SparseSet : public SparseSetBase {
 
     /**
      * @brief Updates cached max entity id after insertion.
+     * If the invalidated max id is not a tombstone, it means that a previous remove operation
+     * removed the max entity. If the specified id is greater or equal than the invalidated id,
+     * a new max value was found and the invalidated entry is reset to a tombstone.
+     * Else, the maxEntityId will not be touched and is treated as unknown, so that insert operations
+     * with values less than the actual, but unknown max id do not erroneously apply a new max id
+     * [0...100] -> remove 100 -> maxId unknown -> insert 5 -> new maxId == 5, while set contains max Id == 99.
+     *
+     * To make sure the current maxId is available, make sure to call finalizeMutations() (Entitymanager)
+     * after structural changes.
      *
      * @param idx Inserted entity id.
      */
     void updateMaxEntityId(const EntityId idx) {
-        if (invalidatedMaxEntityId_ != Tombstone && invalidatedMaxEntityId_ <= idx) {
-            invalidatedMaxEntityId_ = Tombstone;
-            maxEntityId_ = idx;
+        if (invalidatedMaxEntityId_ != Tombstone) {
+            if (invalidatedMaxEntityId_ <= idx) {
+                invalidatedMaxEntityId_ = Tombstone;
+                maxEntityId_ = idx;
+            }
             return;
         }
 
