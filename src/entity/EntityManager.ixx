@@ -694,6 +694,11 @@ public:
         components_[typeId.value()]->finalizeMutations();
     }
 
+    template<typename TComponent>
+    void finalizeMutations() {
+        finalizeMutations(ComponentTypeId::template id<TComponent>());
+    }
+
 private:
 
 

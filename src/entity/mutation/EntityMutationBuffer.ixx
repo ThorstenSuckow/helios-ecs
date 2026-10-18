@@ -51,6 +51,7 @@ export namespace helios::ecs::entity::mutation {
                         } else {
                             static_assert(false, "Unsupported command type for EntityMutationBuffer");
                         }
+                        em.template finalizeMutations<ComponentType>();
 
                         vectors.clear();
                     }(), ...);
