@@ -586,10 +586,29 @@ public:
      * @brief Recomputes cached max id if removals invalidated it.
      */
     void finalizeMutations() noexcept override {
-        if (invalidatedMaxEntityId_ != Tombstone) {
-            maxEntityId_ = denseToSparse_.empty() ? Tombstone : *std::ranges::max_element(denseToSparse_);
-            invalidatedMaxEntityId_ = Tombstone;
+        if (invalidatedMaxEntityId_ == Tombstone) {
+           return;
         }
+
+        // must be less than, otherwise it should have been invalidated bei an add/emplace operation
+        assert(invalidatedMaxEntityId_ < sparse_.size());
+
+        // Scan at most componentCount() slots downwards, afterwards fall back to linear
+        // pass over the dense ids. Worst case O(componentCount()).
+        auto id = invalidatedMaxEntityId_;
+        auto budget = denseToSparse_.size();
+        while (id > 0 && budget > 0) {
+            --id;
+            --budget;
+            if (sparse_[id] != Tombstone) {
+                maxEntityId_ = id;
+                invalidatedMaxEntityId_ = Tombstone;
+                return;
+            }
+        }
+
+        maxEntityId_ = denseToSparse_.empty() ? Tombstone : *std::ranges::max_element(denseToSparse_);
+        invalidatedMaxEntityId_ = Tombstone;
     }
 
     /**

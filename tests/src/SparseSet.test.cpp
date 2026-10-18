@@ -84,3 +84,82 @@ TEST(SparseSetTest, remove) {
     EXPECT_EQ(storage.get(EntityId{4})->value, 40);
 
 }
+
+namespace {
+
+SparseSet<HandleType, TestEntity> filled(std::initializer_list<EntityId> ids) {
+    SparseSet<HandleType, TestEntity> storage;
+    for (const auto id : ids) {
+        EXPECT_NE(storage.emplace(EntityId{id}, TestEntity{}), nullptr);
+    }
+    return storage;
+}
+
+} // namespace
+
+TEST(SparseSetTest, maxEntityIdDenseRemoveMax) {
+    SparseSet<HandleType, TestEntity> storage;
+    for (EntityId i = 0; i <= 100; ++i) {
+        ASSERT_NE(storage.emplace(EntityId{i}, TestEntity{}), nullptr);
+    }
+    EXPECT_EQ(storage.maxEntityId(), EntityId{100});
+
+    EXPECT_TRUE(storage.remove(EntityId{100}));
+    EXPECT_EQ(storage.maxEntityId(), Tombstone);
+    storage.finalizeMutations();
+    EXPECT_EQ(storage.maxEntityId(), EntityId{99});
+}
+
+TEST(SparseSetTest, maxEntityIdMultipleRemovals) {
+    SparseSet<HandleType, TestEntity> storage;
+    for (EntityId i = 0; i <= 100; ++i) {
+        ASSERT_NE(storage.emplace(EntityId{i}, TestEntity{}), nullptr);
+    }
+    EXPECT_TRUE(storage.remove(EntityId{100}));
+    EXPECT_TRUE(storage.remove(EntityId{99}));
+    EXPECT_TRUE(storage.remove(EntityId{98}));
+    storage.finalizeMutations();
+    EXPECT_EQ(storage.maxEntityId(), EntityId{97});
+}
+
+TEST(SparseSetTest, maxEntityIdInsertBelowInvalidated) {
+    SparseSet<HandleType, TestEntity> storage;
+    for (EntityId i = 0; i <= 100; ++i) {
+        ASSERT_NE(storage.emplace(EntityId{i}, TestEntity{}), nullptr);
+    }
+    EXPECT_TRUE(storage.remove(EntityId{100}));
+    EXPECT_TRUE(storage.remove(EntityId{5}));
+    ASSERT_NE(storage.emplace(EntityId{5}, TestEntity{}), nullptr);
+    EXPECT_EQ(storage.maxEntityId(), Tombstone);
+    storage.finalizeMutations();
+    EXPECT_EQ(storage.maxEntityId(), EntityId{99});
+}
+
+TEST(SparseSetTest, maxEntityIdInsertAboveInvalidated) {
+    auto storage = filled({1, 2, 100});
+    EXPECT_TRUE(storage.remove(EntityId{100}));
+    ASSERT_NE(storage.emplace(EntityId{150}, TestEntity{}), nullptr);
+    EXPECT_EQ(storage.maxEntityId(), EntityId{150});
+    storage.finalizeMutations();
+    EXPECT_EQ(storage.maxEntityId(), EntityId{150});
+}
+
+TEST(SparseSetTest, maxEntityIdSparseFallback) {
+    // budget (= 1 component) is exhausted before reaching id 3 -> fallback to max_element
+    auto storage = filled({3, 100000});
+    EXPECT_TRUE(storage.remove(EntityId{100000}));
+    storage.finalizeMutations();
+    EXPECT_EQ(storage.maxEntityId(), EntityId{3});
+}
+
+TEST(SparseSetTest, maxEntityIdDownToZero) {
+    auto storage = filled({0, 1});
+    EXPECT_TRUE(storage.remove(EntityId{1}));
+    storage.finalizeMutations();
+    EXPECT_EQ(storage.maxEntityId(), EntityId{0});
+
+    EXPECT_TRUE(storage.remove(EntityId{0}));
+    storage.finalizeMutations();
+    EXPECT_EQ(storage.maxEntityId(), Tombstone);
+}
+
