@@ -192,7 +192,7 @@ export namespace helios::ecs::scheduling {
             std::size_t idx
         )
         : owner_(owner),
-        runCondition_([predicate](auto& ecsDataContainer) -> bool {
+        runCondition_([predicate](auto& ecsDataContainer) mutable -> bool {
             return common::container::EcsDataContainerFunctionInvoker::invoke<&TPredicate::operator()>(
             predicate, ecsDataContainer);
         }),
