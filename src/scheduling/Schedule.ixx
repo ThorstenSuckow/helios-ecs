@@ -468,17 +468,17 @@ export namespace helios::ecs::scheduling {
 
 
         void onScheduleStart() noexcept {
-            runManagers(managerTypeIdStartQueue_);
+            runManagers(managerTypeIdStartQueue_, types::SchedulePhase::Start);
         }
 
         void onScheduleEnd() noexcept {
-            runManagers(managerTypeIdEndQueue_);
+            runManagers(managerTypeIdEndQueue_, types::SchedulePhase::End);
         }
 
         // +---------------------------
         // | Runtime
         // +---------------------------
-        void runManagers(ManagerQueue& managerQueue) noexcept {
+        void runManagers(ManagerQueue& managerQueue, types::SchedulePhase phase) noexcept {
 
             if (managerQueue.empty()) {
                 return;
@@ -498,7 +498,15 @@ export namespace helios::ecs::scheduling {
                 manager.execute(ecsDataContainer);
             });
 #if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_SCHEDULES)
-            scheduleTiming_.scheduleEndDuration = stopwatch.elapsedNanoseconds();
+            auto elapsed = stopwatch.elapsedNanoseconds();
+            if (phase == types::SchedulePhase::End) {
+                scheduleTiming_.scheduleEndDuration = elapsed;
+            } else if (phase == types::SchedulePhase::Start) {
+                scheduleTiming_.scheduleStartDuration = elapsed;
+            } else {
+                assert(false && "Unexpected phase for manager execution");
+                std::terminate();
+            }
 #endif
         }
 

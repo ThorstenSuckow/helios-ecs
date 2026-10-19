@@ -16,18 +16,21 @@ export namespace helios::ecs::scheduling::types {
      */
     struct ScheduleTiming {
 #if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_SCHEDULES)
+
+        std::chrono::nanoseconds::rep scheduleStartDuration;
         std::chrono::nanoseconds::rep scheduleUpdateDuration;
         std::chrono::nanoseconds::rep scheduleEndDuration;
 
         ScheduleTiming operator +(const ScheduleTiming& other) const {
             return {
+                scheduleStartDuration + other.scheduleStartDuration,
                 scheduleUpdateDuration + other.scheduleUpdateDuration,
                 scheduleEndDuration + other.scheduleEndDuration
             };
         }
 
         [[nodiscard]] std::chrono::nanoseconds::rep total() const {
-            return scheduleUpdateDuration + scheduleEndDuration;
+            return scheduleStartDuration + scheduleUpdateDuration + scheduleEndDuration;
         }
 #endif
     };
