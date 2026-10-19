@@ -214,7 +214,7 @@ private:
         }
     }
 
-    [[nodiscard]] bool isValid(EntityId entityId, bool isQueriedFromLeadSet = true) const {
+    [[nodiscard]] bool isValid(EntityId entityId, const bool isQueriedFromLeadSet = true) const {
         if constexpr (DirtySet::size > 0) {
             const bool hasAnyDirtyIncludes = std::apply(
                 [entityId](auto*... sets) {
@@ -327,41 +327,6 @@ public:
         initializeRequiredSets();
     };
 
-
-    /**
-     * @brief Constructs the view with the specified component sets and filters.
-     *
-     * @param em Pointer to the EntityManager to retrieve sets and construct Entities.
-     * @param includeSets Tuple of pointers to the SparseSets of the required components.
-     * @param excludeChecks Vector of functions to determine if an entity should be excluded.
-     * @param filterActiveOnly Flag to filter only entities with Active component.
-     * @param activeSet Pointer to the SparseSet of Active components.
-     */
-   /* explicit PartialQuery(
-        TEntityManager* em,
-        std::tuple<const SparseSet<TReadComponents>*...> includeSets,
-        std::tuple<SparseSet<TWriteComponents>*...> writeSets,
-        std::vector<std::function<bool(EntityId)>> excludeChecks,
-        EntityMutationBuffer* entityMutationBuffer = nullptr
-    ) :
-        em_(em),
-        readSet_(std::move(includeSets)),
-        modifiableSet_(std::move(writeSets)),
-        excludeChecks_(std::move(excludeChecks)),
-        entityMutationBuffer_(entityMutationBuffer),
-
-        optionalSets_(std::make_tuple(em_->template sparseSet<TOptional>()...)),
-        anyDirtySets_(
-            [em]<typename ... TDirty>(core::common::types::TypeList<TDirty...>){
-                return std::make_tuple(em->template sparseSet<TDirty>()...);
-            }(typename TFilter::dirtyList{})
-        ) {
-
-        initializeRequiredSets();
-    }*/
-
-
-
     /**
      * @brief Excludes entities that have a specific component.
      *
@@ -470,7 +435,7 @@ public:
          * @param end Iterator to the end position.
          * @param view Pointer to the owning Query for filter access.
          */
-        Iterator(LeadIterator current, LeadIterator end, const PartialQuery* view)
+        Iterator(const LeadIterator current, const LeadIterator end, const PartialQuery* view)
             : current_(current), end_(end), view_(view) {}
 
         /**
@@ -488,7 +453,7 @@ public:
                 return true;
             }
 
-            EntityId entityId = *current_;
+            const EntityId entityId = *current_;
             return view_->isValid(entityId);
         }
 
