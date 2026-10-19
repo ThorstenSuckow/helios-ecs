@@ -42,7 +42,6 @@ export namespace helios::ecs::scheduling {
 
 
     class Schedule {
-
         using EcsDataContainer = ecs::common::container::EcsDataContainer;
         using ThreadPool = helios::core::thread::ThreadPool;
 
@@ -58,18 +57,32 @@ export namespace helios::ecs::scheduling {
         std::vector<std::vector<std::vector<SystemExecutionEntry>>> systemTypeIdQueue_;
 
         std::vector<bool> registeredManagerTypeIds_;
-        std::vector<std::vector<std::vector<ManagerExecutionEntry>>> managerTypeIdQueue_;
+
+        using ManagerQueue = std::vector<std::vector<std::vector<ManagerExecutionEntry>>>;
+        ManagerQueue managerTypeIdEndQueue_;
+        ManagerQueue managerTypeIdStartQueue_;
+
+        bool isScheduleStartConfigurationPossible_ = true;
+
+        bool checkScheduleStartConfigurationPossible() {
+            if (!isScheduleStartConfigurationPossible_) {
+                assert(false && "Schedule start configuration is not possible anymore.");
+                std::terminate();
+            }
+            isScheduleStartConfigurationPossible_ = false;
+            return true;
+        }
 
         template<typename TManager>
         void prepareManagerRegistration() {
             using ManagerType = std::remove_cvref_t<TManager>;
             auto typeId = manager::types::ManagerTypeId::template id<ManagerType>();
             auto* reg = ecsDataContainer_.tryGet<ecs::manager::ManagerRegistry>();
-            #if HELIOS_DEBUG
+#if HELIOS_DEBUG
             if (!reg) {
                 assert(reg && "ManagerRegistry not found in EcsDataContainer");
             }
-            #endif
+#endif
 
             if (registeredManagerTypeIds_.size() <= typeId.value()) {
                 registeredManagerTypeIds_.resize(typeId.value() + 1);
@@ -108,7 +121,7 @@ export namespace helios::ecs::scheduling {
 
             auto* manager = reg->item(typeId);
             if (!manager) {
-                 if constexpr (std::is_default_constructible_v<ManagerType>) {
+                if constexpr (std::is_default_constructible_v<ManagerType>) {
                     reg->add<ManagerType>(ManagerType{});
                 } else {
                     assert(false && "Failed to construct manager");
@@ -207,6 +220,7 @@ export namespace helios::ecs::scheduling {
         template<typename TSystem>
         requires ecs::system::concepts::IsTypedSystem<TSystem>
         Schedule& add() {
+            isScheduleStartConfigurationPossible_ = false;
             using SystemType = std::remove_cvref_t<TSystem>;
             return add(SystemType{});
         }
@@ -214,6 +228,7 @@ export namespace helios::ecs::scheduling {
         template<typename TSystem>
         requires ecs::system::concepts::IsTypedSystem<TSystem>
         Schedule& add(TSystem sys) {
+            isScheduleStartConfigurationPossible_ = false;
             using SystemType = std::remove_cvref_t<TSystem>;
             ensureRequiredStorage<SystemType>(ecsDataContainer_);
             registerTypedSystemInstance<SystemType>(std::move(sys));
@@ -224,6 +239,7 @@ export namespace helios::ecs::scheduling {
         template<typename TFuncSystem>
         requires ecs::system::concepts::IsCallableSystem<TFuncSystem>
         Schedule& add(TFuncSystem&& system) {
+            isScheduleStartConfigurationPossible_ = false;
             using SystemType = std::remove_cvref_t<TFuncSystem>;
 
             ensureRequiredStorage<SystemType>(ecsDataContainer_);
@@ -239,7 +255,7 @@ export namespace helios::ecs::scheduling {
         template<typename ... TSystem>
         requires concepts::ConflictFreeCallableSystems<TSystem...>
         Schedule& add(TSystem&&... system) {
-
+            isScheduleStartConfigurationPossible_ = false;
             (ensureRequiredStorage<TSystem>(ecsDataContainer_), ...);
 
             (registerCallOperatorSystem(std::forward<TSystem>(system)), ...);
@@ -255,7 +271,7 @@ export namespace helios::ecs::scheduling {
         template<typename ...TSystem>
         requires concepts::ConflictFreeTypedSystems<TSystem...>
         Schedule& add() {
-
+            isScheduleStartConfigurationPossible_ = false;
             (ensureRequiredStorage<TSystem>(ecsDataContainer_), ...);
 
             (registerTypedSystemInstance<TSystem>(std::remove_cvref_t<TSystem>{}), ...);
@@ -270,7 +286,7 @@ export namespace helios::ecs::scheduling {
         template<typename ...TSystem>
         requires concepts::ConflictFreeTypedSystems<TSystem...>
         Schedule& add(TSystem&& ...systems) {
-
+            isScheduleStartConfigurationPossible_ = false;
             (ensureRequiredStorage<TSystem>(ecsDataContainer_), ...);
 
             (registerTypedSystemInstance(std::move(systems)), ...);
@@ -293,7 +309,7 @@ export namespace helios::ecs::scheduling {
         template <typename ... TSequentials>
         requires concepts::ConflictFreeSequentialSystems<TSequentials...>
         Schedule& add(TSequentials&& ... sequentials) {
-
+            isScheduleStartConfigurationPossible_ = false;
             auto& parallelGroup = systemTypeIdQueue_.emplace_back();
             parallelGroup.reserve(sizeof...(TSequentials));
 
@@ -322,30 +338,81 @@ export namespace helios::ecs::scheduling {
             return *this;
         }
 
+        template<typename... TManagers>
+        requires concepts::ConflictFreeManagers<TManagers...>
+        Schedule& startWith() {
+            checkScheduleStartConfigurationPossible();
+            enqueueManager<common::Sequential<TManagers>...>(managerTypeIdStartQueue_);
+            return *this;
+        }
+
+        template<typename... TManagers>
+        requires concepts::ConflictFreeManagers<TManagers...>
+        Schedule& startWith(TManagers&& ... managers) {
+            checkScheduleStartConfigurationPossible();
+            enqueueManager(
+                managerTypeIdStartQueue_,
+                common::Sequential(std::forward<TManagers>(managers))...
+            );
+            return *this;
+        }
+
+        template <typename ... TSequentials>
+        requires concepts::ConflictFreeSequentialManagers<TSequentials...>
+        Schedule& startWith(TSequentials&&... sequentials) {
+            checkScheduleStartConfigurationPossible();
+            enqueueManager(managerTypeIdStartQueue_, std::forward<TSequentials>(sequentials)...);
+            return *this;
+        }
+
+        template <typename ... TSequentials>
+        requires concepts::ConflictFreeSequentialManagers<TSequentials...>
+        Scheduler& startWith() {
+            enqueueManager<TSequentials...>(managerTypeIdStartQueue_);
+            return owner_;
+        }
+
+
         Scheduler& endSchedule() {
             return owner_;
         }
 
         template<typename... TManagers>
         requires concepts::ConflictFreeManagers<TManagers...>
-        Scheduler& endSchedule() {
-            endSchedule<common::Sequential<TManagers>...>();
+        Scheduler& endWith() {
+            enqueueManager<common::Sequential<TManagers>...>(managerTypeIdEndQueue_);
             return owner_;
         }
 
         template<typename... TManagers>
         requires concepts::ConflictFreeManagers<TManagers...>
-        Scheduler& endSchedule(TManagers&& ... managers) {
-            endSchedule(
+        Scheduler& endWith(TManagers&& ... managers) {
+            enqueueManager(
+                managerTypeIdEndQueue_,
                 common::Sequential(std::forward<TManagers>(managers))...
             );
             return owner_;
         }
 
         template <typename ... TSequentials>
+       requires concepts::ConflictFreeSequentialManagers<TSequentials...>
+       Scheduler& endWith(TSequentials&&... sequentials) {
+            enqueueManager(managerTypeIdEndQueue_, std::forward<TSequentials>(sequentials)...);
+            return owner_;
+        }
+
+        template <typename ... TSequentials>
         requires concepts::ConflictFreeSequentialManagers<TSequentials...>
-        Scheduler& endSchedule(TSequentials&&... sequentials) {
-            auto& parallelGroup = managerTypeIdQueue_.emplace_back();
+        Scheduler& endWith() {
+            enqueueManager<TSequentials...>(managerTypeIdEndQueue_);
+            return owner_;
+        }
+
+        template <typename ... TSequentials>
+        requires concepts::ConflictFreeSequentialManagers<TSequentials...>
+        Scheduler& enqueueManager(ManagerQueue& managerQueue, TSequentials&&... sequentials) {
+            isScheduleStartConfigurationPossible_ = false;
+            auto& parallelGroup = managerQueue.emplace_back();
             parallelGroup.reserve(sizeof...(TSequentials));
 
             auto addManagerInstance = [this]<typename TManager>(auto& sequential, auto& sequentialGroup) {
@@ -371,8 +438,9 @@ export namespace helios::ecs::scheduling {
 
         template <typename ... TSequentials>
         requires concepts::ConflictFreeSequentialManagers<TSequentials...>
-        Scheduler& endSchedule() {
-            auto& parallelGroup = managerTypeIdQueue_.emplace_back();
+        Scheduler& enqueueManager(ManagerQueue& managerQueue) {
+            isScheduleStartConfigurationPossible_ = false;
+            auto& parallelGroup = managerQueue.emplace_back();
             parallelGroup.reserve(sizeof...(TSequentials));
 
             auto addManager = [this]<typename TManager>(auto& sequentialGroup) {
@@ -399,13 +467,20 @@ export namespace helios::ecs::scheduling {
         }
 
 
+        void onScheduleStart() noexcept {
+            runManagers(managerTypeIdStartQueue_);
+        }
+
+        void onScheduleEnd() noexcept {
+            runManagers(managerTypeIdEndQueue_);
+        }
 
         // +---------------------------
         // | Runtime
         // +---------------------------
-        void onScheduleEnd() noexcept {
+        void runManagers(ManagerQueue& managerQueue) noexcept {
 
-            if (managerTypeIdQueue_.empty()) {
+            if (managerQueue.empty()) {
                 return;
             }
 
@@ -419,7 +494,7 @@ export namespace helios::ecs::scheduling {
 #if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_SCHEDULES)
             const auto stopwatch = helios::core::time::Stopwatch{};
 #endif
-            run(managerTypeIdQueue_, *reg, [](auto& manager, auto& ecsDataContainer) {
+            run(managerQueue, *reg, [](auto& manager, auto& ecsDataContainer) {
                 manager.execute(ecsDataContainer);
             });
 #if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_SCHEDULES)
@@ -553,11 +628,18 @@ export namespace helios::ecs::scheduling {
         const types::RuntimeSystemEntry<TRuntimeSystemTypeId> timings(types::RuntimeSystemEntryHandle<TRuntimeSystemTypeId> handle) const {
             assert(handle.scheduleIdx == idx_ && "Unexpected idx mismatch.");
 
-            auto queueFor = [&](types::RuntimeSystemEntryHandle<TRuntimeSystemTypeId> handle) -> const auto& {
+            auto queueFor = [&](types::RuntimeSystemEntryHandle<TRuntimeSystemTypeId> hndl) -> const auto& {
                 using TypeId = std::remove_cvref_t<TRuntimeSystemTypeId>;
 
                 if constexpr (std::same_as<TypeId,  manager::types::ManagerTypeId>) {
-                    return managerTypeIdQueue_;
+                    if (hndl.phase == types::SchedulePhase::Start) {
+                        return managerTypeIdStartQueue_;
+                    }
+                    if (hndl.phase == types::SchedulePhase::End) {
+                        return managerTypeIdEndQueue_;
+                    }
+                    assert(false && "Unexpected phase for manager");
+                    std::terminate();
                 } else if constexpr (std::same_as<TypeId,  system::types::SystemTypeId>) {
                     return systemTypeIdQueue_;
                 }

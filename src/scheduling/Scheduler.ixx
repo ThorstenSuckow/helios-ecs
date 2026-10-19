@@ -57,6 +57,7 @@ export namespace helios::ecs::scheduling {
 
             for (auto& schedule : schedules_) {
                 if (schedule.shouldRun()) {
+                    schedule.onScheduleStart();
                     schedule.update();
                     schedule.onScheduleEnd();
                 }

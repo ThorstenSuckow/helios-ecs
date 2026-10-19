@@ -12,6 +12,12 @@ import helios.ecs.manager.types;
 
 export namespace helios::ecs::scheduling::types {
 
+    enum class SchedulePhase : uint8_t {
+        Start,
+        System,
+        End
+    };
+
     template<typename TRuntimeSystemTypeId>
     struct RuntimeSystemEntryHandle {
 
@@ -19,6 +25,7 @@ export namespace helios::ecs::scheduling::types {
 
         TRuntimeSystemTypeId runtimeSystemTypeId;
 
+        SchedulePhase phase;
         std::size_t scheduleIdx;
         std::size_t parallelIdx;
         std::size_t sequentialIdx;
