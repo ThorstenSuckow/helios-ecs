@@ -54,6 +54,34 @@ export namespace helios::ecs::scheduling {
         types::ScheduleTiming scheduleTiming_{};
 #endif
 
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_PARALLEL_SYSTEMGROUPS)
+        std::vector<types::ParallelSystemGroupTiming> startGroupTimings_{};
+        std::vector<types::ParallelSystemGroupTiming> systemGroupTimings_{};
+        std::vector<types::ParallelSystemGroupTiming> endGroupTimings_{};
+
+        std::vector<types::ParallelSystemGroupTiming>& groupTimingsFor(types::SchedulePhase phase) {
+            switch (phase) {
+                case types::SchedulePhase::Start: return startGroupTimings_;
+                case types::SchedulePhase::End:   return endGroupTimings_;
+                default:                          return systemGroupTimings_;
+            }
+        }
+
+        const std::vector<types::ParallelSystemGroupTiming>& groupTimingsFor(types::SchedulePhase phase) const {
+            switch (phase) {
+                case types::SchedulePhase::Start: return startGroupTimings_;
+                case types::SchedulePhase::End:   return endGroupTimings_;
+                default:                          return systemGroupTimings_;
+            }
+        }
+
+        void addGroupTiming(types::SchedulePhase phase) {
+            groupTimingsFor(phase).emplace_back();
+        }
+#else
+        void addGroupTiming(types::SchedulePhase) {}
+#endif
+
         std::vector<std::vector<std::vector<SystemExecutionEntry>>> systemTypeIdQueue_;
 
         std::vector<bool> registeredManagerTypeIds_;
@@ -233,6 +261,7 @@ export namespace helios::ecs::scheduling {
             ensureRequiredStorage<SystemType>(ecsDataContainer_);
             registerTypedSystemInstance<SystemType>(std::move(sys));
             systemTypeIdQueue_.push_back({{SystemExecutionEntry{ecs::system::types::SystemTypeId::template id<SystemType>()}}});
+            addGroupTiming(types::SchedulePhase::System);
             return *this;
         }
 
@@ -246,6 +275,7 @@ export namespace helios::ecs::scheduling {
 
             registerCallOperatorSystem(std::forward<TFuncSystem>(system));
             systemTypeIdQueue_.push_back({{SystemExecutionEntry{ecs::system::types::SystemTypeId::template id<SystemType>()}}});
+            addGroupTiming(types::SchedulePhase::System);
             return *this;
         }
         // +---------------------------------
@@ -261,6 +291,8 @@ export namespace helios::ecs::scheduling {
             (registerCallOperatorSystem(std::forward<TSystem>(system)), ...);
 
             auto& group = systemTypeIdQueue_.emplace_back();
+            addGroupTiming(types::SchedulePhase::System);
+
             group.reserve(sizeof...(TSystem));
             (group.push_back({SystemExecutionEntry{ecs::system::types::SystemTypeId::template id<std::remove_cvref_t<TSystem>>()}}), ...);
 
@@ -277,6 +309,7 @@ export namespace helios::ecs::scheduling {
             (registerTypedSystemInstance<TSystem>(std::remove_cvref_t<TSystem>{}), ...);
 
             auto& group = systemTypeIdQueue_.emplace_back();
+            addGroupTiming(types::SchedulePhase::System);
             group.reserve(sizeof...(TSystem));
             (group.push_back({SystemExecutionEntry{ecs::system::types::SystemTypeId::template id<TSystem>()}}), ...);
 
@@ -292,6 +325,7 @@ export namespace helios::ecs::scheduling {
             (registerTypedSystemInstance(std::move(systems)), ...);
 
             auto& group = systemTypeIdQueue_.emplace_back();
+            addGroupTiming(types::SchedulePhase::System);
             group.reserve(sizeof...(TSystem));
             (group.push_back({SystemExecutionEntry{ecs::system::types::SystemTypeId::template id<std::remove_cvref_t<TSystem>>()}}), ...);
 
@@ -311,8 +345,8 @@ export namespace helios::ecs::scheduling {
         Schedule& add(TSequentials&& ... sequentials) {
             isScheduleStartConfigurationPossible_ = false;
             auto& parallelGroup = systemTypeIdQueue_.emplace_back();
+            addGroupTiming(types::SchedulePhase::System);
             parallelGroup.reserve(sizeof...(TSequentials));
-
             auto addSystemInstance = [this]<typename TSystem>(auto& sequential, auto& sequentialGroup) {
 
                 ensureRequiredStorage<TSystem>(ecsDataContainer_);
@@ -413,7 +447,10 @@ export namespace helios::ecs::scheduling {
         Scheduler& enqueueManager(ManagerQueue& managerQueue, TSequentials&&... sequentials) {
             isScheduleStartConfigurationPossible_ = false;
             auto& parallelGroup = managerQueue.emplace_back();
+            addGroupTiming(&managerQueue == &managerTypeIdEndQueue_
+                ? types::SchedulePhase::End : types::SchedulePhase::Start);
             parallelGroup.reserve(sizeof...(TSequentials));
+
 
             auto addManagerInstance = [this]<typename TManager>(auto& sequential, auto& sequentialGroup) {
 
@@ -441,8 +478,9 @@ export namespace helios::ecs::scheduling {
         Scheduler& enqueueManager(ManagerQueue& managerQueue) {
             isScheduleStartConfigurationPossible_ = false;
             auto& parallelGroup = managerQueue.emplace_back();
+            addGroupTiming(&managerQueue == &managerTypeIdEndQueue_
+                ? types::SchedulePhase::End : types::SchedulePhase::Start);
             parallelGroup.reserve(sizeof...(TSequentials));
-
             auto addManager = [this]<typename TManager>(auto& sequentialGroup) {
                 ensureRequiredStorage<TManager>(ecsDataContainer_);
                 registerManager<TManager>();
@@ -496,7 +534,7 @@ export namespace helios::ecs::scheduling {
 #endif
             run(managerQueue, *reg, [](auto& manager, auto& ecsDataContainer) {
                 manager.execute(ecsDataContainer);
-            });
+            }, phase);
 #if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_SCHEDULES)
             auto elapsed = stopwatch.elapsedNanoseconds();
             if (phase == types::SchedulePhase::End) {
@@ -516,25 +554,22 @@ export namespace helios::ecs::scheduling {
 #endif
             run(systemTypeIdQueue_, systemRegistry_, [](auto& system, auto& ecsDataContainer) {
                 system.update(ecsDataContainer);
-            });
+            }, types::SchedulePhase::System);
 #if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_SCHEDULES)
             scheduleTiming_.scheduleUpdateDuration = stopwatch.elapsedNanoseconds();
 #endif
         }
 
         template<typename TRuntimeQueue, typename TRegistry, typename TExecute>
-        void run(TRuntimeQueue& queue, TRegistry& registry, TExecute cmd) {
+        void run(TRuntimeQueue& queue, TRegistry& registry, TExecute cmd, [[maybe_unused]] types::SchedulePhase phase) {
 
             auto runtimeSystemFor = [&registry](auto &entry) {
-                using EntryType = std::remove_cvref_t<decltype(entry)>;
                 return registry.item(entry.runtimeSystemTypeId);
             };
-
 
             auto invalidateView = [this](bool mustInvalidate) {
                 if (mustInvalidate) {
                     if (auto* resultRegistry = ecsDataContainer_.tryGet<ecs::common::RuntimeResultRegistry>()) {
-                        assert(resultRegistry && "RuntimeResultRegistry not found in EcsDataContainer");
                         resultRegistry->invalidateView();
                     }
                 }
@@ -543,9 +578,22 @@ export namespace helios::ecs::scheduling {
             auto* threadPool = ecsDataContainer_.tryGet<ThreadPool>();
             assert(threadPool && "ThreadPool not found in EcsDataContainer");
 
-            for (auto& parallelRuntimeSystems : queue) {
-                 bool mustInvalidate = false;
-                // parallelSystems with only one entry are treated serial
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_PARALLEL_SYSTEMGROUPS)
+            auto& groupTimings = groupTimingsFor(phase);
+            assert(groupTimings.size() == queue.size() && "Group timings must be parallel to the queue");
+#endif
+
+            for (std::size_t groupIdx = 0; groupIdx < queue.size(); ++groupIdx) {
+                auto& parallelRuntimeSystems = queue[groupIdx];
+                bool mustInvalidate = false;
+
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_PARALLEL_SYSTEMGROUPS)
+                // one stopwatch per group (a group with a single entry is a parallel group with one parallel entry):
+                // execution and flushes (the cheap view invalidation is not part of the duration)
+                [[maybe_unused]] const auto groupStopwatch = helios::core::time::Stopwatch{};
+#endif
+
+                // a single parallel entry does not need the ThreadPool and is executed on the calling thread
                 if (parallelRuntimeSystems.size() == 1) {
                     for (auto& serialRuntimeSystem : parallelRuntimeSystems[0]) {
 
@@ -571,10 +619,14 @@ export namespace helios::ecs::scheduling {
                         }
 
                     }
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_PARALLEL_SYSTEMGROUPS)
+                    groupTimings[groupIdx].duration = groupStopwatch.elapsedNanoseconds();
+#endif
                     invalidateView(mustInvalidate);
+
                     continue;
                 }
-                mustInvalidate = false;
+
                 // parallelSystems > 1 will be queued with the ThreadPool
                 threadPool->runAndWait(
                     parallelRuntimeSystems.size(),
@@ -612,6 +664,9 @@ export namespace helios::ecs::scheduling {
                         }
                     }
                 }
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_PARALLEL_SYSTEMGROUPS)
+                groupTimings[groupIdx].duration = groupStopwatch.elapsedNanoseconds();
+#endif
                 invalidateView(mustInvalidate);
             }
 
@@ -628,6 +683,18 @@ export namespace helios::ecs::scheduling {
 #if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_SCHEDULES)
         types::ScheduleTiming timings() const {
             return scheduleTiming_;
+        }
+#endif
+
+
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_PARALLEL_SYSTEMGROUPS)
+        types::ParallelSystemGroupTiming timings(types::ParallelSystemGroupEntryHandle handle) const {
+            assert(handle.scheduleIdx == idx_ && "Unexpected idx mismatch.");
+
+            const auto& groupTimings = groupTimingsFor(handle.phase);
+            assert(handle.groupIdx < groupTimings.size() && "Unexpected groupIdx");
+
+            return groupTimings[handle.groupIdx];
         }
 #endif
 

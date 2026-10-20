@@ -102,6 +102,13 @@ export namespace helios::ecs::scheduling {
         }
 #endif
 
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_PARALLEL_SYSTEMGROUPS)
+        types::ParallelSystemGroupTiming timings(types::ParallelSystemGroupEntryHandle handle) const {
+            assert (handle.scheduleIdx < schedules_.size() && "Schedule not found.");
+            return schedules_[handle.scheduleIdx].timings(handle);
+        }
+#endif
+
     };
 
 }
