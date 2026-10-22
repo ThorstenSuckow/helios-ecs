@@ -504,6 +504,24 @@ export namespace helios::ecs::scheduling {
             return owner_;
         }
 
+        void onScheduleSkip() {
+#if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_RUNTIME_SYSTEMS)
+            auto resetTimings = [](auto&  queue) {
+                for (std::size_t groupIdx = 0; groupIdx < queue.size(); ++groupIdx) {
+                    auto& parallelRuntimeSystems = queue[groupIdx];
+                    for (auto& sequentials : parallelRuntimeSystems) {
+                        for (auto& serialRuntimeSystem : sequentials) {
+                            serialRuntimeSystem.reset();
+                        }
+                    }
+                }
+            };
+            resetTimings(systemTypeIdQueue_);
+            resetTimings(managerTypeIdStartQueue_);
+            resetTimings(managerTypeIdEndQueue_);
+#endif
+        }
+
 
         void onScheduleStart() noexcept {
             runManagers(managerTypeIdStartQueue_, types::SchedulePhase::Start);
@@ -561,7 +579,7 @@ export namespace helios::ecs::scheduling {
         }
 
         template<typename TRuntimeQueue, typename TRegistry, typename TExecute>
-        void run(TRuntimeQueue& queue, TRegistry& registry, TExecute cmd, [[maybe_unused]] types::SchedulePhase phase) {
+        void run(TRuntimeQueue& queue, TRegistry& registry, TExecute cmd, [[maybe_unused]] const types::SchedulePhase phase) {
 
             auto runtimeSystemFor = [&registry](auto &entry) {
                 return registry.item(entry.runtimeSystemTypeId);
@@ -604,6 +622,7 @@ export namespace helios::ecs::scheduling {
                         auto stopwatch = helios::core::time::Stopwatch{};
                         cmd(*runtimeSystem, ecsDataContainer_);
                         serialRuntimeSystem.updateDuration = stopwatch.elapsedNanoseconds();
+                        serialRuntimeSystem.threadId = helios::core::thread::ThreadPool::currentThreadId();
 
                         // produce system results, flush any underlying flushable objects
                         stopwatch.start();
@@ -639,6 +658,7 @@ export namespace helios::ecs::scheduling {
                             auto stopwatch = helios::core::time::Stopwatch{};
                             cmd(*runtimeSystem, ecsDataContainer_);
                             serialRuntimeSystem.updateDuration = stopwatch.elapsedNanoseconds();
+                            serialRuntimeSystem.threadId = helios::core::thread::ThreadPool::currentThreadId();
 #else
                             cmd(*runtimeSystem, ecsDataContainer_);
 #endif

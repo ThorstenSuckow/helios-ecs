@@ -40,6 +40,15 @@ export namespace helios::ecs::scheduling::types {
         TRuntimeSystemTypeId runtimeSystemTypeId;
 
 #if (HELIOS_PERFORMANCE & HELIOS_PERFORMANCE_RUNTIME_SYSTEMS)
+
+        void reset() {
+            updateDuration = 0;
+            flushDuration = 0;
+            threadId = std::numeric_limits<std::size_t>::max();
+        }
+
+        std::size_t threadId = std::numeric_limits<std::size_t>::max();
+
         /**
          * @brief represents main method duration, i.e. systems.update()
          * and manager.execute(), respectively

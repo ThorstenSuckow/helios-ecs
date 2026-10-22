@@ -60,6 +60,8 @@ export namespace helios::ecs::scheduling {
                     schedule.onScheduleStart();
                     schedule.update();
                     schedule.onScheduleEnd();
+                } else {
+                    schedule.onScheduleSkip();
                 }
             }
         };
