@@ -31,6 +31,18 @@ namespace {
     template<typename TListA, typename TListB>
     struct HasArgumentTypeConflict;
 
+    template<typename THandle>
+    inline constexpr bool DoesQueryHaveWriteSet = false;
+
+    template<typename THandle, typename ... TRead, typename TFirstWrite, typename ... TWrite>
+    inline constexpr bool DoesQueryHaveWriteSet<
+        helios::ecs::entity::QueryAccessSet<
+            THandle,
+            helios::core::common::types::TypeList<TRead...>,
+            helios::core::common::types::TypeList<TFirstWrite, TWrite...>
+        >
+    >  = true;
+
 
     template<typename TLeft, typename TRight>
     struct IsArgumentTypeConflict {
@@ -40,11 +52,17 @@ namespace {
         static constexpr bool IsQueryA = helios::ecs::entity::concepts::IsQuery<TypeA>;
         static constexpr bool IsQueryB = helios::ecs::entity::concepts::IsQuery<TypeB>;
 
+        static constexpr bool QueryAWrites = IsQueryA && DoesQueryHaveWriteSet<TypeA>;
+        static constexpr bool QueryBWrites = IsQueryB && DoesQueryHaveWriteSet<TypeB>;
+
         static constexpr bool IsEntityManagerA = helios::ecs::entity::concepts::IsEntityManager<TypeA>;
         static constexpr bool IsEntityManagerB = helios::ecs::entity::concepts::IsEntityManager<TypeB>;
 
         static constexpr bool ConstA = std::is_const_v<std::remove_reference_t<TLeft>>;
         static constexpr bool ConstB = std::is_const_v<std::remove_reference_t<TRight>>;
+
+        static constexpr bool EntityManagerAWrites = IsEntityManagerA && !ConstA;
+        static constexpr bool EntityManagerBWrites = IsEntityManagerB && !ConstB;
 
         static constexpr bool RefA = std::is_reference_v<TLeft>;
         static constexpr bool RefB = std::is_reference_v<TRight>;
@@ -56,17 +74,28 @@ namespace {
                          return true;
             }
 
-            if constexpr (IsQueryA && IsEntityManagerB && !ConstB) {
+            // special treatment of queries and EntityManagers as per thesis
+            if constexpr (QueryAWrites && IsEntityManagerB) {
+                if constexpr(std::same_as<typename TypeA::HandleType, typename TypeB::HandleType>) {
+                    return true;
+                }
+            }
+            if constexpr (EntityManagerAWrites && IsQueryB) {
+                if constexpr(std::same_as<typename TypeA::HandleType, typename TypeB::HandleType>) {
+                    return true;
+                }
+            }
+            if constexpr (QueryBWrites && IsEntityManagerA) {
+                if constexpr(std::same_as<typename TypeA::HandleType, typename TypeB::HandleType>) {
+                    return true;
+                }
+            }
+            if constexpr (EntityManagerBWrites && IsQueryA) {
                 if constexpr(std::same_as<typename TypeA::HandleType, typename TypeB::HandleType>) {
                     return true;
                 }
             }
 
-            if constexpr (IsQueryB && IsEntityManagerA && !ConstA){
-                if constexpr (std::same_as<typename TypeA::HandleType, typename TypeB::HandleType>) {
-                    return true;
-                }
-            }
 
             return false;
 
