@@ -105,8 +105,8 @@ export namespace helios::ecs::scheduling {
         void prepareManagerRegistration() {
             using ManagerType = std::remove_cvref_t<TManager>;
             auto typeId = manager::types::ManagerTypeId::template id<ManagerType>();
-            auto* reg = ecsDataContainer_.tryGet<ecs::manager::ManagerRegistry>();
 #if HELIOS_DEBUG
+            auto* reg = ecsDataContainer_.tryGet<ecs::manager::ManagerRegistry>();
             if (!reg) {
                 assert(reg && "ManagerRegistry not found in EcsDataContainer");
             }

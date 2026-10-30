@@ -122,10 +122,10 @@ private:
             ([&]<std::size_t... Idx>(std::index_sequence<Idx...>) {
 
                 ([&]() {
-                    auto& buffer = std::get<Idx>(entityMutationBuffers_);
-                    using BufferType = std::remove_cvref_t<decltype(buffer)>;
+                    using BufferType = std::remove_cvref_t<decltype(std::get<Idx>(entityMutationBuffers_))>;
 
                     if constexpr (!std::same_as<BufferType, std::monostate>) {
+                        auto& buffer = std::get<Idx>(entityMutationBuffers_);
                         auto& entityManager = ecsDataContainer.get<
                             ecs::entity::EntityManager<typename BufferType::HandleType>
                         >();
@@ -161,10 +161,7 @@ private:
 
 
         bool flush(EcsDataContainer& ecsDataContainer) noexcept override {
-            if constexpr (hasCommandBuffer()) {
-                return commandBuffer_.flush(ecsDataContainer);
-            }
-            return true;
+            return hasCommandBuffer() && commandBuffer_.flush(ecsDataContainer);
         }
 
         bool publishResults(EcsDataContainer &ecsDataContainer) noexcept override {
@@ -179,11 +176,8 @@ private:
             return true;
         }
 
-        bool hasResult() const noexcept override {
-            if constexpr (std::is_class_v<ProducedRuntimeResultType>) {
-                return true;
-            }
-            return false;
+        [[nodiscard]] bool hasResult() const noexcept override {
+            return std::is_class_v<ProducedRuntimeResultType>;
         }
 
         bool init(EcsDataContainer& ecsDataContainer) noexcept override {

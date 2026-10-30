@@ -10,6 +10,7 @@ module;
 #include <span>
 #include <vector>
 #include <memory>
+#include "helios-ecs-config.h"
 
 export module helios.ecs.entity.storage.SparseSet;
 
@@ -463,9 +464,11 @@ public:
         }
 
         const auto denseIndex = sparse_[idx];
-        const auto sparseIdx = denseToSparse_[denseIndex];
 
+#if HELIOS_DEBUG
+        const auto sparseIdx = denseToSparse_[denseIndex];
         assert(sparseIdx == idx && "Sparse index mismatch");
+#endif
 
         if (denseIndex != storage_.size() - 1) {
             storage_[denseIndex] = std::move(storage_.back());
