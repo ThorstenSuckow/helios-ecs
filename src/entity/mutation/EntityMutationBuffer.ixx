@@ -46,7 +46,7 @@ export namespace helios::ecs::entity::mutation {
                             }
                         } else if constexpr (std::same_as<CommandType, commands::RemoveComponentCommand<THandle, ComponentType>>) {
                             for (auto& cmd : vectors) {
-                                em.template remove<ComponentType>(cmd.handle);
+                                (void)em.template remove<ComponentType>(cmd.handle);
                             }
                         } else {
                             static_assert(false, "Unsupported command type for EntityMutationBuffer");

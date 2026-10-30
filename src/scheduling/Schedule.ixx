@@ -192,7 +192,7 @@ export namespace helios::ecs::scheduling {
 
                     auto& em = ecsDataContainer.get<ecs::entity::EntityManager<HandleType>>();
                     auto ensure =[&em]<typename TComponent>() {
-                        em.template ensureSparseSet<TComponent>();
+                        (void)em.template ensureSparseSet<TComponent>();
                     };
                     core::common::traits::Apply<ReadSet>::forEach(ensure);
                     core::common::traits::Apply<WriteSet>::forEach(ensure);
