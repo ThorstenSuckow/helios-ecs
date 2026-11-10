@@ -15,18 +15,6 @@ using namespace helios::ecs::commands;
 using namespace helios::ecs::components;
 export namespace helios::ecs::common::concepts::traits {
 
-/**
- * @brief Trait that allows components to be trackable.
- *
- * @param T the type to check.
- *
- * @see Entity::setTrackedValue
- */
-template <typename TComponent, typename TValue>
-concept IsComponentDirtyTrackable = requires(TComponent& component, const TValue& value) {
-    typename TComponent::Value_type;
-    { component.setValue(value) } -> std::same_as<void>;
-};
 
 /**
  * @brief Type trait – `true` for `Active` specialisations.

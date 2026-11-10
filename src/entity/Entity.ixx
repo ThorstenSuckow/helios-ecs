@@ -7,6 +7,7 @@ module;
 #include <cassert>
 #include <type_traits>
 #include <utility>
+#include "helios-ecs-config.h"
 
 export module helios.ecs.entity.Entity;
 
@@ -122,7 +123,11 @@ public:
 
         auto* cmp = entityManager_->template ensureAndEmplace<TComponent>(entityHandle_, std::forward<Args>(args)...);
 
-        assert(cmp != nullptr && "Component emplace failed.");
+#if HELIOS_DEBUG
+        if (!cmp) {
+            assert(false && "Component emplace failed.");
+        }
+#endif
         return *cmp;
     }
 
@@ -144,14 +149,12 @@ public:
         return add<TComponent>(std::forward<Args>(args)...);
     }
 
-
-
-    template <typename TComponent, typename TValue>
-    void setTrackedValue(TComponent* component, const TValue& value) {
+    template<typename TComponent>
+    TComponent* track(TComponent* component) {
         assert(component != nullptr && "Unexpected nullptr for component.");
-        component->setValue(value);
         auto* sp = entityManager_->template sparseSet<TComponent>();
         sp->markDirty(entityHandle_.entityId());
+        return component;
     }
 
     /**
