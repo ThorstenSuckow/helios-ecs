@@ -42,5 +42,9 @@ public:
     [[nodiscard]] TTargetHandle targetHandle() const noexcept {
         return targetHandle_;
     }
+
+    void setTargetHandle(const TTargetHandle targetHandle) noexcept {
+        targetHandle_ = targetHandle;
+    }
 };
 } // namespace helios::ecs::components
