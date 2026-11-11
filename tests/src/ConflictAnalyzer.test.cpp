@@ -8,17 +8,17 @@ import helios.core;
 using namespace helios::ecs;
 using namespace helios::ecs::entity;
 using namespace helios::core::common::types;
+using namespace helios::ecs::components;
 using namespace helios::ecs::common;
 using namespace helios::ecs::scheduling::concepts;
 using namespace helios::ecs::scheduling::traits;
 
 
 namespace {
-
     struct Foo{};
     struct Bar{};
     struct Foobar{};
-
+    struct ShaderBindings{};
 
 
     struct GameObjectHandle{};
@@ -31,6 +31,8 @@ namespace {
     struct VelocityComponent {
     };
 
+    struct ShaderComponent {
+    };
 
     struct RotationComponent {
     };
@@ -594,5 +596,30 @@ TEST(ConflictAnalyzerTest, TwoSystemsEntityManagerAndQuery) {
     >::value;
     static_assert(!conflict2);
     EXPECT_FALSE(conflict2);
+}
+
+TEST(ConflictAnalyzerTest, BindingComponent) {
+    auto s1 = [](
+        entity::query::Query<
+            ParticleHandle,
+            ReadSet<BindingComponent<GameObjectHandle, ShaderBindings>>,
+            WriteSet<>
+        > q1,
+        entity::query::Query<
+            GameObjectHandle,
+            ReadSet<ShaderComponent>,
+            WriteSet<>
+        > q2
+        ){};
+
+    auto s2 = [](EntityManager<GameObjectHandle>){};
+
+    auto Group1 = Sequential(s1);
+    auto Group2 = Sequential(s2);
+
+    static constexpr bool conflict = HasConflict<
+        TypeList<decltype(Group1), decltype(Group2)>
+    >::value;
+    EXPECT_TRUE(conflict);
 }
 
