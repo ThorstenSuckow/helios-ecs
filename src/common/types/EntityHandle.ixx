@@ -115,6 +115,15 @@ public:
     }
 
     /**
+     * @brief Returns the raw 64-bit value representing the entity and version IDs.
+     *
+     * @return Raw 64-bit value.
+     */
+    [[nodiscard]] std::uint64_t raw() const noexcept {
+        return static_cast<uint64_t>(entityId_) << 32 | static_cast<uint64_t>(versionId_);
+    }
+
+    /**
      * @brief Returns whether this handle is valid.
      *
      * @return `true` if the version is not `InvalidVersion`.
