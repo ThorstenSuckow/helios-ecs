@@ -24,7 +24,7 @@ import helios.ecs.entity.mutation.EntityMutationBuffer;
 
 export namespace helios::ecs::entity::query {
 
-    template<typename THandle, typename TModSet, typename TStructMutSet>
+    template<typename THandle, typename TModSet, typename TStructMutSet, typename TMutationBuffer>
     class EntityProxy {
 
         using ModifiableComponents = TModSet::list;
@@ -35,20 +35,7 @@ export namespace helios::ecs::entity::query {
         template<typename T>
         struct EntityMutationBufferWrap;
 
-        using WriteList = typename core::common::traits::UniqueList<
-            core::common::types::TypeList<>,
-            typename core::common::traits::ConcatList<
-                typename TModSet::list, typename TStructMutSet::list
-            >::list
-        >::list;
-
-        // EntityMutationBuffer
-        template<typename ... TWriteComponents>
-        struct EntityMutationBufferWrap< core::common::types::TypeList<TWriteComponents...>> {
-            using type = mutation::EntityMutationBuffer<THandle, TWriteComponents...>;
-        };
-        using EntityMutationBuffer = EntityMutationBufferWrap<WriteList>::type;
-        EntityMutationBuffer* buffer_;
+        TMutationBuffer* buffer_;
 
         // ModifiableComponents
         template<typename T>
@@ -77,11 +64,12 @@ export namespace helios::ecs::entity::query {
 
         std::bitset<TModSet::size> tracked_{};
         std::bitset<TStructMutSet::size> added_{};
+        std::bitset<TModSet::size> removed_{};
 
     public:
 
         explicit EntityProxy(THandle handle,
-            EntityMutationBuffer* buffer,
+            TMutationBuffer* buffer,
             ModifiableComponentTuple modifiableComponents,
             ModifiableSparseSet modifiableSparseSets
         )
@@ -122,6 +110,22 @@ export namespace helios::ecs::entity::query {
             using CmdCompType = commands::AddComponentCommand<THandle, TComponent>;
 
             buffer_->add(CmdCompType{handle_, std::forward<TArgs>(args)...});
+        }
+
+        template<typename TComponent>
+        requires (core::common::traits::IsInList<TComponent, ModifiableComponents>::value)
+        void remove() {
+
+            constexpr auto position = core::common::traits::IsInList<TComponent, ModifiableComponents>::index;
+            if (removed_.test(position)) {
+                assert(false && "Component already removed to entity.");
+                return;
+            }
+            removed_[position] = true;
+
+            using CmdCompType = commands::RemoveComponentCommand<THandle, TComponent>;
+
+            buffer_->add(CmdCompType{handle_});
         }
 
     };

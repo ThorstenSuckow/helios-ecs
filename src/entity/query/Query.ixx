@@ -273,7 +273,7 @@ private:
         return std::tuple_cat(
 
             std::make_tuple(
-                EntityProxy<typename TEntityManager::HandleType, ModifiableSet, StructMutableSet>(
+                EntityProxy<typename TEntityManager::HandleType, ModifiableSet, StructMutableSet, EntityMutationBuffer>(
                     handle, 
                     entityMutationBuffer_, 
                     modifiableTuples, 
