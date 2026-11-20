@@ -26,28 +26,14 @@ struct RemoveComponentCommand {
 
     HandleType handle;
 
-    TComponent component;
-
     /**
-     * @brief Constructs the command with a default-initialised component.
+     * @brief Constructs the command with the component to remove.
      *
      * @param handle Target entity handle.
      */
     explicit RemoveComponentCommand(HandleType handle)
-        requires std::default_initializable<TComponent>
-        : handle(handle), component() {}
+        : handle(handle) {}
 
-    /**
-     * @brief Constructs the command and forwards arguments to the component constructor.
-     *
-     * @tparam TArgs Component constructor argument types.
-     * @param handle Target entity handle.
-     * @param args   Arguments forwarded to `TComponent`.
-     */
-    template <typename... TArgs>
-        requires std::constructible_from<TComponent, TArgs...>
-    explicit RemoveComponentCommand(HandleType handle, TArgs&&... args)
-        : handle(handle), component(std::forward<TArgs>(args)...) {}
 };
 
 }; // namespace helios::ecs::commands
